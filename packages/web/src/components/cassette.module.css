@@ -1,0 +1,23 @@
+/* Giro dos carretéis do logo. A velocidade vem de `--reel-speed` (prop `speed`). */
+.hub {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ondas-reel var(--reel-speed, 1.8s) linear infinite;
+}
+
+.hubPaused {
+  animation-play-state: paused;
+}
+
+@keyframes ondas-reel {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Quem pediu menos movimento não vê a fita rodar. */
+@media (prefers-reduced-motion: reduce) {
+  .hub {
+    animation: none;
+  }
+}

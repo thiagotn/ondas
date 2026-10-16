@@ -27,6 +27,12 @@
   cursor: pointer;
 }
 
+.logo {
+  width: 40px;
+  flex-shrink: 0;
+  display: flex;
+}
+
 /* Bloco de modo, estilo vim: ocupa a altura inteira da linha. */
 .mode {
   align-self: stretch;

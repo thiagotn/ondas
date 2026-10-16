@@ -19,7 +19,9 @@ export default defineConfig({
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,woff2,svg,png,ico,webmanifest}'],
         // As faixas baixadas vivem no cache `ondas-offline`, fora do precache.
-        globIgnores: ['**/node_modules/**', 'offline/**'],
+        // As telas de abertura do iOS também ficam de fora: são ~830KB que o
+        // Safari busca na hora de instalar, não o SW, e inchariam o precache.
+        globIgnores: ['**/node_modules/**', 'offline/**', 'splash/**'],
       },
       devOptions: { enabled: false, type: 'module' },
       manifest: {
@@ -34,10 +36,10 @@ export default defineConfig({
         background_color: DEFAULT_BG,
         theme_color: DEFAULT_BG,
         icons: [
-          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: 'icons/maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-          { src: 'icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml' },
         ],
       },
     }),

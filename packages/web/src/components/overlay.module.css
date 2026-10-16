@@ -93,16 +93,13 @@
   image-rendering: pixelated;
 }
 
-.coverAscii {
-  margin: 0;
+/* Sem capa, o logo ocupa o lugar dela. */
+.coverLogo {
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: inherit;
-  color: var(--color-neutral-700);
-  font-size: 14px;
-  line-height: 1.1;
+  padding: 14%;
 }
 
 .info {

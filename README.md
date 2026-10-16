@@ -27,13 +27,15 @@ pnpm preview    # serve o build em :4173 (service worker ativo)
 | `pnpm typecheck` | `tsc --noEmit` nos dois pacotes |
 | `pnpm test` | Vitest em `core` (90 testes) |
 | `pnpm test:e2e` | Playwright na web (build + preview + smoke) |
-| `pnpm --filter @ondas/web icons` | regenera os ícones da PWA a partir do logo ASCII |
+| `pnpm --filter @ondas/web splash` | regenera as telas de abertura do iOS a partir do `splash.svg` da marca |
 
 Antes do primeiro `test:e2e`: `pnpm --filter @ondas/web exec playwright install chromium`.
 
 Variáveis de ambiente (opcionais, em `packages/web/.env.local`):
 
 - `VITE_FORCE_DEMO=true` — pula a API e usa o catálogo demo de 12 faixas.
+- `VITE_SHOW_SPLASH=false` — desliga a abertura no boot (o logo da barra de abas
+  continua reexibindo-a sob demanda).
 
 ## Arquitetura
 
@@ -55,6 +57,11 @@ Decisões que valem registrar:
 - **Catálogo com 3 níveis** (`core/src/catalog/resolve.ts`): Audius ao vivo →
   metadados em cache local → catálogo demo. Trocar o Audius por um backend
   próprio é implementar `CatalogClient` e injetar.
+- **A marca é um componente, não uma imagem.** O logo (`components/CassetteLogo`)
+  é SVG inline pintado com as CSS vars do tema, então trocar de tema o recolore
+  na hora e um só componente serve abertura, login, barra de abas, linha do
+  player e a capa ausente. Os PNGs em `public/` são só para o sistema
+  operacional (ícone instalado, favicon, abertura do iOS).
 - **Áudio offline fora do Service Worker.** O SW só pré-cacheia o app shell; as
   faixas baixadas são gravadas e lidas pelo `CacheOfflineStore`, para o índice da
   biblioteca e os bytes em disco nunca divergirem.

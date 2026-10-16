@@ -13,6 +13,7 @@ import { useNetwork } from '../hooks/useNetwork';
 import { usePlayerOverlay } from '../hooks/usePlayerOverlay';
 import { useWide } from '../hooks/useWide';
 import s from './bottombar.module.css';
+import { CassetteLogo } from './CassetteLogo';
 import { Waveform } from './Waveform';
 
 const LEGEND: [string, string][] = [
@@ -56,6 +57,9 @@ function PlayerRow({ track }: { track: Track }) {
   return (
     <div className={s.player} onClick={openPlayer} role="presentation">
       <span className={`${s.mode} ${mode === 'PLAY' ? s.modePlay : s.modeIdle}`}>{mode}</span>
+      <span className={s.logo}>
+        <CassetteLogo playing={playing} progress={played} />
+      </span>
       <span className={s.lines}>
         <button
           type="button"

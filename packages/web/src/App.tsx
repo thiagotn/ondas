@@ -2,7 +2,9 @@ import { useEffect } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { bootstrap } from './app/controller';
 import { hydrate } from './app/hydrate';
+import { useSplash } from './app/splash';
 import { useUi } from './app/stores';
+import { Splash } from './components/Splash';
 import { ThemePicker } from './components/ThemePicker';
 import { AppLayout } from './routes/AppLayout';
 import { HomeRoute } from './routes/HomeRoute';
@@ -14,6 +16,8 @@ import { applyTheme } from './theme/applyTheme';
 export function App() {
   const themeId = useUi((s) => s.themeId);
   const pickerOpen = useUi((s) => s.pickerOpen);
+  const splash = useSplash((s) => s.visible);
+  const splashRun = useSplash((s) => s.run);
 
   // Tokens completos do tema (o script do index.html só aplica o essencial).
   useEffect(() => {
@@ -39,6 +43,8 @@ export function App() {
       </Routes>
       {/* O picker vale para o app e para o login, que fica fora do AppLayout. */}
       {pickerOpen && <ThemePicker />}
+      {/* `key` reinicia o cronômetro quando a abertura é reexibida. */}
+      {splash && <Splash key={splashRun} />}
     </BrowserRouter>
   );
 }

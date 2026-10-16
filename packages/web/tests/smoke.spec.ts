@@ -14,12 +14,24 @@ test.beforeEach(async ({ page }) => {
   await blockAudius(page);
 });
 
+/**
+ * A abertura cobre a tela a cada boot. Um toque a dispensa — e ela também fecha
+ * sozinha no teto de 4,5s, daí o clique tolerar não encontrar nada.
+ */
+async function skipSplash(page: Page) {
+  const splash = page.getByRole('button', { name: 'pular abertura' });
+  await splash.click({ timeout: 6000 }).catch(() => {});
+  await expect(splash).toBeHidden();
+}
+
 test('visitante entra, troca de tema, toca e abre o full player', async ({ page }) => {
   await page.goto('/');
+  await skipSplash(page);
 
   // Sem sessão, a rota raiz manda para o login.
   await expect(page.getByText('ondas — login')).toBeVisible();
-  await expect(page.getByLabel('ondas')).toContainText('┌─┐┌┐┌┌┬┐┌─┐┌─┐');
+  await expect(page.getByLabel('ondas', { exact: true })).toBeVisible();
+  await expect(page.getByText('lado A', { exact: true })).toBeVisible();
 
   // Credenciais inválidas são recusadas sem sair da tela.
   await page.getByPlaceholder('voce@email.com').fill('thiago');
@@ -42,6 +54,7 @@ test('visitante entra, troca de tema, toca e abre o full player', async ({ page 
   // A sessão de visitante é efêmera (como no protótipo): recarregar volta ao
   // login, mas o tema escolhido continua valendo.
   await page.reload();
+  await skipSplash(page);
   await expect(page.getByText('ondas — login')).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'nord');
   await page.getByRole('button', { name: /continuar como visitante/ }).click();
@@ -62,6 +75,7 @@ test('visitante entra, troca de tema, toca e abre o full player', async ({ page 
 
 test('faixa [pro] abre o gate de permissão para visitante', async ({ page }) => {
   await page.goto('/login');
+  await skipSplash(page);
   await page.getByRole('button', { name: /continuar como visitante/ }).click();
 
   // Cada 3ª faixa é [pro] enquanto a API não informa o campo.
@@ -77,6 +91,7 @@ test('faixa [pro] abre o gate de permissão para visitante', async ({ page }) =>
 
 test('login libera o catálogo e a biblioteca mostra a conta', async ({ page }) => {
   await page.goto('/login');
+  await skipSplash(page);
   await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
   await page.getByPlaceholder('••••').fill('senha');
   await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
@@ -95,6 +110,7 @@ test('login libera o catálogo e a biblioteca mostra a conta', async ({ page }) 
 
 test('busca filtra por artista e mostra a mensagem de grep vazio', async ({ page }) => {
   await page.goto('/login');
+  await skipSplash(page);
   await page.getByRole('button', { name: /continuar como visitante/ }).click();
 
   await page.keyboard.press('/');
@@ -107,4 +123,22 @@ test('busca filtra por artista e mostra a mensagem de grep vazio', async ({ page
 
   await input.fill('zzz');
   await expect(page.getByText('grep: nenhum resultado para "zzz"')).toBeVisible();
+});
+
+test('abertura toca no boot e volta pelo logo da barra de abas', async ({ page }) => {
+  await page.goto('/login');
+
+  const splash = page.getByRole('button', { name: 'pular abertura' });
+  await expect(splash).toBeVisible();
+  await expect(page.getByText('lado A · streaming independente')).toBeVisible();
+
+  // Um toque pula — não é preciso esperar os 2,2s.
+  await splash.click();
+  await expect(splash).toBeHidden();
+
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+  await page.getByRole('button', { name: 'ondas — rever abertura' }).click();
+  await expect(splash).toBeVisible();
+  await splash.click();
+  await expect(splash).toBeHidden();
 });

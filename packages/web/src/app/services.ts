@@ -14,3 +14,6 @@ export const engine = new WebPlayerEngine();
 
 /** Flag de dev: força o catálogo demo sem bater na API. */
 export const FORCE_DEMO = import.meta.env['VITE_FORCE_DEMO'] === 'true';
+
+/** Abertura no boot. Ligada por padrão; `VITE_SHOW_SPLASH=false` desliga. */
+export const SHOW_SPLASH = import.meta.env['VITE_SHOW_SPLASH'] !== 'false';

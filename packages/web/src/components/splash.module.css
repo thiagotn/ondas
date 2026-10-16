@@ -1,0 +1,63 @@
+/* Abertura do app: logo, assinatura e a barra de carregamento. */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 24px;
+  cursor: pointer;
+}
+
+.logo {
+  width: min(220px, 56vw);
+}
+
+.wordmark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.name {
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.tagline {
+  font-size: 12px;
+  color: var(--color-neutral-500);
+}
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-neutral-500);
+  font-variant-numeric: tabular-nums;
+}
+
+.bar {
+  letter-spacing: 0;
+}
+
+.barFilled {
+  color: var(--color-accent);
+}
+
+.barRest {
+  color: var(--color-neutral-800);
+}
+
+.spinner {
+  color: var(--color-accent);
+}

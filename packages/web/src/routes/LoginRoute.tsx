@@ -3,12 +3,11 @@ import { Palette } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGuestMode } from '../app/guest';
+import { CassetteLogo } from '../components/CassetteLogo';
 import { auth } from '../app/services';
 import { sessionStore, uiStore, useUi } from '../app/stores';
 import { TrafficLights } from '../components/TabBar';
 import s from './login.module.css';
-
-const LOGO = ['┌─┐┌┐┌┌┬┐┌─┐┌─┐', '│ ││││ ││├─┤└─┐', '└─┘┘└┘─┴┘┴ ┴└─┘'].join('\n');
 
 /**
  * Login. As credenciais são validadas pelo `AuthService` de `core` — hoje a
@@ -71,9 +70,16 @@ export function LoginRoute() {
       </div>
 
       <div className={s.content}>
-        <pre className={s.logo} aria-label="ondas">
-          {LOGO}
-        </pre>
+        <div className={s.lockup}>
+          <div className={s.lockupMark}>
+            {/* Gira sozinho na abertura da tela, devagar: é vitrine, não player. */}
+            <CassetteLogo playing progress={0.3} speed={3} ariaLabel="ondas" />
+          </div>
+          <div className={s.lockupText}>
+            <span className={s.lockupName}>ondas</span>
+            <span className={s.lockupSide}>lado A</span>
+          </div>
+        </div>
         <div className={s.intro}>
           ondas v1.0.0 — streaming de música independente
           <br />

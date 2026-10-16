@@ -1,8 +1,11 @@
 import { themeIndex } from '@ondas/core';
 import { Palette } from '@phosphor-icons/react';
-import { uiStore, useUi } from '../app/stores';
+import { useSplash } from '../app/splash';
+import { uiStore, usePlayer, useUi } from '../app/stores';
+import { useCurrentTrack } from '../hooks/useCurrentTrack';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { useWide } from '../hooks/useWide';
+import { CassetteLogo } from './CassetteLogo';
 import s from './shell.module.css';
 
 const TABS = [
@@ -20,6 +23,7 @@ export function TabBar() {
   return (
     <div className={s.tabbar}>
       {wide && <TrafficLights />}
+      <TabLogo />
       {TABS.map((t, i) => (
         <button
           key={t.id}
@@ -44,6 +48,22 @@ export function TabBar() {
         {wide && themeId}
       </button>
     </div>
+  );
+}
+
+/** O logo da barra: acompanha o player e reexibe a abertura ao ser clicado. */
+function TabLogo() {
+  const replay = useSplash((st) => st.replay);
+  const { t, dur, playing } = usePlayer((st) => st);
+  const track = useCurrentTrack();
+  const duration = dur || track?.dur || 0;
+
+  return (
+    <button type="button" className={s.logo} title="ondas" aria-label="ondas — rever abertura" onClick={replay}>
+      <span className={s.logoMark}>
+        <CassetteLogo playing={playing} progress={duration ? t / duration : 0} />
+      </span>
+    </button>
   );
 }
 

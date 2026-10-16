@@ -19,10 +19,9 @@ import { playerStore, useLibrary, usePlayer, useSession } from '../app/stores';
 import { usePlayerOverlay } from '../hooks/usePlayerOverlay';
 import { useViewportWidth, useWide } from '../hooks/useWide';
 import { PlayIcon } from './BottomBar';
+import { CassetteLogo } from './CassetteLogo';
 import s from './overlay.module.css';
 import { Waveform } from './Waveform';
-
-const ASCII_COVER = '░░▒▒▓▓██▓▓▒▒░░\n░▒▓█ ondas █▓▒░\n░░▒▒▓▓██▓▓▒▒░░';
 
 /** Overlay de tela cheia da faixa atual. Fechado pelo Esc e pelo botão voltar. */
 export function FullPlayer({ track }: { track: Track }) {
@@ -54,7 +53,9 @@ export function FullPlayer({ track }: { track: Track }) {
             {track.art ? (
               <img src={track.art} alt="" decoding="async" />
             ) : (
-              <pre className={s.coverAscii}>{ASCII_COVER}</pre>
+              <div className={s.coverLogo}>
+                <CassetteLogo playing={playing} progress={played} label />
+              </div>
             )}
           </div>
 
