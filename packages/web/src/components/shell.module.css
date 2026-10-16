@@ -1,21 +1,32 @@
 /* Casca do app: barra de abas, prompt, filtros, busca e painel da biblioteca. */
 
 .app {
+  position: relative;
+  z-index: 1;
   height: 100vh;
   height: 100dvh;
   display: flex;
   flex-direction: column;
+  background: var(--color-bg-a, transparent);
 }
 
 /* ── barra de abas ────────────────────────────────────────────── */
+/* Faixa de largura total: fundo e borda vão de ponta a ponta... */
 .tabbar {
   height: 40px;
   flex-shrink: 0;
-  display: flex;
-  align-items: stretch;
-  background: var(--color-surface);
+  background: var(--color-surface-a, var(--color-surface));
   border-bottom: 1px solid var(--color-neutral-800);
   font-size: 12px;
+}
+
+/* ...e só o conteúdo se alinha à coluna central. */
+.tabbarInner {
+  max-width: var(--content-max);
+  height: 100%;
+  margin: 0 auto;
+  display: flex;
+  align-items: stretch;
 }
 
 .lights {
@@ -70,7 +81,7 @@
 }
 
 .tabActive {
-  background: var(--color-bg);
+  background: var(--color-bg-a, var(--color-bg));
   color: var(--color-text);
 }
 
@@ -108,7 +119,8 @@
 }
 
 .content {
-  max-width: 980px;
+  max-width: var(--content-max);
+  margin: 0 auto;
   padding: 16px 16px 24px;
   display: flex;
   flex-direction: column;

@@ -19,16 +19,28 @@ const FONT_STACK = '"JetBrains Mono", ui-monospace, monospace';
 
 const cssMix = (a: string, p: number, b: string) => `color-mix(in oklab, ${a} ${p}%, ${b})`;
 
+/** Mistura em sRGB com `transparent` — é assim que se tira opacidade de uma cor em CSS. */
+const cssAlpha = (color: string, pct: number) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
+
 /**
  * Tokens CSS de um tema, prontos para `documentElement.style.setProperty`.
  * Os valores usam `color-mix(in oklab, …)` para bater exatamente com o protótipo.
+ *
+ * `opacity` (0..1) gera só os dois tokens translúcidos — `--color-bg-a` e
+ * `--color-surface-a`, usados pelo fundo do app e pelas barras. As rampas
+ * neutral/accent continuam **opacas** de propósito: elas são derivadas do bg
+ * sólido, então texto e bordas mantêm o contraste por cima do wallpaper.
  */
-export function themeCssVars(theme: ThemeDef): Record<string, string> {
+export function themeCssVars(theme: ThemeDef, opacity = 1): Record<string, string> {
   const { bg, fg, accent, ansi } = theme;
+  const surface = cssMix(fg, 6, bg);
+  const op = Math.round(Math.min(1, Math.max(0, opacity)) * 100);
   const vars: Record<string, string> = {
     '--color-bg': bg,
     '--color-text': fg,
-    '--color-surface': cssMix(fg, 6, bg),
+    '--color-surface': surface,
+    '--color-bg-a': cssAlpha(bg, op),
+    '--color-surface-a': cssAlpha(surface, op),
     '--color-accent': accent,
     '--color-divider': cssMix(fg, 16, 'transparent'),
     '--font-body': FONT_STACK,

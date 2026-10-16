@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createLibraryStore, offlineBytes } from '../stores/library.js';
 import { createPlayerStore, playerMode } from '../stores/player.js';
 import { createSessionStore, planLabel, userTag, whoAmI } from '../stores/session.js';
-import { createUiStore, gateCopy, TOAST_MS } from '../stores/ui.js';
+import { createUiStore, gateCopy, OPACITY_ON_UPLOAD, TOAST_MS } from '../stores/ui.js';
 
 describe('session store', () => {
   it('entra, sai e marca a restauração', () => {
@@ -141,5 +141,51 @@ describe('ui store', () => {
     expect(gateCopy({ kind: 'dl', title: 'Dobra' }).body).toBe(
       'entre na sua conta para salvar "Dobra" no aparelho e ouvir sem conexão.',
     );
+  });
+});
+
+describe('ui store — fundo', () => {
+  it('nasce opaco e sem imagem, com a capa como origem do wallpaper', () => {
+    const s = createUiStore();
+    expect(s.getState()).toMatchObject({ opacity: 1, blur: 16, wall: 'capa', wallImg: '' });
+  });
+
+  it('respeita a opacidade padrão de configuração', () => {
+    expect(createUiStore({ opacity: 0.6 }).getState().opacity).toBe(0.6);
+  });
+
+  it('limita opacidade e blur aos intervalos dos sliders', () => {
+    const s = createUiStore();
+    s.getState().setOpacity(0.1);
+    expect(s.getState().opacity).toBe(0.3);
+    s.getState().setOpacity(5);
+    expect(s.getState().opacity).toBe(1);
+    s.getState().setBlur(99);
+    expect(s.getState().blur).toBe(40);
+    s.getState().setBlur(-3);
+    expect(s.getState().blur).toBe(0);
+  });
+
+  it('enviar imagem com fundo opaco baixa a opacidade para revelar o efeito', () => {
+    const s = createUiStore();
+    s.getState().setWallImage('data:image/jpeg;base64,xxx');
+    expect(s.getState()).toMatchObject({
+      wall: 'imagem',
+      wallImg: 'data:image/jpeg;base64,xxx',
+      opacity: OPACITY_ON_UPLOAD,
+    });
+  });
+
+  it('enviar imagem com fundo já translúcido preserva a opacidade escolhida', () => {
+    const s = createUiStore();
+    s.getState().setOpacity(0.45);
+    s.getState().setWallImage('data:image/jpeg;base64,yyy');
+    expect(s.getState().opacity).toBe(0.45);
+  });
+
+  it('hidrata só o que foi persistido, mantendo o resto', () => {
+    const s = createUiStore();
+    s.getState().hydrateBackground({ opacity: 0.7, wall: 'nenhum' });
+    expect(s.getState()).toMatchObject({ opacity: 0.7, wall: 'nenhum', blur: 16, wallImg: '' });
   });
 });

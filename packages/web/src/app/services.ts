@@ -17,3 +17,9 @@ export const FORCE_DEMO = import.meta.env['VITE_FORCE_DEMO'] === 'true';
 
 /** Abertura no boot. Ligada por padrão; `VITE_SHOW_SPLASH=false` desliga. */
 export const SHOW_SPLASH = import.meta.env['VITE_SHOW_SPLASH'] !== 'false';
+
+/**
+ * Opacidade do fundo quando o usuário ainda não escolheu uma
+ * (`VITE_DEFAULT_OPACITY`, 0.3–1). O valor salvo sempre tem prioridade.
+ */
+export const DEFAULT_OPACITY = Number(import.meta.env['VITE_DEFAULT_OPACITY'] ?? 1) || 1;

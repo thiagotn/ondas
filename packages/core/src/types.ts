@@ -25,6 +25,9 @@ export interface User {
 
 export type Session = User | null;
 
+/** Origem da imagem de fundo: capa da faixa, imagem enviada ou nenhuma. */
+export type WallMode = 'capa' | 'imagem' | 'nenhum';
+
 export type ThemeId =
   | 'nocturne'
   | 'catppuccin-mocha'

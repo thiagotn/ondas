@@ -6,6 +6,7 @@ import { useSplash } from './app/splash';
 import { useUi } from './app/stores';
 import { Splash } from './components/Splash';
 import { ThemePicker } from './components/ThemePicker';
+import { Wallpaper } from './components/Wallpaper';
 import { AppLayout } from './routes/AppLayout';
 import { HomeRoute } from './routes/HomeRoute';
 import { LibraryRoute } from './routes/LibraryRoute';
@@ -16,13 +17,16 @@ import { applyTheme } from './theme/applyTheme';
 export function App() {
   const themeId = useUi((s) => s.themeId);
   const pickerOpen = useUi((s) => s.pickerOpen);
+  const opacity = useUi((s) => s.opacity);
   const splash = useSplash((s) => s.visible);
   const splashRun = useSplash((s) => s.run);
 
   // Tokens completos do tema (o script do index.html só aplica o essencial).
+  // A opacidade entra aqui porque muda os tokens `-a`: mexer no slider
+  // re-aplica o tema inteiro, e trocar de tema preserva a transparência.
   useEffect(() => {
-    applyTheme(themeId);
-  }, [themeId]);
+    applyTheme(themeId, opacity);
+  }, [themeId, opacity]);
 
   useEffect(() => {
     void hydrate();
@@ -31,6 +35,7 @@ export function App() {
 
   return (
     <BrowserRouter>
+      <Wallpaper />
       <Routes>
         {/* O picker também existe no login, que fica fora do AppLayout. */}
         <Route path="/login" element={<LoginRoute />} />

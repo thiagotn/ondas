@@ -24,6 +24,35 @@ describe('themes', () => {
   });
 });
 
+describe('themeCssVars — tokens translúcidos', () => {
+  const theme = findTheme('catppuccin-mocha');
+
+  it('em opacidade 1 os tokens -a ficam 100% (idêntico ao opaco)', () => {
+    const vars = themeCssVars(theme);
+    expect(vars['--color-bg-a']).toBe('color-mix(in srgb, #1e1e2e 100%, transparent)');
+    expect(vars['--color-surface-a']).toContain('100%, transparent');
+  });
+
+  it('aplica a opacidade só em bg e surface, mantendo as rampas opacas', () => {
+    const vars = themeCssVars(theme, 0.85);
+    expect(vars['--color-bg-a']).toBe('color-mix(in srgb, #1e1e2e 85%, transparent)');
+    expect(vars['--color-surface-a']).toBe(
+      'color-mix(in srgb, color-mix(in oklab, #cdd6f4 6%, #1e1e2e) 85%, transparent)',
+    );
+    // O que carrega texto e borda não pode perder contraste.
+    for (const key of ['--color-bg', '--color-surface', '--color-neutral-500', '--color-accent-200']) {
+      expect(vars[key]).toBe(themeCssVars(theme)[key]);
+      expect(vars[key]).not.toContain('transparent');
+    }
+  });
+
+  it('arredonda e limita a opacidade recebida', () => {
+    expect(themeCssVars(theme, 0.333)['--color-bg-a']).toContain('33%');
+    expect(themeCssVars(theme, 2)['--color-bg-a']).toContain('100%');
+    expect(themeCssVars(theme, -1)['--color-bg-a']).toContain('0%');
+  });
+});
+
 describe('themeCssVars', () => {
   const vars = themeCssVars(findTheme('catppuccin-mocha'));
 

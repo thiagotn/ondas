@@ -2,15 +2,20 @@
 .bar {
   flex-shrink: 0;
   border-top: 1px solid var(--color-neutral-800);
-  background: var(--color-surface);
+  background: var(--color-surface-a, var(--color-surface));
   padding-bottom: env(safe-area-inset-bottom);
 }
 
 .toast {
-  padding: 6px 14px;
   border-bottom: 1px solid var(--color-neutral-800);
   color: var(--color-neutral-300);
-  background: var(--color-bg);
+  background: var(--color-bg-a, var(--color-bg));
+}
+
+.toastInner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 6px 14px;
 }
 
 .toastMark {
@@ -19,6 +24,8 @@
 
 /* A linha inteira abre o player no clique; o foco do teclado fica no título. */
 .player {
+  max-width: var(--content-max);
+  margin: 0 auto;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -140,14 +147,20 @@
 }
 
 .status {
+  border-top: 1px solid var(--color-neutral-800);
+  font-size: 11px;
+  color: var(--color-neutral-500);
+}
+
+/* A rolagem horizontal fica na coluna, não na faixa: a borda segue inteira. */
+.statusInner {
+  max-width: var(--content-max);
+  margin: 0 auto;
   display: flex;
   align-items: center;
   gap: 14px;
   min-height: 28px;
   padding: 0 12px;
-  border-top: 1px solid var(--color-neutral-800);
-  font-size: 11px;
-  color: var(--color-neutral-500);
   white-space: nowrap;
   overflow-x: auto;
 }

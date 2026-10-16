@@ -26,14 +26,14 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
       // Theme picker captura o teclado enquanto está aberto.
       if (ui.pickerOpen) {
         if (k === 'Escape') {
-          applyTheme(ui.themeId);
+          applyTheme(ui.themeId, ui.opacity);
           ui.closePicker();
         } else if (k === 'j' || k === 'ArrowDown' || k === 'k' || k === 'ArrowUp') {
           e.preventDefault();
           const dir = k === 'j' || k === 'ArrowDown' ? 1 : -1;
           const next = (ui.pickIdx + dir + THEMES.length) % THEMES.length;
           ui.setPickIdx(next);
-          applyTheme(THEMES[next]!.id);
+          applyTheme(THEMES[next]!.id, ui.opacity);
         } else if (k === 'Enter') {
           e.preventDefault();
           controller.setTheme(THEMES[ui.pickIdx]!.id);

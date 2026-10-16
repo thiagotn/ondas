@@ -1,12 +1,16 @@
 /* Overlays: full player, gate de permissão e theme picker.
    Todos usam o mesmo truque de rótulo sentado sobre a borda do painel. */
 
+/* Aqui o `backdrop-filter` é seguro: é um overlay fixo e isolado, não a raiz —
+   na raiz ele criaria um containing block e quebraria os próprios overlays. */
 .fullscreen {
   position: fixed;
   inset: 0;
   z-index: 20;
   overflow-y: auto;
-  background: var(--color-bg);
+  background: var(--color-bg-a, var(--color-bg));
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
   padding: 12px;
 }
 
@@ -21,8 +25,10 @@
   padding: 16px;
 }
 
+/* Mais claro que o backdrop comum: o picker agora ajusta a transparência, e
+   com 45% de preto por cima não daria para ver o efeito enquanto se regula. */
 .backdropLight {
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.2);
   z-index: 40;
 }
 
@@ -395,4 +401,79 @@
   padding: 8px 8px 0;
   font-size: 11px;
   color: var(--color-neutral-500);
+}
+
+/* ── controles de fundo, no rodapé do picker ──────────────────── */
+.settings {
+  margin-top: 8px;
+  padding: 12px 8px 4px;
+  border-top: 1px solid var(--color-neutral-800);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setting {
+  display: flex;
+  align-items: center;
+  gap: 4px 10px;
+  flex-wrap: wrap;
+  min-height: 32px;
+}
+
+/* Sem efeito para ajustar: o controle continua utilizável, só não se destaca. */
+.settingOff {
+  opacity: 0.45;
+}
+
+.settingLabel {
+  width: 19ch;
+  color: var(--ansi-4);
+}
+
+.slider {
+  flex: 1;
+  min-width: 140px;
+  accent-color: var(--color-accent);
+}
+
+.settingValue {
+  width: 4ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.wallOptions {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.wallOption {
+  min-height: 32px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-neutral-400);
+  cursor: pointer;
+  font: inherit;
+}
+
+.wallOptionOn {
+  background: var(--color-accent-900);
+  color: var(--color-accent-200);
+}
+
+.upload {
+  min-height: 32px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  color: var(--color-accent-300);
+  cursor: pointer;
+}
+
+.upload input {
+  display: none;
 }

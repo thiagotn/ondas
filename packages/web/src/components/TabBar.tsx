@@ -22,31 +22,33 @@ export function TabBar() {
 
   return (
     <div className={s.tabbar}>
-      {wide && <TrafficLights />}
-      <TabLogo />
-      {TABS.map((t, i) => (
+      <div className={s.tabbarInner}>
+        {wide && <TrafficLights />}
+        <TabLogo />
+        {TABS.map((t, i) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => goToTab(t.id)}
+            aria-current={tab === t.id ? 'page' : undefined}
+            className={tab === t.id ? `${s.tab} ${s.tabActive}` : s.tab}
+          >
+            {wide && <span className={s.tabKey}>{i + 1}</span>}
+            {t.label}
+          </button>
+        ))}
+        <span className={s.spacer} />
         <button
-          key={t.id}
           type="button"
-          onClick={() => goToTab(t.id)}
-          aria-current={tab === t.id ? 'page' : undefined}
-          className={tab === t.id ? `${s.tab} ${s.tabActive}` : s.tab}
+          title="Tema (t)"
+          aria-label="Trocar tema"
+          className={s.palette}
+          onClick={() => uiStore.getState().openPicker(themeIndex(themeId))}
         >
-          {wide && <span className={s.tabKey}>{i + 1}</span>}
-          {t.label}
+          <Palette size={16} />
+          {wide && themeId}
         </button>
-      ))}
-      <span className={s.spacer} />
-      <button
-        type="button"
-        title="Tema (t)"
-        aria-label="Trocar tema"
-        className={s.palette}
-        onClick={() => uiStore.getState().openPicker(themeIndex(themeId))}
-      >
-        <Palette size={16} />
-        {wide && themeId}
-      </button>
+      </div>
     </div>
   );
 }

@@ -36,6 +36,8 @@ Variáveis de ambiente (opcionais, em `packages/web/.env.local`):
 - `VITE_FORCE_DEMO=true` — pula a API e usa o catálogo demo de 12 faixas.
 - `VITE_SHOW_SPLASH=false` — desliga a abertura no boot (o logo da barra de abas
   continua reexibindo-a sob demanda).
+- `VITE_DEFAULT_OPACITY=0.85` — opacidade inicial do fundo (0,3–1) para quem
+  ainda não escolheu uma; o valor salvo pelo usuário sempre tem prioridade.
 
 ## Arquitetura
 
@@ -57,6 +59,16 @@ Decisões que valem registrar:
 - **Catálogo com 3 níveis** (`core/src/catalog/resolve.ts`): Audius ao vivo →
   metadados em cache local → catálogo demo. Trocar o Audius por um backend
   próprio é implementar `CatalogClient` e injetar.
+- **Faixa de largura total, conteúdo centralizado.** No desktop o fundo e as
+  bordas da barra de abas, do rodapé e do toast vão de ponta a ponta, mas o
+  conteúdo se alinha a uma coluna de `--content-max` (1080px). A rolagem
+  continua na borda da tela, não na coluna.
+- **Transparência sem `backdrop-filter` na raiz.** Só `--color-bg-a` e
+  `--color-surface-a` ficam translúcidos; as rampas neutral/accent continuam
+  derivadas do bg opaco, então texto e bordas não perdem contraste por cima do
+  wallpaper. O desfoque mora na camada do wallpaper (`filter`), porque um
+  `backdrop-filter` na raiz criaria um containing block e quebraria todo overlay
+  `position: fixed` — full player, gate, picker e abertura.
 - **A marca é um componente, não uma imagem.** O logo (`components/CassetteLogo`)
   é SVG inline pintado com as CSS vars do tema, então trocar de tema o recolore
   na hora e um só componente serve abertura, login, barra de abas, linha do

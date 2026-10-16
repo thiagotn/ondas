@@ -3,6 +3,7 @@ import {
   createPlayerStore,
   createSessionStore,
   createUiStore,
+  type BackgroundSettings,
   type LibrarySnapshot,
   type LibraryState,
   type PlayerState,
@@ -11,11 +12,31 @@ import {
 } from '@ondas/core';
 import { useStore } from 'zustand';
 import { readStoredTheme } from '../theme/applyTheme';
-import { kv } from './services';
+import { DEFAULT_OPACITY, kv } from './services';
 
 export const LIBRARY_KEY = 'library';
+export const BACKGROUND_KEY = 'background';
 
-export const uiStore = createUiStore({ themeId: readStoredTheme() });
+export const uiStore = createUiStore({ themeId: readStoredTheme(), opacity: DEFAULT_OPACITY });
+
+/**
+ * Preferências de fundo no IndexedDB, não no localStorage: `wallImg` é um
+ * dataURL de até ~1MB, que estoura a cota de 5MB do localStorage em poucas
+ * trocas de imagem.
+ */
+uiStore.subscribe((st, prev) => {
+  if (
+    st.opacity === prev.opacity &&
+    st.blur === prev.blur &&
+    st.wall === prev.wall &&
+    st.wallImg === prev.wallImg
+  ) {
+    return;
+  }
+  const { opacity, blur, wall, wallImg } = st;
+  void kv.set<BackgroundSettings>(BACKGROUND_KEY, { opacity, blur, wall, wallImg });
+});
+
 export const playerStore = createPlayerStore();
 export const sessionStore = createSessionStore();
 export const libraryStore = createLibraryStore({

@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/nocturne-80773e82-ab7a-4867-b1b5-a33e927b45d9/styles.css">
+<script src="_ds/nocturne-80773e82-ab7a-4867-b1b5-a33e927b45d9/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:"JetBrains Mono",ui-monospace,monospace;-webkit-font-smoothing:antialiased}
+a{color:var(--color-accent-300)}a:hover{color:var(--color-accent-200)}
+*{box-sizing:border-box}
+button,input{font-family:inherit;font-size:inherit}
+input::placeholder{color:var(--color-neutral-600)}
+::selection{background:var(--color-accent-800)}
+::-webkit-scrollbar{width:0;height:0}
+:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
+@keyframes blink{50%{opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+<div style="min-height:100vh;background:transparent;color:var(--color-text);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;line-height:1.5">
+<sc-if value="{{ hasWall }}" hint-placeholder-val="{{ false }}"><div style="position:fixed;inset:-60px;z-index:0;pointer-events:none;background-image:{{ wallBg }};background-size:cover;background-position:center;filter:blur({{ blurPx }})"></div></sc-if>
+
+<sc-if value="{{ showSplash }}" hint-placeholder-val="{{ true }}">
+<div onClick="{{ skipSplash }}" style="position:fixed;inset:0;z-index:50;background:var(--color-bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;cursor:pointer">
+  <div style="width:min(220px,56vw)">{{ splashLogo }}</div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+    <span style="font-size:30px;font-weight:500;letter-spacing:-0.02em;color:var(--color-text)">ondas</span>
+    <span style="font-size:12px;color:var(--color-neutral-500)">lado A · streaming independente</span>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--color-neutral-500);font-variant-numeric:tabular-nums">
+    <span style="letter-spacing:0"><span style="color:var(--color-accent)">{{ splashBar.a }}</span><span style="color:var(--color-neutral-800)">{{ splashBar.b }}</span></span>
+    <span><span style="color:var(--color-accent)">{{ spinner }}</span> {{ splashMsg }}</span>
+  </div>
+</div>
+</sc-if>
+<sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+<div style="position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;background:var(--color-bg-a,transparent)">
+  <div style="height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;background:var(--color-surface-a,var(--color-surface));border-bottom:1px solid var(--color-neutral-800);color:var(--color-neutral-500);font-size:12px">
+    <span style="display:flex;gap:7px"><span style="width:11px;height:11px;border-radius:999px;background:var(--ansi-1,#d98484)"></span><span style="width:11px;height:11px;border-radius:999px;background:var(--ansi-3,#d9c784)"></span><span style="width:11px;height:11px;border-radius:999px;background:var(--ansi-2,#84d9a0)"></span></span>
+    <span style="flex:1;text-align:center">ondas — login</span>
+    <button onClick="{{ openPicker }}" style="border:0;background:transparent;color:var(--color-neutral-400);cursor:pointer;display:flex;align-items:center;gap:6px;height:32px"><i class="ph ph-palette" style="font-size:15px"></i>{{ themeName }}</button>
+  </div>
+  <div style="flex:1;padding:28px 20px;display:flex;flex-direction:column;gap:18px;max-width:640px">
+    <div style="display:flex;align-items:center;gap:14px"><div style="width:92px;flex-shrink:0">{{ loginLogo }}</div><div style="display:flex;flex-direction:column"><span style="font-size:24px;font-weight:500;letter-spacing:-0.02em">ondas</span><span style="font-size:12px;color:var(--color-neutral-500)">lado A</span></div></div>
+    <div style="color:var(--color-neutral-500)">ondas v1.0.0 — streaming de música independente<br>digite suas credenciais ou continue como visitante.</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <label style="display:flex;align-items:center;gap:10px;min-height:44px;border-bottom:1px solid var(--color-neutral-800)"><span style="color:var(--ansi-2,#84d9a0);width:9ch;flex-shrink:0">login:</span><input type="email" placeholder="voce@email.com" value="{{ email }}" onChange="{{ onEmail }}" onKeyDown="{{ onLoginKey }}" style="flex:1;min-width:0;height:40px;border:0;background:transparent;color:var(--color-text);outline:none;caret-color:var(--color-accent)"></label>
+      <label style="display:flex;align-items:center;gap:10px;min-height:44px;border-bottom:1px solid var(--color-neutral-800)"><span style="color:var(--ansi-2,#84d9a0);width:9ch;flex-shrink:0">password:</span><input type="password" placeholder="••••" value="{{ pass }}" onChange="{{ onPass }}" onKeyDown="{{ onLoginKey }}" style="flex:1;min-width:0;height:40px;border:0;background:transparent;color:var(--color-text);outline:none;caret-color:var(--color-accent)"></label>
+      <sc-if value="{{ hasErr }}" hint-placeholder-val="{{ false }}"><div style="color:var(--ansi-1,#d98484)">error: {{ err }}</div></sc-if>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <button onClick="{{ doLogin }}" style="display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border:1px solid var(--color-accent);border-radius:var(--radius-sm);background:transparent;color:var(--color-accent-200);cursor:pointer;text-align:left" style-hover="background:var(--color-accent-900)"><span style="color:var(--color-neutral-500)">[enter]</span>entrar — catálogo completo + offline</button>
+      <button onClick="{{ doGuest }}" style="display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);background:transparent;color:var(--color-text);cursor:pointer;text-align:left" style-hover="background:var(--color-neutral-900)"><span style="color:var(--color-neutral-500)">[g]</span>continuar como visitante — só faixas grátis</button>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isApp }}" hint-placeholder-val="{{ false }}">
+<div style="position:relative;z-index:1;height:100vh;display:flex;flex-direction:column;background:var(--color-bg-a,transparent)">
+  <div style="height:40px;flex-shrink:0;background:var(--color-surface-a,var(--color-surface));border-bottom:1px solid var(--color-neutral-800);font-size:12px"><div style="max-width:1080px;height:100%;margin:0 auto;display:flex;align-items:stretch">
+    <sc-if value="{{ wide }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:7px;padding:0 14px"><span style="width:11px;height:11px;border-radius:999px;background:var(--ansi-1,#d98484)"></span><span style="width:11px;height:11px;border-radius:999px;background:var(--ansi-3,#d9c784)"></span><span style="width:11px;height:11px;border-radius:999px;background:var(--ansi-2,#84d9a0)"></span></span></sc-if>
+    <button onClick="{{ replaySplash }}" title="ondas" style="flex-shrink:0;border:0;border-right:1px solid var(--color-neutral-800);background:transparent;cursor:pointer;display:flex;align-items:center;padding:0 10px"><span style="width:34px;display:flex">{{ tabLogo }}</span></button>
+    <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="3">
+      <button onClick="{{ tb.go }}" style="flex:1;min-width:0;max-width:240px;border:0;border-right:1px solid var(--color-neutral-800);background:{{ tb.bg }};color:{{ tb.fg }};cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;white-space:nowrap;overflow:hidden" style-hover="color:var(--color-text)"><sc-if value="{{ wide }}" hint-placeholder-val="{{ false }}"><span style="color:var(--color-neutral-600)">{{ tb.key }}</span></sc-if>{{ tb.label }}</button>
+    </sc-for>
+    <span style="flex:1"></span>
+    <button onClick="{{ openPicker }}" title="Tema (t)" style="border:0;border-left:1px solid var(--color-neutral-800);background:transparent;color:var(--color-neutral-400);cursor:pointer;display:flex;align-items:center;gap:6px;padding:0 12px;min-width:44px" style-hover="color:var(--color-accent-200)"><i class="ph ph-palette" style="font-size:16px"></i><sc-if value="{{ wide }}" hint-placeholder-val="{{ false }}">{{ themeName }}</sc-if></button>
+  </div></div>
+
+  <main style="flex:1;min-height:0;overflow-y:auto">
+    <div style="max-width:1080px;margin:0 auto;padding:16px 16px 24px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:0 8px;font-size:14px">
+        <span style="color:var(--ansi-2,#84d9a0)">{{ who }}@ondas</span><span style="color:var(--ansi-4,#84a6d9)">{{ cwd }}</span><span style="color:var(--color-accent)">❯</span><span>{{ cmd }}</span>{{ cursor }}
+      </div>
+      <div style="color:var(--color-neutral-500)"># {{ comment }}</div>
+
+      <sc-if value="{{ isGuest }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 10px;border:1px dashed var(--color-neutral-700);border-radius:var(--radius-sm)">
+          <span style="color:var(--ansi-3,#d9c784)">aviso:</span><span style="flex:1;min-width:200px;color:var(--color-neutral-300)">sessão de visitante — faixas [pro] e downloads exigem login.</span>
+          <button onClick="{{ goLogin }}" style="min-height:32px;border:0;background:transparent;color:var(--color-accent-300);cursor:pointer;padding:0" style-hover="color:var(--color-accent-100)">[entrar]</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isHome }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:2px;overflow-x:auto;margin:0 -16px;padding:0 16px;white-space:nowrap">
+          <span style="color:var(--color-neutral-500);margin-right:6px">--genero=</span>
+          <sc-for list="{{ chips }}" as="c" hint-placeholder-count="5">
+            <button onClick="{{ c.go }}" style="flex-shrink:0;min-height:36px;padding:0 6px;border:0;border-radius:var(--radius-sm);background:{{ c.bg }};color:{{ c.fg }};cursor:pointer" style-hover="color:var(--color-text)">{{ c.label }}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isSearch }}" hint-placeholder-val="{{ false }}">
+        <label style="display:flex;align-items:center;gap:10px;min-height:44px;padding:0 10px;border:1px solid var(--color-neutral-700);border-radius:var(--radius-sm);background:var(--color-surface)">
+          <span style="color:var(--color-accent)">/</span>
+          <input ref="{{ searchRef }}" placeholder="faixa, artista ou #gênero" value="{{ q }}" onChange="{{ onQ }}" style="flex:1;min-width:0;height:40px;border:0;background:transparent;color:var(--color-text);outline:none;caret-color:var(--color-accent)">
+          <span style="color:var(--color-neutral-600);font-size:12px">{{ resultCount }}</span>
+        </label>
+      </sc-if>
+
+      <sc-if value="{{ isLibrary }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm)">
+          <div style="display:flex;align-items:center;gap:12px;min-height:48px;padding:4px 12px;border-bottom:1px solid var(--color-neutral-800)">
+            <span style="width:9ch;flex-shrink:0;color:var(--ansi-4,#84a6d9)">conta</span>
+            <span style="flex:1;min-width:0">{{ userName }} <span style="color:var(--color-neutral-500)">· {{ planLabel }}</span></span>
+            <sc-if value="{{ loggedIn }}" hint-placeholder-val="{{ false }}"><button onClick="{{ logout }}" style="min-height:36px;border:0;background:transparent;color:var(--ansi-1,#d98484);cursor:pointer">[sair]</button></sc-if>
+            <sc-if value="{{ isGuest }}" hint-placeholder-val="{{ false }}"><button onClick="{{ goLogin }}" style="min-height:36px;border:0;background:transparent;color:var(--color-accent-300);cursor:pointer">[entrar]</button></sc-if>
+          </div>
+          <button onClick="{{ togglePrefetch }}" style="display:flex;align-items:center;gap:12px;min-height:48px;padding:4px 12px;border:0;border-bottom:1px solid var(--color-neutral-800);background:transparent;color:inherit;text-align:left;cursor:pointer" style-hover="background:var(--color-neutral-900)">
+            <span style="width:9ch;flex-shrink:0;color:var(--ansi-4,#84a6d9)">buffer</span>
+            <span style="color:{{ pfColor }}">{{ pfBox }}</span>
+            <span style="flex:1;min-width:0;color:var(--color-neutral-300)">pré-carregar a próxima faixa no aparelho</span>
+          </button>
+          <div style="display:flex;align-items:center;gap:12px;min-height:48px;padding:4px 12px">
+            <span style="width:9ch;flex-shrink:0;color:var(--ansi-4,#84a6d9)">offline</span>
+            <span style="flex:1;min-width:0;color:var(--color-neutral-300)">{{ storage }}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:4px">
+          <sc-for list="{{ segs }}" as="s" hint-placeholder-count="2">
+            <button onClick="{{ s.go }}" style="min-height:36px;padding:0 8px;border:0;border-radius:var(--radius-sm);background:{{ s.bg }};color:{{ s.fg }};cursor:pointer">{{ s.label }}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><div style="color:var(--color-neutral-500)">⠋ carregando metadados…</div></sc-if>
+
+      <div style="display:flex;flex-direction:column">
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="8">
+          <div onClick="{{ r.play }}" style="display:flex;align-items:center;gap:10px;min-height:50px;padding:4px 8px;margin:0 -8px;border-radius:var(--radius-sm);background:{{ r.bg }};cursor:pointer;opacity:{{ r.op }}" style-hover="background:var(--color-neutral-900)">
+            <span style="width:3ch;flex-shrink:0;text-align:right;color:{{ r.idxC }}">{{ r.idx }}</span>
+            <sc-if value="{{ wideArt }}" hint-placeholder-val="{{ false }}"><div style="width:36px;height:36px;flex-shrink:0;border-radius:var(--radius-sm);overflow:hidden;background:var(--color-surface)">{{ r.img }}</div></sc-if>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+              <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.tc }}">{{ r.title }}</span>
+              <span style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--color-neutral-500)"><span style="color:var(--ansi-5,#9184d9)">{{ r.artist }}</span> <span style="color:{{ r.gc }}">#{{ r.genre }}</span> {{ r.durS }}</span>
+            </div>
+            <sc-if value="{{ r.locked }}" hint-placeholder-val="{{ false }}"><span style="flex-shrink:0;font-size:12px;color:var(--ansi-3,#d9c784)">[pro]</span></sc-if>
+            <sc-if value="{{ r.cached }}" hint-placeholder-val="{{ false }}"><span style="flex-shrink:0;font-size:12px;color:var(--ansi-2,#84d9a0)">[off]</span></sc-if>
+            <sc-if value="{{ r.isDl }}" hint-placeholder-val="{{ false }}"><span style="flex-shrink:0;font-size:12px;color:var(--ansi-6,#84d0d9);font-variant-numeric:tabular-nums">[{{ r.dlPct }}]</span></sc-if>
+            <button onClick="{{ r.like }}" aria-label="Curtir" style="width:40px;height:40px;flex-shrink:0;border:0;border-radius:var(--radius-sm);background:transparent;color:{{ r.likeFg }};cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:var(--color-neutral-800)"><i class="{{ r.likeIcon }}" style="font-size:17px"></i></button>
+            <button onClick="{{ r.dl }}" aria-label="Offline" style="width:40px;height:40px;flex-shrink:0;border:0;border-radius:var(--radius-sm);background:transparent;color:{{ r.dlFg }};cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:var(--color-neutral-800)"><i class="{{ r.dlIcon }}" style="font-size:17px"></i></button>
+          </div>
+        </sc-for>
+        <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}"><div style="padding:16px 0;color:var(--color-neutral-500)">{{ emptyText }}</div></sc-if>
+      </div>
+    </div>
+  </main>
+
+  <div style="flex-shrink:0;border-top:1px solid var(--color-neutral-800);background:var(--color-surface-a,var(--color-surface))">
+    <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}"><div style="border-bottom:1px solid var(--color-neutral-800);background:var(--color-bg-a,var(--color-bg))"><div style="max-width:1080px;margin:0 auto;padding:6px 14px;color:var(--color-neutral-300)"><span style="color:var(--color-accent)">»</span> {{ toast }}</div></div></sc-if>
+    <sc-if value="{{ hasCur }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ openPlayer }}" style="max-width:1080px;margin:0 auto;display:flex;align-items:center;gap:10px;min-height:52px;padding:4px 6px 4px 0;cursor:pointer">
+      <span style="align-self:stretch;display:flex;align-items:center;padding:0 10px;background:{{ modeBg }};color:var(--color-bg);font-weight:700;font-size:12px;letter-spacing:.04em">{{ mode }}</span>
+      <span style="width:40px;flex-shrink:0;display:flex">{{ miniLogo }}</span>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cur.title }} <span style="color:var(--color-neutral-500)">— {{ cur.artist }}</span></span>
+        <span style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--color-neutral-500);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden">{{ tStr }}<span onClick="{{ seekWave }}" style="flex:1;min-width:0;overflow:hidden;white-space:nowrap;letter-spacing:0"><sc-for list="{{ waveSmall }}" as="b" hint-placeholder-count="30"><span style="color:{{ b.c }}">{{ b.ch }}</span></sc-for></span>{{ dStr }}</span>
+      </div>
+      <button onClick="{{ prev }}" style="width:40px;height:44px;border:0;background:transparent;color:var(--color-neutral-300);cursor:pointer;border-radius:var(--radius-sm)" style-hover="background:var(--color-neutral-800)"><i class="ph-fill ph-skip-back" style="font-size:17px"></i></button>
+      <button onClick="{{ togglePlay }}" style="width:44px;height:44px;border:1px solid var(--color-accent);background:transparent;color:var(--color-accent-200);cursor:pointer;border-radius:var(--radius-sm)" style-hover="background:var(--color-accent-900)"><i class="{{ playIcon }}" style="font-size:18px"></i></button>
+      <button onClick="{{ next }}" style="width:40px;height:44px;border:0;background:transparent;color:var(--color-neutral-300);cursor:pointer;border-radius:var(--radius-sm)" style-hover="background:var(--color-neutral-800)"><i class="ph-fill ph-skip-forward" style="font-size:17px"></i></button>
+    </div>
+    </sc-if>
+    <div style="border-top:1px solid var(--color-neutral-800)"><div style="max-width:1080px;margin:0 auto;display:flex;align-items:center;gap:14px;min-height:28px;padding:0 12px;font-size:11px;color:var(--color-neutral-500);white-space:nowrap;overflow-x:auto">
+      <button onClick="{{ toggleOffline }}" style="border:0;background:transparent;padding:0;min-height:28px;cursor:pointer;color:{{ netFg }}">● {{ netLabel }}</button>
+      <span>{{ userTag }}</span>
+      <sc-if value="{{ hasCur }}" hint-placeholder-val="{{ false }}"><span>{{ bufShort }}</span></sc-if>
+      <span style="flex:1"></span>
+      <sc-if value="{{ wide }}" hint-placeholder-val="{{ false }}"><span><span style="color:var(--color-text)">␣</span> play  <span style="color:var(--color-text)">n/p</span> faixa  <span style="color:var(--color-text)">←/→</span> ±10s  <span style="color:var(--color-text)">/</span> buscar  <span style="color:var(--color-text)">l</span> curtir  <span style="color:var(--color-text)">d</span> offline  <span style="color:var(--color-text)">t</span> tema  <span style="color:var(--color-text)">o</span> rede</span></sc-if>
+    </div></div>
+  </div>
+</div>
+
+<sc-if value="{{ playerOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;inset:0;z-index:20;overflow-y:auto;background:var(--color-bg-a,var(--color-bg));backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);padding:12px">
+  <div style="position:relative;max-width:980px;min-height:calc(100% - 8px);margin:8px auto 0;padding:24px 18px 18px;border:1px solid var(--color-neutral-700);border-radius:var(--radius-sm);display:flex;flex-direction:column;gap:20px">
+    <span style="position:absolute;top:-10px;left:14px;padding:0 6px;background:var(--color-bg);color:var(--color-accent)">agora-tocando — {{ cur.genre }}</span>
+    <button onClick="{{ closePlayer }}" style="position:absolute;top:-14px;right:10px;height:28px;padding:0 8px;border:1px solid var(--color-neutral-700);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-neutral-400);cursor:pointer;font-size:12px" style-hover="color:var(--color-text)">[esc] fechar</button>
+    <div style="flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:24px 36px">
+      <div style="flex:1 1 260px;max-width:400px;aspect-ratio:1;border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);overflow:hidden;background:var(--color-surface)">
+        {{ curArtImg }}
+        <sc-if value="{{ cur.noArt }}" hint-placeholder-val="{{ false }}"><div style="height:100%;display:flex;align-items:center;justify-content:center;padding:14%">{{ bigLogo }}</div></sc-if>
+      </div>
+      <div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <span style="color:var(--color-neutral-500);font-size:12px">titulo</span>
+          <h2 style="margin:0;font-size:22px;font-weight:500;line-height:1.25;text-wrap:pretty">{{ cur.title }}</h2>
+          <span style="color:var(--ansi-5,#9184d9)">{{ cur.artist }}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div onClick="{{ seekWave }}" style="font-size:22px;line-height:1;white-space:nowrap;overflow:hidden;letter-spacing:0;cursor:pointer"><sc-for list="{{ wave }}" as="b" hint-placeholder-count="40"><span style="color:{{ b.c }}">{{ b.ch }}</span></sc-for></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--color-neutral-500);font-variant-numeric:tabular-nums"><span>{{ tStr }}</span><span>{{ dStr }}</span></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <sc-for list="{{ controls }}" as="k" hint-placeholder-count="6">
+            <button onClick="{{ k.go }}" style="min-width:52px;height:56px;padding:0 10px;border:1px solid {{ k.bd }};border-radius:var(--radius-sm);background:transparent;color:{{ k.fg }};cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px" style-hover="background:var(--color-neutral-900)"><i class="{{ k.icon }}" style="font-size:19px"></i><span style="font-size:10px;color:var(--color-neutral-500)">{{ k.key }}</span></button>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);font-size:12px">
+          <div style="display:flex;gap:10px;white-space:nowrap;overflow:hidden"><span style="width:8ch;flex-shrink:0;color:var(--ansi-4,#84a6d9)">buffer</span><span style="letter-spacing:0"><span style="color:var(--color-accent)">{{ bufBar.a }}</span><span style="color:var(--color-neutral-500)">{{ bufBar.b }}</span><span style="color:var(--color-neutral-800)">{{ bufBar.c }}</span></span></div>
+          <div style="display:flex;gap:10px"><span style="width:8ch;flex-shrink:0;color:var(--ansi-4,#84a6d9)">fonte</span><span style="color:{{ srcColor }}">{{ bufTitle }}</span></div>
+          <sc-if value="{{ showDlBtn }}" hint-placeholder-val="{{ false }}"><button onClick="{{ dlCur }}" style="align-self:flex-start;min-height:36px;padding:0;border:0;background:transparent;color:var(--color-accent-300);cursor:pointer" style-hover="color:var(--color-accent-100)">{{ dlBtnLabel }}</button></sc-if>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasGate }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ closeGate }}" style="position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px">
+  <div onClick="{{ stop }}" style="position:relative;width:100%;max-width:440px;padding:22px 18px 16px;border:1px solid var(--ansi-3,#d9c784);border-radius:var(--radius-sm);background:var(--color-bg);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;gap:12px">
+    <span style="position:absolute;top:-10px;left:12px;padding:0 6px;background:var(--color-bg);color:var(--ansi-3,#d9c784)">permissão negada</span>
+    <div style="color:var(--color-text)">{{ gateTitle }}</div>
+    <div style="color:var(--color-neutral-400);text-wrap:pretty">{{ gateBody }}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button onClick="{{ goLogin }}" style="min-height:40px;padding:0 12px;border:1px solid var(--color-accent);border-radius:var(--radius-sm);background:transparent;color:var(--color-accent-200);cursor:pointer" style-hover="background:var(--color-accent-900)">[enter] entrar</button>
+      <button onClick="{{ closeGate }}" style="min-height:40px;padding:0 12px;border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);background:transparent;color:var(--color-neutral-300);cursor:pointer" style-hover="background:var(--color-neutral-900)">[esc] agora não</button>
+    </div>
+  </div>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{ pickerOpen }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ closePicker }}" style="position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;padding:16px">
+  <div onClick="{{ stop }}" onMouseLeave="{{ pickLeave }}" style="position:relative;width:100%;max-width:560px;padding:22px 10px 12px;border:1px solid var(--color-accent);border-radius:var(--radius-sm);background:var(--color-bg);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;gap:2px">
+    <span style="position:absolute;top:-10px;left:12px;padding:0 6px;background:var(--color-bg);color:var(--color-accent)">ondas +list-themes</span><div style="max-height:calc(100vh - 80px);overflow-y:auto;display:flex;flex-direction:column;gap:2px">
+    <sc-for list="{{ themeRows }}" as="th" hint-placeholder-count="9">
+      <button onClick="{{ th.go }}" onMouseEnter="{{ th.hover }}" style="display:flex;align-items:center;gap:10px;min-height:44px;padding:0 8px;border:0;border-radius:var(--radius-sm);background:{{ th.bg }};color:var(--color-text);cursor:pointer;text-align:left">
+        <span style="width:2ch;color:var(--color-accent)">{{ th.mark }}</span>
+        <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ th.name }}</span>
+        <span style="display:flex;border-radius:2px;overflow:hidden;outline:1px solid var(--color-neutral-800)">
+          <span style="width:14px;height:18px;background:{{ th.bgc }}"></span>
+          <sc-for list="{{ th.sw }}" as="c" hint-placeholder-count="8"><span style="width:12px;height:18px;background:{{ c }}"></span></sc-for>
+        </span>
+      </button>
+    </sc-for>
+    <div style="margin-top:8px;padding:12px 8px 4px;border-top:1px solid var(--color-neutral-800);display:flex;flex-direction:column;gap:10px">
+      <label style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:32px"><span style="width:19ch;color:var(--ansi-4,#84a6d9)">background-opacity</span><input type="range" min="0.3" max="1" step="0.01" value="{{ opacity }}" onChange="{{ onOpacity }}" style="flex:1;min-width:140px;accent-color:var(--color-accent)"><span style="width:4ch;text-align:right;font-variant-numeric:tabular-nums">{{ opacityStr }}</span></label>
+      <label style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:32px;opacity:{{ blurOp }}"><span style="width:19ch;color:var(--ansi-4,#84a6d9)">background-blur</span><input type="range" min="0" max="40" step="1" value="{{ blur }}" onChange="{{ onBlur }}" style="flex:1;min-width:140px;accent-color:var(--color-accent)"><span style="width:4ch;text-align:right;font-variant-numeric:tabular-nums">{{ blur }}</span></label>
+      <div style="display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap;min-height:32px"><span style="width:19ch;color:var(--ansi-4,#84a6d9)">wallpaper</span>
+        <span style="display:flex;gap:2px;flex-wrap:wrap">
+          <sc-for list="{{ walls }}" as="wl" hint-placeholder-count="3"><button onClick="{{ wl.go }}" style="min-height:32px;padding:0 6px;border:0;border-radius:var(--radius-sm);background:{{ wl.bg }};color:{{ wl.fg }};cursor:pointer">{{ wl.label }}</button></sc-for>
+          <label style="min-height:32px;padding:0 6px;display:flex;align-items:center;color:var(--color-accent-300);cursor:pointer">[enviar imagem…]<input type="file" accept="image/*" onChange="{{ onWallFile }}" style="display:none"></label>
+        </span>
+      </div>
+    </div>
+    <div style="padding:8px 8px 0;font-size:11px;color:var(--color-neutral-500)">j/k navegar · enter aplicar · esc fechar · passe o mouse para pré-visualizar</div>
+  </div></div>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;nocturne&quot;,&quot;catppuccin-mocha&quot;,&quot;tokyonight&quot;,&quot;dracula&quot;,&quot;gruvbox-dark&quot;,&quot;nord&quot;,&quot;rose-pine&quot;,&quot;solarized-dark&quot;,&quot;github-light&quot;],&quot;default&quot;:&quot;catppuccin-mocha&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;defaultOpacity&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:0.3,&quot;max&quot;:1,&quot;step&quot;:0.01,&quot;default&quot;:1,&quot;tsType&quot;:&quot;number&quot;},&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;login&quot;,&quot;app&quot;],&quot;default&quot;:&quot;login&quot;,&quot;tsType&quot;:&quot;'login'|'app'&quot;},&quot;showSplash&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;pixelArt&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;forceDemo&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;premiumEvery&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:3,&quot;min&quot;:2,&quot;max&quot;:8,&quot;tsType&quot;:&quot;number&quot;}}">
+const K = 'ondas-proto-';
+const THEMES = [
+  ['nocturne', 'Nocturne', '#161826', '#e9e9ed', '#9184d9', ['#292b31', '#d98484', '#84d9a0', '#d9c784', '#84a6d9', '#9184d9', '#84d0d9', '#cfd3e5']],
+  ['catppuccin-mocha', 'Catppuccin Mocha', '#1e1e2e', '#cdd6f4', '#cba6f7', ['#45475a', '#f38ba8', '#a6e3a1', '#f9e2af', '#89b4fa', '#f5c2e7', '#94e2d5', '#bac2de']],
+  ['tokyonight', 'TokyoNight', '#1a1b26', '#c0caf5', '#7aa2f7', ['#15161e', '#f7768e', '#9ece6a', '#e0af68', '#7aa2f7', '#bb9af7', '#7dcfff', '#a9b1d6']],
+  ['dracula', 'Dracula', '#282a36', '#f8f8f2', '#bd93f9', ['#21222c', '#ff5555', '#50fa7b', '#f1fa8c', '#bd93f9', '#ff79c6', '#8be9fd', '#f8f8f2']],
+  ['gruvbox-dark', 'Gruvbox Dark', '#282828', '#ebdbb2', '#fabd2f', ['#3c3836', '#fb4934', '#b8bb26', '#fabd2f', '#83a598', '#d3869b', '#8ec07c', '#a89984']],
+  ['nord', 'Nord', '#2e3440', '#d8dee9', '#88c0d0', ['#3b4252', '#bf616a', '#a3be8c', '#ebcb8b', '#81a1c1', '#b48ead', '#88c0d0', '#e5e9f0']],
+  ['rose-pine', 'Rosé Pine', '#191724', '#e0def4', '#ebbcba', ['#26233a', '#eb6f92', '#9ccfd8', '#f6c177', '#31748f', '#c4a7e7', '#ebbcba', '#e0def4']],
+  ['solarized-dark', 'Solarized Dark', '#002b36', '#93a1a1', '#268bd2', ['#073642', '#dc322f', '#859900', '#b58900', '#268bd2', '#d33682', '#2aa198', '#eee8d5']],
+  ['github-light', 'GitHub Light', '#ffffff', '#24292f', '#0969da', ['#24292f', '#cf222e', '#116329', '#9a6700', '#0969da', '#8250df', '#1b7c83', '#6e7781']]
+];
+const DEMO = [
+  ['Maré Baixa','Lia Sombra','ambient',214],['Concreto Molhado','Turbo Vício','techno',356],['Neon na Chuva','Kaio Ruas','synthwave',241],
+  ['Fio de Cobre','Bruma','lofi',172],['Último Trem','Vera Noir','house',298],['Sal & Ferrugem','Os Alfaiates','indie',203],
+  ['Céu de Sódio','Lia Sombra','ambient',265],['Pressão 808','MC Lunar','hiphop',187],['Calçada Fria','Bruma','lofi',149],
+  ['Ponto Cego','Turbo Vício','techno',412],['Dobra','Kaio Ruas','electronic',230],['Fim de Turno','Vera Noir','house',322]
+];
+const BLOCKS = '▁▂▃▄▅▆▇█';
+const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const hash = str => { let h = 2166136261; for (const c of String(str)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+const ld = (k, d) => { try { return JSON.parse(localStorage.getItem(K + k)) ?? d; } catch (e) { return d; } };
+const sv = (k, v) => { try { localStorage.setItem(K + k, JSON.stringify(v)); } catch (e) {} };
+const slug = g => String(g || 'outros').toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '');
+
+class Component extends DCLogic {
+  state = {
+    screen: null, user: ld('user', null), tab: 'home', tracks: [], loading: true, source: '',
+    cur: -1, playing: false, t: 0, dur: 0, buf: 0, waiting: false, playerOpen: false,
+    offline: false, cached: ld('cached', {}), dl: {}, liked: ld('liked', {}), q: '', genre: 'tudo', seg: 'liked',
+    w: window.innerWidth, gate: null, email: '', pass: '', err: '', prefetch: ld('prefetch', true),
+    shuffle: false, repeat: false, toast: '', sizes: ld('sizes', {}),
+    theme: ld('theme', null), pickerOpen: false, pickIdx: 0, splash: true, splashT: 0, opacity: ld('opacity', null), blur: ld('blur', 16), wall: ld('wall', 'capa'), wallImg: ld('wallImg', '')
+  };
+  blobs = new Map();
+  searchRef = React.createRef();
+  themeId() { return this.state.theme || this.props.defaultTheme || 'catppuccin-mocha'; }
+  applyTheme(id) {
+    const t = THEMES.find(x => x[0] === id) || THEMES[0];
+    const [, , bg, fg, ac, an] = t, r = document.documentElement.style;
+    const mix = (a, p, b) => `color-mix(in oklab, ${a} ${p}%, ${b})`;
+    const set = (k, v) => r.setProperty(k, v);
+    this.lastId = id; const op = Math.round(this.op() * 100);
+    set('--color-bg-a', `color-mix(in srgb, ${bg} ${op}%, transparent)`); set('--color-surface-a', `color-mix(in srgb, ${mix(fg, 6, bg)} ${op}%, transparent)`);
+    set('--color-bg', bg); set('--color-text', fg); set('--color-surface', mix(fg, 6, bg)); set('--color-accent', ac);
+    set('--color-divider', mix(fg, 16, 'transparent'));
+    [[100, 100], [200, 92], [300, 82], [400, 70], [500, 57], [600, 44], [700, 30], [800, 18], [900, 9]].forEach(([k, p]) => set('--color-neutral-' + k, mix(fg, p, bg)));
+    [[100, 25, fg], [200, 45, fg], [300, 65, fg], [400, 85, fg], [500, 100, bg], [600, 78, bg], [700, 55, bg], [800, 35, bg], [900, 18, bg]].forEach(([k, p, o]) => set('--color-accent-' + k, mix(ac, p, o)));
+    an.forEach((c, i) => set('--ansi-' + i, c));
+    set('--shadow-sm', '0 0 0 1px ' + mix(fg, 18, bg)); set('--shadow-md', '0 0 0 1px ' + mix(fg, 30, bg) + ', 0 6px 18px rgba(0,0,0,.35)'); set('--shadow-lg', '0 0 0 1px ' + mix(fg, 44, bg) + ', 0 16px 40px rgba(0,0,0,.45)');
+    set('--font-body', '"JetBrains Mono", ui-monospace, monospace'); set('--font-heading', '"JetBrains Mono", ui-monospace, monospace');
+    r.colorScheme = id === 'github-light' ? 'light' : 'dark';
+  }
+  op() { return this.state.opacity ?? this.props.defaultOpacity ?? 1; }
+  setOpacity(v) { sv('opacity', v); this.setState({ opacity: v }, () => this.applyTheme(this.lastId || this.themeId())); }
+  setWallFile(e) {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const url = URL.createObjectURL(f), img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const data = c.toDataURL('image/jpeg', 0.82); URL.revokeObjectURL(url);
+      sv('wallImg', data); sv('wall', 'imagem');
+      const op = this.op() >= 1 ? 0.8 : this.op(); sv('opacity', op);
+      this.setState({ wallImg: data, wall: 'imagem', opacity: op }, () => this.applyTheme(this.lastId || this.themeId()));
+    };
+    img.src = url;
+  }
+  setTheme(id) { sv('theme', id); this.setState({ theme: id, pickerOpen: false }); this.applyTheme(id); this.flash('tema → ' + id); }
+  componentDidMount() {
+    this.applyTheme(this.themeId());
+    this.onResize = () => this.setState({ w: window.innerWidth });
+    window.addEventListener('resize', this.onResize);
+    window.addEventListener('keydown', this.onKey);
+    const a = this.audio = new Audio(); a.preload = 'auto';
+    a.addEventListener('timeupdate', () => this.setState({ t: a.currentTime }));
+    a.addEventListener('durationchange', () => isFinite(a.duration) && this.setState({ dur: a.duration }));
+    a.addEventListener('progress', () => { const b = a.buffered; if (b.length && a.duration) this.setState({ buf: b.end(b.length - 1) / a.duration }); });
+    a.addEventListener('waiting', () => this.setState({ waiting: true }));
+    a.addEventListener('playing', () => this.setState({ waiting: false, playing: true }));
+    a.addEventListener('pause', () => this.setState({ playing: false }));
+    a.addEventListener('ended', () => this.ended());
+    a.addEventListener('error', () => { if (!a.getAttribute('src')) return; this.flash('stream indisponível — prévia simulada'); this.simulate(); });
+    this.fetchTracks();
+    this.startSplash();
+  }
+  startSplash() {
+    clearInterval(this.sp); this.setState({ splash: true, splashT: 0 });
+    this.sp = setInterval(() => {
+      const t = this.state.splashT + 80;
+      if ((t >= 2200 && !this.state.loading) || t >= 4500) { clearInterval(this.sp); return this.setState({ splash: false, splashT: t }); }
+      this.setState({ splashT: t });
+    }, 80);
+  }
+  cassette(spin, p, opts) {
+    const e = React.createElement, o = opts || {}, CY = 17;
+    const reel = (cx, r, k) => e('g', { key: k },
+      e('circle', { cx, cy: CY, r, fill: 'var(--color-neutral-700)' }),
+      e('g', { style: { transformBox: 'fill-box', transformOrigin: 'center', animation: 'spin ' + (o.speed || 1.8) + 's linear infinite', animationPlayState: spin ? 'running' : 'paused' } },
+        e('circle', { cx, cy: CY, r: 2.6, fill: 'var(--color-neutral-900)', stroke: 'var(--color-accent)', strokeWidth: 1.2 }),
+        [0, 120, 240].map(a => e('line', { key: a, x1: cx, y1: CY, x2: cx + 2.6 * Math.cos(a * Math.PI / 180), y2: CY + 2.6 * Math.sin(a * Math.PI / 180), stroke: 'var(--color-accent)', strokeWidth: 1.2, strokeLinecap: 'round' }))));
+    const q = Math.min(1, Math.max(0, p || 0));
+    return e('svg', { viewBox: '0 0 64 42', width: '100%', style: { display: 'block', overflow: 'visible' }, 'aria-label': 'ondas' },
+      e('rect', { x: 1, y: 1, width: 62, height: 40, rx: 4, fill: 'var(--color-surface)', stroke: 'var(--color-text)', strokeWidth: 1.6 }),
+      [[4.5, 4.5], [59.5, 4.5], [4.5, 37.5], [59.5, 37.5]].map(([x, y], i) => e('circle', { key: 's' + i, cx: x, cy: y, r: 0.9, fill: 'var(--color-neutral-600)' })),
+      e('rect', { x: 7, y: 5, width: 50, height: 24, rx: 2, fill: 'var(--color-bg)', stroke: 'var(--color-neutral-700)', strokeWidth: 0.8 }),
+      e('rect', { x: 7, y: 5, width: 50, height: 2.2, fill: 'var(--color-accent)' }),
+      o.label ? e('text', { x: 32, y: 27.4, textAnchor: 'middle', fontSize: 2.6, fill: 'var(--color-neutral-500)', fontFamily: '"JetBrains Mono", monospace', letterSpacing: 0.3 }, 'ONDAS · LADO A') : null,
+      e('rect', { x: 14, y: 10, width: 36, height: 14, rx: 7, fill: 'var(--color-neutral-900)', stroke: 'var(--color-neutral-600)', strokeWidth: 0.8 }),
+      reel(23, 2.9 + 3.6 * (1 - q), 'l'), reel(41, 2.9 + 3.6 * q, 'r'),
+      e('path', { d: 'M16 41 L19.5 33.5 H44.5 L48 41', fill: 'none', stroke: 'var(--color-neutral-600)', strokeWidth: 0.9 }),
+      e('circle', { cx: 25, cy: 37.5, r: 1.3, fill: 'var(--color-neutral-700)' }), e('circle', { cx: 39, cy: 37.5, r: 1.3, fill: 'var(--color-neutral-700)' }));
+  }
+  componentDidUpdate(pp) { if (pp.defaultTheme !== this.props.defaultTheme && !this.state.theme) this.applyTheme(this.themeId()); }
+  componentWillUnmount() { clearInterval(this.sp); window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); this.audio.pause(); clearInterval(this.sim); }
+  onKey = e => {
+    const s = this.state, typing = e.target && e.target.tagName === 'INPUT', k = e.key;
+    if (s.pickerOpen) {
+      const n = THEMES.length;
+      if (k === 'Escape') { this.applyTheme(this.themeId()); this.setState({ pickerOpen: false }); }
+      else if (k === 'j' || k === 'ArrowDown' || k === 'k' || k === 'ArrowUp') { e.preventDefault(); const i = (s.pickIdx + (k === 'j' || k === 'ArrowDown' ? 1 : -1) + n) % n; this.setState({ pickIdx: i }); this.applyTheme(THEMES[i][0]); }
+      else if (k === 'Enter') this.setTheme(THEMES[s.pickIdx][0]);
+      return;
+    }
+    if (k === 'Escape') { if (typing) e.target.blur(); return this.setState({ playerOpen: false, gate: null }); }
+    if (typing || e.metaKey || e.ctrlKey) return;
+    if (s.gate && k === 'Enter') return this.setState({ screen: 'login', gate: null, playerOpen: false });
+    const screen = this.screen();
+    if (screen === 'login') { if (k === 'g') this.setState({ screen: 'app' }); if (k === 't') this.openPicker(); return; }
+    const map = {
+      ' ': () => this.togglePlay(), n: () => this.step(1), p: () => this.step(-1), t: () => this.openPicker(),
+      o: () => this.toggleOffline(), l: () => this.likeCur(), d: () => this.dlCur(), f: () => this.setState({ playerOpen: !s.playerOpen && s.cur >= 0 }),
+      s: () => this.setState({ shuffle: !s.shuffle }), r: () => this.setState({ repeat: !s.repeat }),
+      ArrowRight: () => this.seekBy(10), ArrowLeft: () => this.seekBy(-10),
+      '1': () => this.setState({ tab: 'home' }), '2': () => this.setState({ tab: 'search' }), '3': () => this.setState({ tab: 'library' }),
+      '/': () => this.setState({ tab: 'search', playerOpen: false }, () => setTimeout(() => this.searchRef.current && this.searchRef.current.focus(), 30))
+    };
+    if (map[k]) { e.preventDefault(); map[k](); }
+  };
+  screen() { return this.state.screen || (this.state.user ? 'app' : (this.props.startScreen ?? 'login')); }
+  openPicker() { const i = Math.max(0, THEMES.findIndex(t => t[0] === this.themeId())); this.setState({ pickerOpen: true, pickIdx: i }); }
+  flash(msg) { clearTimeout(this.tt); this.setState({ toast: msg }); this.tt = setTimeout(() => this.setState({ toast: '' }), 3200); }
+  toggleOffline() { const off = !this.state.offline; this.setState({ offline: off }); this.flash(off ? 'rede desconectada — apenas faixas [off]' : 'rede conectada'); }
+  useDemo(source) {
+    const tracks = DEMO.map((d, i) => ({ id: 'demo' + i, title: d[0], artist: d[1], genre: d[2], dur: d[3], art: '', stream: '' }));
+    this.setState({ tracks, loading: false, source: source || 'catálogo demo' });
+  }
+  async fetchTracks() {
+    if (this.props.forceDemo) return this.useDemo();
+    try {
+      const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 8000);
+      const hosts = (await (await fetch('https://api.audius.co', { signal: ctl.signal })).json()).data;
+      const host = hosts[Math.floor(Math.random() * hosts.length)];
+      const r = await (await fetch(host + '/v1/tracks/trending?app_name=ONDAS_PROTO&limit=24', { signal: ctl.signal })).json();
+      clearTimeout(to);
+      const tracks = r.data.filter(t => t.is_streamable !== false).map(t => ({
+        id: t.id, title: t.title, artist: (t.user && t.user.name) || '—', genre: slug(t.genre), dur: t.duration || 0,
+        art: (t.artwork && (t.artwork['480x480'] || t.artwork['150x150'])) || '',
+        stream: host + '/v1/tracks/' + t.id + '/stream?app_name=ONDAS_PROTO'
+      }));
+      sv('meta', tracks);
+      this.setState({ tracks, loading: false, source: 'audius api (ao vivo)' });
+    } catch (e) {
+      const meta = ld('meta', null);
+      if (meta && meta.length) this.setState({ tracks: meta, loading: false, source: 'metadados em cache local' });
+      else this.useDemo('catálogo demo — api inacessível');
+    }
+  }
+  premium(i) { const n = this.props.premiumEvery ?? 3; return i % n === n - 1; }
+  locked(i) { return !this.state.user && this.premium(i); }
+  async getBlob(id) {
+    if (this.blobs.has(id)) return this.blobs.get(id);
+    try { const c = await caches.open('ondas-offline'); const r = await c.match('/offline/' + id); if (r) { const b = await r.blob(); this.blobs.set(id, b); return b; } } catch (e) {}
+    return null;
+  }
+  async play(i) {
+    const s = this.state, tr = s.tracks[i]; if (!tr) return;
+    if (this.locked(i)) return this.setState({ gate: { kind: 'play', title: tr.title } });
+    if (s.offline && !s.cached[tr.id]) return this.flash('sem rede — faixa não está no aparelho');
+    clearInterval(this.sim); this.audio.pause();
+    if (this.objUrl) { URL.revokeObjectURL(this.objUrl); this.objUrl = null; }
+    this.setState({ cur: i, t: 0, dur: tr.dur, buf: s.cached[tr.id] ? 1 : 0, playing: true, waiting: true });
+    let src = tr.stream;
+    if (s.cached[tr.id]) { const b = await this.getBlob(tr.id); if (b) src = this.objUrl = URL.createObjectURL(b); else if (s.offline || !tr.stream) src = ''; }
+    if (!src) this.simulate();
+    else { this.audio.src = src; this.audio.play().catch(() => this.setState({ playing: false, waiting: false })); }
+    if (s.prefetch && s.user) this.prefetchNext(i);
+  }
+  simulate() {
+    clearInterval(this.sim); this.audio.removeAttribute('src');
+    const tr = this.state.tracks[this.state.cur], cached = tr && this.state.cached[tr.id];
+    this.setState({ playing: true, waiting: false, dur: (tr && tr.dur) || 200 });
+    this.sim = setInterval(() => {
+      if (!this.state.playing) return;
+      const t = this.state.t + 0.25, d = this.state.dur;
+      if (t >= d) return this.ended();
+      this.setState({ t, buf: cached ? 1 : Math.min(1, Math.max(this.state.buf, (t + 40) / d)) });
+    }, 250);
+  }
+  isSim() { return !this.audio.getAttribute('src'); }
+  togglePlay() {
+    const s = this.state; if (s.cur < 0) return this.play(Math.max(0, s.tracks.findIndex((t, i) => !this.locked(i))));
+    if (this.isSim()) this.setState({ playing: !s.playing });
+    else if (this.audio.paused) this.audio.play().catch(() => {}); else this.audio.pause();
+  }
+  step(dir) {
+    const s = this.state, n = s.tracks.length; if (!n) return;
+    let i = s.cur < 0 ? -1 : s.cur;
+    for (let k = 0; k < n; k++) {
+      i = s.shuffle ? Math.floor(Math.random() * n) : (i + dir + n) % n;
+      if (!this.locked(i) && (!s.offline || s.cached[s.tracks[i].id])) return this.play(i);
+    }
+  }
+  ended() { if (this.state.repeat) { this.seek(0); if (!this.isSim()) this.audio.play(); } else this.step(1); }
+  seek(f) { const d = this.state.dur || 0; if (this.isSim()) this.setState({ t: f * d }); else if (isFinite(this.audio.duration)) this.audio.currentTime = f * this.audio.duration; }
+  seekBy(sec) { const d = this.state.dur; if (d) this.seek(Math.min(1, Math.max(0, (this.state.t + sec) / d))); }
+  prefetchNext(i) {
+    const s = this.state;
+    for (let k = 1; k < s.tracks.length; k++) { const j = (i + k) % s.tracks.length; if (this.locked(j)) continue; if (!s.cached[s.tracks[j].id]) this.download(s.tracks[j], true); return; }
+  }
+  setDl(id, v) { this.setState(s => { const dl = { ...s.dl }; if (v == null) delete dl[id]; else dl[id] = v; return { dl }; }); }
+  markCached(id, size) { this.setState(s => { const cached = { ...s.cached, [id]: true }, sizes = { ...s.sizes, [id]: size }; sv('cached', cached); sv('sizes', sizes); return { cached, sizes }; }); }
+  async download(tr, silent) {
+    const s = this.state;
+    if (!s.user) return this.setState({ gate: { kind: 'dl', title: tr.title } });
+    if (s.cached[tr.id]) {
+      this.blobs.delete(tr.id); try { (await caches.open('ondas-offline')).delete('/offline/' + tr.id); } catch (e) {}
+      this.flash('removida do aparelho');
+      return this.setState(st => { const cached = { ...st.cached }; delete cached[tr.id]; sv('cached', cached); return { cached }; });
+    }
+    if (s.dl[tr.id] != null) return;
+    if (s.offline) return this.flash('conecte-se para baixar');
+    this.setDl(tr.id, 0);
+    if (!tr.stream) {
+      let p = 0; const iv = setInterval(() => { p += 0.12; if (p >= 1) { clearInterval(iv); this.setDl(tr.id, null); this.markCached(tr.id, tr.dur * 16000); this.flash(silent ? 'buffer: próxima faixa salva' : 'salva no aparelho'); } else this.setDl(tr.id, p); }, 160);
+      return;
+    }
+    try {
+      const res = await fetch(tr.stream); if (!res.ok) throw 0;
+      const len = +res.headers.get('content-length') || 0, rd = res.body.getReader(), chunks = []; let got = 0, last = 0;
+      for (;;) { const { done, value } = await rd.read(); if (done) break; chunks.push(value); got += value.length;
+        if (Date.now() - last > 150) { last = Date.now(); this.setDl(tr.id, len ? got / len : Math.min(0.95, got / 6e6)); } }
+      const blob = new Blob(chunks, { type: res.headers.get('content-type') || 'audio/mpeg' });
+      this.blobs.set(tr.id, blob);
+      try { await (await caches.open('ondas-offline')).put('/offline/' + tr.id, new Response(blob)); } catch (e) {}
+      this.setDl(tr.id, null); this.markCached(tr.id, blob.size);
+      this.flash(silent ? 'buffer: próxima faixa salva' : 'salva no aparelho');
+    } catch (e) { this.setDl(tr.id, null); if (!silent) this.flash('falha no download'); }
+  }
+  toggleLike(id) { this.setState(s => { const liked = { ...s.liked }; if (liked[id]) delete liked[id]; else liked[id] = true; sv('liked', liked); return { liked }; }); }
+  likeCur() { const t = this.state.tracks[this.state.cur]; if (t) this.toggleLike(t.id); }
+  dlCur() { const t = this.state.tracks[this.state.cur]; if (t) this.download(t); }
+  wave(tr, n, played, buf) {
+    const out = [], h = hash(tr ? tr.id : 'x');
+    for (let i = 0; i < n; i++) {
+      const v = Math.abs(Math.sin(h * 0.0001 + i * 0.55) * 0.6 + Math.sin(i * 0.17 + h % 7) * 0.4);
+      const f = (i + 0.5) / n;
+      out.push({ ch: BLOCKS[Math.min(7, Math.floor(v * 8))], c: f <= played ? 'var(--color-accent)' : f <= buf ? 'var(--color-neutral-500)' : 'var(--color-neutral-800)' });
+    }
+    return out;
+  }
+  renderVals() {
+    const s = this.state, p = this.props, screen = this.screen();
+    const wide = s.w >= 860, tracks = s.tracks, curT = tracks[s.cur];
+    const stop = e => e && e.stopPropagation && e.stopPropagation();
+    const go = tab => () => this.setState({ tab });
+    const ansi = g => 'var(--ansi-' + (1 + hash(g) % 6) + ')';
+    const item = tr => {
+      const i = tracks.indexOf(tr), locked = this.locked(i), cached = !!s.cached[tr.id], dlv = s.dl[tr.id], cur = i === s.cur;
+      const unavailable = s.offline && !cached;
+      return {
+        title: tr.title, artist: tr.artist, img: tr.art ? this.img(tr.art, true) : null, hasArt: !!tr.art, genre: tr.genre, durS: fmt(tr.dur), gc: ansi(tr.genre),
+        idx: cur ? (s.playing ? '▶' : '‖') : String(i + 1).padStart(2, '0'), idxC: cur ? 'var(--color-accent)' : 'var(--color-neutral-600)',
+        locked, cached, isDl: dlv != null, dlPct: dlv != null ? String(Math.round(dlv * 100)).padStart(3, ' ') + '%' : '',
+        op: unavailable ? 0.4 : 1, tc: cur ? 'var(--color-accent-300)' : 'var(--color-text)', bg: cur ? 'var(--color-accent-900)' : 'transparent',
+        likeIcon: s.liked[tr.id] ? 'ph-fill ph-heart' : 'ph ph-heart', likeFg: s.liked[tr.id] ? 'var(--ansi-1)' : 'var(--color-neutral-500)',
+        dlIcon: cached ? 'ph-fill ph-check-circle' : 'ph ph-download-simple', dlFg: cached ? 'var(--ansi-2)' : dlv != null ? 'var(--ansi-6)' : 'var(--color-neutral-500)',
+        play: () => this.play(i), like: e => { stop(e); this.toggleLike(tr.id); }, dl: e => { stop(e); this.download(tr); }
+      };
+    };
+    const dur = s.dur || (curT && curT.dur) || 0, played = dur ? s.t / dur : 0;
+    const genres = ['tudo', ...[...new Set(tracks.map(t => t.genre))].slice(0, 8)];
+    let list = [], cwd = '~/em-alta', cmd = 'ondas trending --genero=' + s.genre, comment = '', emptyText = '';
+    const who = s.user ? s.user.name : 'visitante';
+    if (s.tab === 'home') { list = tracks.filter(t => s.genre === 'tudo' || t.genre === s.genre); comment = list.length + ' faixas · fonte: ' + (s.source || '…'); emptyText = s.loading ? '' : 'nenhuma faixa.'; }
+    if (s.tab === 'search') {
+      const q = s.q.trim().toLowerCase().replace(/^#/, '');
+      list = q ? tracks.filter(t => (t.title + ' ' + t.artist + ' ' + t.genre).toLowerCase().includes(q)) : tracks.slice(0, 8);
+      cwd = '~/buscar'; cmd = 'ondas search ' + (s.q ? '"' + s.q + '"' : ''); comment = q ? list.length + ' resultados' : 'sugestões — digite para filtrar';
+      emptyText = 'grep: nenhum resultado para "' + s.q + '"';
+    }
+    if (s.tab === 'library') {
+      list = tracks.filter(t => s.seg === 'liked' ? s.liked[t.id] : s.cached[t.id]);
+      cwd = '~/biblioteca'; cmd = 'ondas ls --' + (s.seg === 'liked' ? 'curtidas' : 'offline'); comment = list.length + ' itens';
+      emptyText = s.seg === 'liked' ? 'vazio — pressione [l] ou o coração para curtir.' : (s.user ? 'vazio — baixe faixas [d] ou ative o buffer para ouvir sem rede.' : 'downloads offline exigem login.');
+    }
+    const buf = curT && s.cached[curT.id] ? 1 : Math.max(s.buf, played);
+    const mb = Object.keys(s.cached).reduce((a, k) => a + (s.sizes[k] || 0), 0) / 1048576;
+    const curCached = curT && s.cached[curT.id], curDl = curT && s.dl[curT.id], ahead = Math.max(0, buf * dur - s.t), liked = curT && s.liked[curT.id];
+    const pIcon = s.waiting && s.playing ? 'ph ph-circle-notch' : s.playing ? 'ph-fill ph-pause' : 'ph-fill ph-play';
+    const BN = 24, ba = Math.round(played * BN), bb = Math.max(0, Math.round(buf * BN) - ba);
+    const tid = this.themeId(), tmeta = THEMES.find(t => t[0] === tid) || THEMES[0];
+    const waveN = wide ? 34 : Math.max(16, Math.floor((Math.min(s.w, 980) - 66) / 13.3));
+    return {
+      showSplash: s.splash && p.showSplash !== false,
+      skipSplash: () => { clearInterval(this.sp); this.setState({ splash: false }); }, replaySplash: () => this.startSplash(),
+      splashLogo: this.cassette(true, Math.min(1, s.splashT / 2200), { label: true, speed: 1.2 }),
+      splashBar: { a: '█'.repeat(Math.round(Math.min(1, s.splashT / 2200) * 20)), b: '░'.repeat(20 - Math.round(Math.min(1, s.splashT / 2200) * 20)) },
+      spinner: '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'[Math.floor(s.splashT / 80) % 10], splashMsg: s.loading ? 'rebobinando · carregando metadados' : 'pronto ▶',
+      loginLogo: this.cassette(true, 0.3, { speed: 3 }), tabLogo: this.cassette(s.playing, played, {}),
+      miniLogo: this.cassette(s.playing, played, {}), bigLogo: this.cassette(s.playing, played, { label: true }),
+      isLogin: !(s.splash && p.showSplash !== false) && screen === 'login', curArtImg: curT && curT.art ? this.img(curT.art) : null, isApp: !(s.splash && p.showSplash !== false) && screen === 'app', wide, wideArt: wide, pixel: p.pixelArt === false ? 'auto' : 'pixelated',
+      cursor: React.createElement('span', { style: { display: 'inline-block', width: '0.6em', height: '1.15em', background: 'var(--color-accent)', verticalAlign: 'middle', animation: 'blink 1.1s steps(1) infinite' } }),
+      email: s.email, pass: s.pass, err: s.err, hasErr: !!s.err,
+      onEmail: e => this.setState({ email: e.target.value, err: '' }), onPass: e => this.setState({ pass: e.target.value, err: '' }),
+      onLoginKey: e => { if (e.key === 'Enter') this.doLogin(); },
+      doLogin: () => this.doLogin(), doGuest: () => this.setState({ screen: 'app' }),
+      goLogin: () => this.setState({ screen: 'login', gate: null, playerOpen: false }),
+      logout: () => { sv('user', null); this.setState({ user: null, screen: 'login' }); },
+      loggedIn: !!s.user, isGuest: !s.user, userName: who, planLabel: s.user ? 'catálogo completo + offline' : 'somente faixas grátis',
+      userTag: s.user ? '@' + s.user.name : 'visitante',
+      tabs: [['home', '~/em-alta'], ['search', '~/buscar'], ['library', '~/biblioteca']].map(([k, l], i) => ({ key: i + 1, label: l, go: go(k), bg: s.tab === k ? 'var(--color-bg-a)' : 'transparent', fg: s.tab === k ? 'var(--color-text)' : 'var(--color-neutral-500)' })),
+      isHome: s.tab === 'home', isSearch: s.tab === 'search', isLibrary: s.tab === 'library',
+      who, cwd, cmd, comment,
+      netLabel: s.offline ? 'offline' : 'online', netFg: s.offline ? 'var(--ansi-1)' : 'var(--ansi-2)', toggleOffline: () => this.toggleOffline(),
+      chips: genres.map(g => ({ label: s.genre === g ? '[' + g + ']' : g, go: () => this.setState({ genre: g }), bg: s.genre === g ? 'var(--color-accent-900)' : 'transparent', fg: s.genre === g ? 'var(--color-accent-200)' : 'var(--color-neutral-400)' })),
+      loading: s.loading, q: s.q, onQ: e => this.setState({ q: e.target.value }), searchRef: this.searchRef, resultCount: s.q ? list.length + '' : '',
+      togglePrefetch: () => { sv('prefetch', !s.prefetch); this.setState({ prefetch: !s.prefetch }); },
+      pfBox: s.prefetch ? '[x]' : '[ ]', pfColor: s.prefetch ? 'var(--ansi-2)' : 'var(--color-neutral-500)',
+      storage: Object.keys(s.cached).length + ' faixas · ' + mb.toFixed(1) + ' MB',
+      segs: [['liked', '--curtidas'], ['offline', '--offline']].map(([k, l]) => ({ label: l, go: () => this.setState({ seg: k }), bg: s.seg === k ? 'var(--color-accent-900)' : 'transparent', fg: s.seg === k ? 'var(--color-accent-200)' : 'var(--color-neutral-500)' })),
+      rows: list.map(item), empty: !s.loading && list.length === 0, emptyText,
+      hasCur: !!curT, mode: s.waiting && s.playing ? 'BUF' : s.playing ? 'PLAY' : 'PAUSE', modeBg: s.playing ? 'var(--color-accent)' : 'var(--color-neutral-500)',
+      cur: curT ? { title: curT.title, artist: curT.artist, art: curT.art, hasArt: !!curT.art, noArt: !curT.art, genre: '#' + curT.genre } : {},
+      asciiArt: '░░▒▒▓▓██▓▓▒▒░░\n░▒▓█ ondas █▓▒░\n░░▒▒▓▓██▓▓▒▒░░',
+      playIcon: pIcon, tStr: fmt(s.t), dStr: fmt(dur),
+      wave: this.wave(curT, waveN, played, buf), waveSmall: this.wave(curT, wide ? 60 : 22, played, buf),
+      togglePlay: e => { stop(e); this.togglePlay(); }, prev: e => { stop(e); this.step(-1); }, next: e => { stop(e); this.step(1); },
+      seekWave: e => { stop(e); const r = e.currentTarget.getBoundingClientRect(); this.seek(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width))); },
+      openPlayer: () => this.setState({ playerOpen: true }), closePlayer: () => this.setState({ playerOpen: false }), playerOpen: s.playerOpen && !!curT,
+      controls: [
+        ['ph ph-shuffle', 's', () => this.setState({ shuffle: !s.shuffle }), s.shuffle],
+        ['ph-fill ph-skip-back', 'p', () => this.step(-1)],
+        [pIcon, 'espaço', () => this.togglePlay(), true],
+        ['ph-fill ph-skip-forward', 'n', () => this.step(1)],
+        ['ph ph-repeat-once', 'r', () => this.setState({ repeat: !s.repeat }), s.repeat],
+        [liked ? 'ph-fill ph-heart' : 'ph ph-heart', 'l', () => this.likeCur(), liked],
+        [curCached ? 'ph-fill ph-check-circle' : 'ph ph-download-simple', 'd', () => this.dlCur(), curCached]
+      ].map(([icon, key, fn, on]) => ({ icon, key, go: fn, bd: on ? 'var(--color-accent)' : 'var(--color-neutral-800)', fg: on ? 'var(--color-accent-200)' : 'var(--color-neutral-300)' })),
+      bufBar: { a: '█'.repeat(ba), b: '▓'.repeat(bb), c: '░'.repeat(Math.max(0, BN - ba - bb)) },
+      bufShort: curCached ? 'buf: local' : 'buf: +' + fmt(ahead),
+      bufTitle: curCached ? 'arquivo local — toca sem rede' : curDl != null ? 'baixando ' + Math.round(curDl * 100) + '% → disponível offline' : (curT && curT.stream ? 'stream · ' : 'prévia · ') + fmt(ahead) + ' em buffer à frente',
+      srcColor: curCached ? 'var(--ansi-2)' : 'var(--color-neutral-300)',
+      showDlBtn: !curCached && curDl == null, dlBtnLabel: s.user ? '[d] baixar para offline' : '[d] entrar para baixar', dlCur: () => this.dlCur(),
+      hasGate: !!s.gate, closeGate: () => this.setState({ gate: null }), stop,
+      gateTitle: s.gate ? (s.gate.kind === 'dl' ? 'downloads exigem login' : '"' + s.gate.title + '" é uma faixa [pro]') : '',
+      gateBody: s.gate ? (s.gate.kind === 'dl' ? 'entre na sua conta para salvar "' + s.gate.title + '" no aparelho e ouvir sem conexão.' : 'entre gratuitamente para liberar o catálogo completo — ou continue ouvindo as faixas grátis.') : '',
+      hasToast: !!s.toast, toast: s.toast,
+      opacity: this.op(), opacityStr: this.op().toFixed(2), onOpacity: e => this.setOpacity(parseFloat(e.target.value)),
+      blur: s.blur, blurPx: s.blur + 'px', blurOp: this.op() < 1 ? 1 : 0.45, onBlur: e => { const v = parseInt(e.target.value, 10); sv('blur', v); this.setState({ blur: v }); },
+      onWallFile: e => this.setWallFile(e),
+      walls: [['capa', 'capa-atual'], ...(s.wallImg ? [['imagem', 'imagem']] : []), ['nenhum', 'nenhum']].map(([k, l]) => ({ label: s.wall === k ? '[' + l + ']' : l, go: () => { sv('wall', k); this.setState({ wall: k }); }, bg: s.wall === k ? 'var(--color-accent-900)' : 'transparent', fg: s.wall === k ? 'var(--color-accent-200)' : 'var(--color-neutral-400)' })),
+      hasWall: this.op() < 1 && s.wall !== 'nenhum',
+      wallBg: (() => { if (s.wall === 'imagem' && s.wallImg) return 'url("' + s.wallImg + '")'; const a = (curT && curT.art) || ((tracks.find(t => t.art) || {}).art); return a ? 'url("' + a + '")' : 'radial-gradient(40% 50% at 20% 30%, var(--ansi-5), transparent), radial-gradient(40% 50% at 80% 70%, var(--ansi-4), transparent), radial-gradient(30% 40% at 60% 15%, var(--ansi-1), transparent)'; })(),
+      themeName: tmeta[0], pickerOpen: s.pickerOpen, openPicker: () => this.openPicker(),
+      closePicker: () => { this.applyTheme(tid); this.setState({ pickerOpen: false }); }, pickLeave: () => this.applyTheme(THEMES[s.pickIdx][0]),
+      themeRows: THEMES.map((t, i) => ({ name: t[1], mark: t[0] === tid ? '●' : i === s.pickIdx ? '❯' : '', bg: i === s.pickIdx ? 'var(--color-accent-900)' : 'transparent', bgc: t[2], sw: t[5], go: () => this.setTheme(t[0]), hover: () => { this.setState({ pickIdx: i }); this.applyTheme(t[0]); } }))
+    };
+  }
+  img(src, lazy) { return React.createElement('img', { src, alt: '', loading: lazy ? 'lazy' : undefined, style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block', imageRendering: this.props.pixelArt === false ? 'auto' : 'pixelated' } }); }
+  doLogin() {
+    const s = this.state;
+    if (!/.+@.+\..+/.test(s.email)) return this.setState({ err: 'e-mail inválido' });
+    if (s.pass.length < 4) return this.setState({ err: 'senha precisa de 4+ caracteres' });
+    const user = { name: s.email.split('@')[0].toLowerCase() }; sv('user', user);
+    this.setState({ user, screen: 'app', pass: '', gate: null }); this.flash('autenticado como ' + user.name + ' — catálogo completo liberado');
+  }
+}
+</script>
+</body>
+</html>

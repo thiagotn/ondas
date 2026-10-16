@@ -1,0 +1,10 @@
+/* Camada de fundo. `inset: -60px` esconde as bordas esmaecidas do blur, que de
+   outro modo apareceriam como um halo claro nos cantos da tela. */
+.wall {
+  position: fixed;
+  inset: -60px;
+  z-index: 0;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+}

@@ -142,3 +142,61 @@ test('abertura toca no boot e volta pelo logo da barra de abas', async ({ page }
   await splash.click();
   await expect(splash).toBeHidden();
 });
+
+test('coluna central no desktop com faixas de ponta a ponta', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+  await page.getByRole('button', { name: /Maré Baixa/ }).click();
+
+  const largura = page.viewportSize()!.width;
+  const coluna = Math.min(1080, largura);
+
+  // A barra de abas é a faixa; o que está dentro dela é a coluna.
+  const abas = page.getByRole('button', { name: '~/em-alta' });
+  const medidas = await abas.evaluate((el) => {
+    const inner = el.parentElement!.getBoundingClientRect();
+    const band = el.parentElement!.parentElement!.getBoundingClientRect();
+    return { inner: Math.round(inner.width), band: Math.round(band.width) };
+  });
+  expect(medidas.band).toBe(largura);
+  expect(medidas.inner).toBe(coluna);
+
+  // Conteúdo e linha do player seguem a mesma coluna.
+  for (const alvo of [page.locator('main > div').first(), page.getByText('PLAY', { exact: true })]) {
+    const box = (await alvo.boundingBox())!;
+    expect(Math.round(box.width)).toBeLessThanOrEqual(coluna);
+  }
+});
+
+test('transparência do fundo liga pelo painel de temas e volta ao opaco', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+
+  const wallpaper = page.locator('div[aria-hidden="true"][style*="blur("]');
+  const bgA = () =>
+    page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-bg-a').trim());
+
+  // Padrão opaco: nada de wallpaper no DOM.
+  await expect(wallpaper).toHaveCount(0);
+  expect(await bgA()).toContain('100%');
+
+  await page.getByRole('button', { name: 'Trocar tema' }).click();
+  const slider = page.getByLabel('background-opacity');
+  const trilha = (await slider.boundingBox())!;
+  await page.mouse.click(trilha.x + trilha.width * 0.4, trilha.y + trilha.height / 2);
+
+  await expect(wallpaper).toHaveCount(1);
+  expect(await bgA()).not.toContain('100%');
+  // As rampas que carregam texto e borda continuam opacas.
+  const neutral = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue('--color-neutral-500'),
+  );
+  expect(neutral).not.toContain('transparent');
+
+  // De volta ao fim da trilha: opaco de novo, sem wallpaper.
+  await page.mouse.click(trilha.x + trilha.width - 2, trilha.y + trilha.height / 2);
+  await expect(wallpaper).toHaveCount(0);
+  expect(await bgA()).toContain('100%');
+});

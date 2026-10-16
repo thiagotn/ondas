@@ -1,8 +1,26 @@
 import { createStore } from 'zustand/vanilla';
 import { DEFAULT_THEME_ID } from '../themes.js';
-import type { Gate, GateKind, LibrarySegment, TabId, ThemeId } from '../types.js';
+import type { Gate, GateKind, LibrarySegment, TabId, ThemeId, WallMode } from '../types.js';
 
 export const TOAST_MS = 3200;
+
+/** Limites do painel de transparência (iguais aos dos sliders). */
+export const OPACITY_MIN = 0.3;
+export const OPACITY_MAX = 1;
+export const BLUR_MAX = 40;
+/** Opacidade assumida ao enviar uma imagem com o fundo ainda opaco. */
+export const OPACITY_ON_UPLOAD = 0.8;
+
+const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+
+/** Preferências de fundo — persistidas pela plataforma (no web, IndexedDB). */
+export interface BackgroundSettings {
+  opacity: number;
+  blur: number;
+  wall: WallMode;
+  /** dataURL da imagem enviada. Vazio enquanto não houver uma. */
+  wallImg: string;
+}
 
 export interface UiState {
   tab: TabId;
@@ -18,6 +36,11 @@ export interface UiState {
   pickIdx: number;
   /** Simulação de queda de rede — só habilitada em build de dev. */
   simulatedOffline: boolean;
+  /** Transparência do fundo (0,3–1). Em 1 o app fica idêntico ao opaco. */
+  opacity: number;
+  blur: number;
+  wall: WallMode;
+  wallImg: string;
   setTab(tab: TabId): void;
   setQ(q: string): void;
   setGenre(genre: string): void;
@@ -33,11 +56,17 @@ export interface UiState {
   closePicker(): void;
   setPickIdx(index: number): void;
   setSimulatedOffline(value: boolean): void;
+  setOpacity(value: number): void;
+  setBlur(value: number): void;
+  setWall(wall: WallMode): void;
+  /** Imagem enviada: passa a valer na hora e revela o efeito se o fundo estava opaco. */
+  setWallImage(dataUrl: string): void;
+  hydrateBackground(settings: Partial<BackgroundSettings>): void;
 }
 
 export type UiStore = ReturnType<typeof createUiStore>;
 
-export function createUiStore(initial?: { themeId?: ThemeId; tab?: TabId }) {
+export function createUiStore(initial?: { themeId?: ThemeId; tab?: TabId; opacity?: number }) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   return createStore<UiState>((set) => ({
     tab: initial?.tab ?? 'home',
@@ -51,6 +80,10 @@ export function createUiStore(initial?: { themeId?: ThemeId; tab?: TabId }) {
     pickerOpen: false,
     pickIdx: 0,
     simulatedOffline: false,
+    opacity: clamp(initial?.opacity ?? OPACITY_MAX, OPACITY_MIN, OPACITY_MAX),
+    blur: 16,
+    wall: 'capa',
+    wallImg: '',
     setTab: (tab) => set({ tab }),
     setQ: (q) => set({ q }),
     setGenre: (genre) => set({ genre }),
@@ -72,6 +105,23 @@ export function createUiStore(initial?: { themeId?: ThemeId; tab?: TabId }) {
     closePicker: () => set({ pickerOpen: false }),
     setPickIdx: (pickIdx) => set({ pickIdx }),
     setSimulatedOffline: (simulatedOffline) => set({ simulatedOffline }),
+    setOpacity: (value) => set({ opacity: clamp(value, OPACITY_MIN, OPACITY_MAX) }),
+    setBlur: (value) => set({ blur: clamp(Math.round(value), 0, BLUR_MAX) }),
+    setWall: (wall) => set({ wall }),
+    setWallImage: (wallImg) =>
+      set((st) => ({
+        wallImg,
+        wall: 'imagem',
+        // Enviar uma imagem com o fundo opaco não mostraria nada.
+        opacity: st.opacity >= OPACITY_MAX ? OPACITY_ON_UPLOAD : st.opacity,
+      })),
+    hydrateBackground: (settings) =>
+      set((st) => ({
+        opacity: clamp(settings.opacity ?? st.opacity, OPACITY_MIN, OPACITY_MAX),
+        blur: clamp(Math.round(settings.blur ?? st.blur), 0, BLUR_MAX),
+        wall: settings.wall ?? st.wall,
+        wallImg: settings.wallImg ?? st.wallImg,
+      })),
   }));
 }
 

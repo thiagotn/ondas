@@ -33,8 +33,10 @@ export function BottomBar({ track }: { track: Track | undefined }) {
   return (
     <div className={s.bar}>
       {toast && (
-        <div className={s.toast} role="status">
-          <span className={s.toastMark}>»</span> {toast}
+        <div className={s.toast}>
+          <div className={s.toastInner} role="status">
+            <span className={s.toastMark}>»</span> {toast}
+          </div>
         </div>
       )}
       {track && <PlayerRow track={track} />}
@@ -137,34 +139,36 @@ function StatusLine({ track }: { track: Track | undefined }) {
 
   return (
     <div className={s.status}>
-      {/* Em produção o indicador só reflete a rede; a simulação é ferramenta de dev. */}
-      {import.meta.env.DEV ? (
-        <button
-          type="button"
-          className={`${s.net} ${s.netToggle} ${offline ? s.netOffline : ''}`}
-          onClick={controller.toggleSimulatedOffline}
-          title="Simular queda de rede (o)"
-        >
-          ● {offline ? 'offline' : 'online'}
-        </button>
-      ) : (
-        <span className={`${s.net} ${offline ? s.netOffline : ''}`}>
-          ● {offline ? 'offline' : 'online'}
-        </span>
-      )}
-      <span>{userTag(user)}</span>
-      {track && <span>{bufferShortLabel(cached, ahead)}</span>}
-      <span className={s.spacer} />
-      {wide && (
-        <span>
-          {LEGEND.map(([key, label]) => (
-            <span key={key}>
-              <span className={s.legendKey}>{key}</span> {label}
-              {'  '}
-            </span>
-          ))}
-        </span>
-      )}
+      <div className={s.statusInner}>
+        {/* Em produção o indicador só reflete a rede; a simulação é ferramenta de dev. */}
+        {import.meta.env.DEV ? (
+          <button
+            type="button"
+            className={`${s.net} ${s.netToggle} ${offline ? s.netOffline : ''}`}
+            onClick={controller.toggleSimulatedOffline}
+            title="Simular queda de rede (o)"
+          >
+            ● {offline ? 'offline' : 'online'}
+          </button>
+        ) : (
+          <span className={`${s.net} ${offline ? s.netOffline : ''}`}>
+            ● {offline ? 'offline' : 'online'}
+          </span>
+        )}
+        <span>{userTag(user)}</span>
+        {track && <span>{bufferShortLabel(cached, ahead)}</span>}
+        <span className={s.spacer} />
+        {wide && (
+          <span>
+            {LEGEND.map(([key, label]) => (
+              <span key={key}>
+                <span className={s.legendKey}>{key}</span> {label}
+                {'  '}
+              </span>
+            ))}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

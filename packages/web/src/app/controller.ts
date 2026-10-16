@@ -210,7 +210,7 @@ async function prefetchNext(index: number): Promise<void> {
 
 export function setTheme(id: ThemeId): void {
   storeTheme(id);
-  applyTheme(id);
+  applyTheme(id, uiStore.getState().opacity);
   uiStore.getState().setThemeId(id);
   uiStore.getState().closePicker();
   uiStore.getState().flash('tema → ' + id);

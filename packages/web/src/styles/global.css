@@ -9,6 +9,9 @@
   --color-text: #cdd6f4;
   --color-accent: #cba6f7;
   --radius-sm: 4px;
+  /* Largura da coluna de conteúdo no desktop. As faixas (fundo e bordas) vão
+     de ponta a ponta; só o conteúdo fica preso a esta medida. */
+  --content-max: 1080px;
 }
 
 * {
@@ -31,8 +34,10 @@ body {
   overscroll-behavior: none;
 }
 
+/* O fundo opaco é o do `body`; a raiz é transparente para o wallpaper aparecer. */
 #root {
   min-height: 100%;
+  background: transparent;
 }
 
 button,
