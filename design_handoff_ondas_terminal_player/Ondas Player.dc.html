@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/nocturne-80773e82-ab7a-4867-b1b5-a33e927b45d9/styles.css">
+<script src="_ds/nocturne-80773e82-ab7a-4867-b1b5-a33e927b45d9/_ds_bundle.js"></script>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+a{color:var(--color-accent-300)}a:hover{color:var(--color-accent-200)}
+*{box-sizing:border-box}
+button{font-family:inherit}
+::-webkit-scrollbar{width:0;height:0}
+</style>
+</helmet>
+<div style="min-height:100vh;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)">
+
+<sc-if value="{{ isLogin }}" hint-placeholder-val="{{ true }}">
+<div style="min-height:100vh;display:flex;align-items:center;padding:32px 24px;background:radial-gradient(120% 60% at 0% 0%, var(--color-accent-900), transparent 70%)">
+  <div style="width:100%;max-width:380px;display:flex;flex-direction:column;gap:22px">
+    <div style="display:flex;align-items:center;gap:8px;color:var(--color-accent)"><i class="ph ph-waveform" style="font-size:26px"></i><span style="font-size:20px;font-weight:500;color:var(--color-text);letter-spacing:-0.01em">ondas</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <h1 style="margin:0;font-size:30px;line-height:1.15;font-weight:500;letter-spacing:-0.02em;text-wrap:pretty">O som de quem cria, em qualquer tela.</h1>
+      <p style="margin:0;color:var(--color-neutral-400);font-size:14px;line-height:1.5;text-wrap:pretty">Entre para ouvir o catálogo completo e baixar faixas para ouvir offline.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="field" style="display:flex;flex-direction:column;gap:6px"><label style="font-size:12px;color:var(--color-neutral-400)">E-mail</label><input class="input" type="email" placeholder="voce@email.com" value="{{ email }}" onChange="{{ onEmail }}" style="height:44px"></div>
+      <div class="field" style="display:flex;flex-direction:column;gap:6px"><label style="font-size:12px;color:var(--color-neutral-400)">Senha</label><input class="input" type="password" placeholder="••••••" value="{{ pass }}" onChange="{{ onPass }}" style="height:44px"></div>
+      <sc-if value="{{ hasErr }}"><div style="font-size:13px;color:var(--color-accent-300)">{{ err }}</div></sc-if>
+      <button class="btn btn-primary btn-block" onClick="{{ doLogin }}" style="height:44px">Entrar</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;color:var(--color-neutral-600);font-size:12px"><span style="flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--color-neutral-800))"></span>ou<span style="flex:1;height:1px;background:linear-gradient(90deg,var(--color-neutral-800),transparent)"></span></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-secondary btn-block" onClick="{{ doGuest }}" style="height:44px">Ouvir sem conta</button>
+      <p style="margin:0;font-size:12px;line-height:1.5;color:var(--color-neutral-500)">Visitantes ouvem apenas faixas grátis, sem downloads offline.</p>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isApp }}">
+<div style="display:flex;height:100vh">
+  <sc-if value="{{ wide }}">
+  <aside style="width:220px;flex-shrink:0;padding:20px 12px;display:flex;flex-direction:column;gap:18px;border-right:1px solid var(--color-neutral-900)">
+    <div style="display:flex;align-items:center;gap:8px;padding:0 8px;color:var(--color-accent)"><i class="ph ph-waveform" style="font-size:22px"></i><span style="font-size:17px;font-weight:500;color:var(--color-text)">ondas</span></div>
+    <nav style="display:flex;flex-direction:column;gap:2px">
+      <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="3">
+        <button onClick="{{ tb.go }}" style="display:flex;align-items:center;gap:10px;height:40px;padding:0 10px;border:0;border-radius:var(--radius-md);background:{{ tb.bg }};color:{{ tb.fg }};font-size:14px;cursor:pointer;text-align:left" style-hover="background:var(--color-neutral-900)"><i class="{{ tb.icon }}" style="font-size:19px"></i>{{ tb.label }}</button>
+      </sc-for>
+    </nav>
+  </aside>
+  </sc-if>
+
+  <main style="flex:1;min-width:0;overflow-y:auto;padding-bottom:{{ mainPad }}">
+    <div style="max-width:1100px;padding:16px 18px 24px;display:flex;flex-direction:column;gap:22px">
+      <header style="display:flex;align-items:center;gap:10px;padding-top:4px">
+        <h1 style="margin:0;flex:1;font-size:24px;font-weight:500;letter-spacing:-0.02em">{{ tabTitle }}</h1>
+        <button onClick="{{ toggleOffline }}" title="Simular conexão" style="display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:999px;border:1px solid {{ netBd }};background:transparent;color:{{ netFg }};font-size:12px;cursor:pointer"><i class="{{ netIcon }}" style="font-size:15px"></i>{{ netLabel }}</button>
+        <sc-if value="{{ loggedIn }}"><button onClick="{{ goLibrary }}" style="width:34px;height:34px;border-radius:999px;border:1px solid var(--color-accent-700);background:var(--color-accent-900);color:var(--color-accent-200);font-size:13px;font-weight:500;cursor:pointer">{{ initial }}</button></sc-if>
+        <sc-if value="{{ isGuest }}"><button class="btn btn-primary" onClick="{{ goLogin }}" style="height:32px">Entrar</button></sc-if>
+      </header>
+
+      <sc-if value="{{ isHome }}">
+        <sc-if value="{{ isGuest }}">
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--radius-md);background:var(--color-surface);box-shadow:var(--shadow-sm)">
+          <i class="ph ph-lock-simple-open" style="font-size:20px;color:var(--color-accent)"></i>
+          <div style="flex:1;font-size:13px;line-height:1.45;color:var(--color-neutral-300)">Modo visitante: faixas com <i class="ph-fill ph-lock-simple" style="color:var(--color-accent)"></i> exigem conta.</div>
+          <button class="btn btn-ghost" onClick="{{ goLogin }}" style="height:32px">Criar conta</button>
+        </div>
+        </sc-if>
+        <div style="display:flex;gap:8px;overflow-x:auto;margin:0 -18px;padding:0 18px">
+          <sc-for list="{{ chips }}" as="c" hint-placeholder-count="5">
+            <button onClick="{{ c.go }}" style="flex-shrink:0;height:32px;padding:0 14px;border-radius:999px;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }};font-size:13px;cursor:pointer">{{ c.label }}</button>
+          </sc-for>
+        </div>
+        <section style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:baseline;gap:8px"><h2 style="margin:0;font-size:16px;font-weight:500">Em alta agora</h2><span style="font-size:12px;color:var(--color-neutral-500)">{{ source }}</span></div>
+          <sc-if value="{{ loading }}"><div style="font-size:13px;color:var(--color-neutral-500);display:flex;gap:8px;align-items:center"><i class="ph ph-circle-notch"></i>Carregando metadados…</div></sc-if>
+          <div style="display:flex;gap:14px;overflow-x:auto;margin:0 -18px;padding:0 18px 4px">
+            <sc-for list="{{ featured }}" as="f" hint-placeholder-count="4">
+              <button onClick="{{ f.play }}" style="flex-shrink:0;width:148px;padding:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:8px;opacity:{{ f.op }}">
+                <div style="position:relative;width:148px;height:148px;border-radius:var(--radius-md);overflow:hidden;background:var(--color-surface);box-shadow:var(--shadow-sm)">
+                  <sc-if value="{{ f.hasArt }}"><img src="{{ f.art }}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block"></sc-if>
+                  <sc-if value="{{ f.noArt }}"><div style="width:100%;height:100%;display:flex;align-items:flex-end;padding:10px;background:var(--color-accent-900);color:var(--color-accent-300);font-size:28px;font-weight:500">{{ f.ini }}</div></sc-if>
+                  <sc-if value="{{ f.locked }}"><span style="position:absolute;top:8px;left:8px;width:24px;height:24px;border-radius:999px;background:var(--color-bg);display:flex;align-items:center;justify-content:center;color:var(--color-accent)"><i class="ph-fill ph-lock-simple" style="font-size:13px"></i></span></sc-if>
+                  <sc-if value="{{ f.cached }}"><span style="position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:999px;background:var(--color-bg);display:flex;align-items:center;justify-content:center;color:var(--color-accent-300)"><i class="ph-fill ph-arrow-circle-down" style="font-size:14px"></i></span></sc-if>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                  <span style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ f.tc }}">{{ f.title }}</span>
+                  <span style="font-size:12px;color:var(--color-neutral-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.artist }}</span>
+                </div>
+              </button>
+            </sc-for>
+          </div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ isSearch }}">
+        <div style="position:relative">
+          <i class="ph ph-magnifying-glass" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--color-neutral-500);font-size:17px"></i>
+          <input class="input" placeholder="Faixas, artistas, gêneros" value="{{ q }}" onChange="{{ onQ }}" style="width:100%;height:44px;padding-left:38px">
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isLibrary }}">
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:var(--radius-md);background:var(--color-surface);box-shadow:var(--shadow-sm)">
+            <div style="width:40px;height:40px;border-radius:999px;background:var(--color-accent-900);color:var(--color-accent-200);display:flex;align-items:center;justify-content:center;font-weight:500">{{ initial }}</div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">{{ userName }}</span><span style="font-size:12px;color:var(--color-neutral-500)">{{ planLabel }}</span></div>
+            <sc-if value="{{ loggedIn }}"><button class="btn btn-ghost" onClick="{{ logout }}" style="height:32px">Sair</button></sc-if>
+            <sc-if value="{{ isGuest }}"><button class="btn btn-primary" onClick="{{ goLogin }}" style="height:32px">Entrar</button></sc-if>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;padding:4px 14px;border-radius:var(--radius-md);background:var(--color-surface);box-shadow:var(--shadow-sm)">
+            <button onClick="{{ togglePrefetch }}" style="display:flex;align-items:center;gap:12px;min-height:52px;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;padding:0">
+              <i class="ph ph-cloud-arrow-down" style="font-size:20px;color:var(--color-neutral-400)"></i>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px">Buffer inteligente</span><span style="font-size:12px;color:var(--color-neutral-500);line-height:1.4">Guarda a próxima faixa no aparelho enquanto você ouve</span></div>
+              <span style="width:36px;height:20px;border-radius:999px;padding:2px;display:flex;justify-content:{{ swJust }};background:{{ swBg }};border:1px solid {{ swBd }}"><span style="width:14px;height:14px;border-radius:999px;background:{{ swDot }}"></span></span>
+            </button>
+            <div style="display:flex;align-items:center;gap:12px;min-height:44px;border-top:1px solid var(--color-neutral-900)">
+              <i class="ph ph-hard-drives" style="font-size:20px;color:var(--color-neutral-400)"></i>
+              <span style="flex:1;font-size:14px">Armazenamento offline</span>
+              <span style="font-size:13px;color:var(--color-neutral-400)">{{ storage }}</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:4px;padding:3px;border-radius:var(--radius-md);background:var(--color-neutral-900);align-self:flex-start">
+            <sc-for list="{{ segs }}" as="s" hint-placeholder-count="2">
+              <button onClick="{{ s.go }}" style="height:30px;padding:0 14px;border-radius:6px;border:0;background:{{ s.bg }};color:{{ s.fg }};font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px"><i class="{{ s.icon }}"></i>{{ s.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <section style="display:flex;flex-direction:column;gap:6px">
+        <sc-if value="{{ hasListTitle }}"><h2 style="margin:0 0 6px;font-size:16px;font-weight:500">{{ listTitle }}</h2></sc-if>
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+          <div onClick="{{ r.play }}" style="display:flex;align-items:center;gap:12px;min-height:60px;padding:6px 8px;margin:0 -8px;border-radius:var(--radius-md);cursor:pointer;background:{{ r.bg }}" style-hover="background:var(--color-neutral-900)">
+            <div style="position:relative;width:48px;height:48px;flex-shrink:0;border-radius:6px;overflow:hidden;background:var(--color-surface);opacity:{{ r.op }}">
+              <sc-if value="{{ r.hasArt }}"><img src="{{ r.art }}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block"></sc-if>
+              <sc-if value="{{ r.noArt }}"><div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--color-accent-900);color:var(--color-accent-300);font-size:16px;font-weight:500">{{ r.ini }}</div></sc-if>
+              <sc-if value="{{ r.isCur }}"><div style="position:absolute;inset:0;background:rgba(22,24,38,.6);display:flex;align-items:center;justify-content:center;color:var(--color-accent-200)"><i class="{{ r.curIcon }}" style="font-size:20px"></i></div></sc-if>
+            </div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;opacity:{{ r.op }}">
+              <span style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.tc }}">{{ r.title }}</span>
+              <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-neutral-500);white-space:nowrap;overflow:hidden">
+                <sc-if value="{{ r.locked }}"><i class="ph-fill ph-lock-simple" style="color:var(--color-accent);flex-shrink:0"></i></sc-if>
+                <sc-if value="{{ r.cached }}"><i class="ph-fill ph-arrow-circle-down" style="color:var(--color-accent-300);flex-shrink:0"></i></sc-if>
+                <span style="overflow:hidden;text-overflow:ellipsis">{{ r.meta }}</span>
+              </span>
+            </div>
+            <button onClick="{{ r.like }}" aria-label="Curtir" style="width:40px;height:40px;flex-shrink:0;border:0;border-radius:999px;background:transparent;color:{{ r.likeFg }};cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:var(--color-neutral-800)"><i class="{{ r.likeIcon }}" style="font-size:19px"></i></button>
+            <button onClick="{{ r.dl }}" aria-label="Offline" style="width:40px;height:40px;flex-shrink:0;border:0;border-radius:999px;background:transparent;color:{{ r.dlFg }};cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;font-variant-numeric:tabular-nums" style-hover="background:var(--color-neutral-800)">
+              <sc-if value="{{ r.isDl }}">{{ r.dlPct }}</sc-if>
+              <sc-if value="{{ r.notDl }}"><i class="{{ r.dlIcon }}" style="font-size:20px"></i></sc-if>
+            </button>
+          </div>
+        </sc-for>
+        <sc-if value="{{ empty }}"><div style="padding:28px 0;display:flex;flex-direction:column;gap:6px;color:var(--color-neutral-500);font-size:13px;line-height:1.5"><i class="{{ emptyIcon }}" style="font-size:26px;color:var(--color-neutral-700)"></i>{{ emptyText }}</div></sc-if>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div style="position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column;background:var(--color-bg);z-index:10">
+  <sc-if value="{{ showMini }}">
+  <div onClick="{{ openPlayer }}" style="position:relative;display:flex;align-items:center;gap:10px;padding:8px 10px;margin:0 8px 6px;border-radius:var(--radius-md);background:var(--color-surface);box-shadow:var(--shadow-md);cursor:pointer;overflow:hidden">
+    <div style="position:absolute;left:0;bottom:0;height:2px;width:{{ bufPct }};background:var(--color-neutral-700)"></div>
+    <div style="position:absolute;left:0;bottom:0;height:2px;width:{{ progPct }};background:var(--color-accent)"></div>
+    <div style="width:40px;height:40px;border-radius:6px;overflow:hidden;flex-shrink:0;background:var(--color-accent-900)">
+      <sc-if value="{{ cur.hasArt }}"><img src="{{ cur.art }}" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></sc-if>
+    </div>
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+      <span style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cur.title }}</span>
+      <span style="font-size:12px;color:var(--color-neutral-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cur.artist }}</span>
+    </div>
+    <button onClick="{{ toggleLikeCur }}" style="width:40px;height:40px;border:0;background:transparent;color:{{ curLikeFg }};cursor:pointer;border-radius:999px"><i class="{{ curLikeIcon }}" style="font-size:20px"></i></button>
+    <button onClick="{{ togglePlay }}" style="width:44px;height:44px;border:0;background:transparent;color:var(--color-text);cursor:pointer;border-radius:999px"><i class="{{ playIcon }}" style="font-size:24px"></i></button>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ showBar }}">
+  <div style="display:flex;align-items:center;gap:18px;height:76px;padding:0 18px;border-top:1px solid var(--color-neutral-900);background:var(--color-bg)">
+    <div onClick="{{ openPlayer }}" style="display:flex;align-items:center;gap:10px;width:240px;min-width:0;cursor:pointer">
+      <div style="width:48px;height:48px;border-radius:6px;overflow:hidden;flex-shrink:0;background:var(--color-accent-900)"><sc-if value="{{ cur.hasArt }}"><img src="{{ cur.art }}" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></sc-if></div>
+      <div style="min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cur.title }}</span><span style="font-size:12px;color:var(--color-neutral-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cur.artist }}</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px">
+      <button onClick="{{ prev }}" class="btn btn-icon btn-ghost"><i class="ph-fill ph-skip-back" style="font-size:18px"></i></button>
+      <button onClick="{{ togglePlay }}" style="width:42px;height:42px;border-radius:999px;border:1px solid var(--color-accent);background:transparent;color:var(--color-accent-200);cursor:pointer;display:flex;align-items:center;justify-content:center"><i class="{{ playIcon }}" style="font-size:18px"></i></button>
+      <button onClick="{{ next }}" class="btn btn-icon btn-ghost"><i class="ph-fill ph-skip-forward" style="font-size:18px"></i></button>
+    </div>
+    <span style="font-size:12px;color:var(--color-neutral-500);font-variant-numeric:tabular-nums">{{ tStr }}</span>
+    <div onClick="{{ seekWave }}" style="flex:1;min-width:80px;height:36px;display:flex;align-items:center;gap:2px;cursor:pointer">
+      <sc-for list="{{ barsSmall }}" as="b" hint-placeholder-count="40"><span style="flex:1;border-radius:1px;height:{{ b.h }};background:{{ b.c }}"></span></sc-for>
+    </div>
+    <span style="font-size:12px;color:var(--color-neutral-500);font-variant-numeric:tabular-nums">{{ dStr }}</span>
+    <button onClick="{{ toggleLikeCur }}" class="btn btn-icon btn-ghost" style="color:{{ curLikeFg }}"><i class="{{ curLikeIcon }}" style="font-size:18px"></i></button>
+    <button onClick="{{ openPlayer }}" class="btn btn-icon btn-ghost"><i class="ph ph-arrows-out-simple" style="font-size:18px"></i></button>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ narrow }}">
+  <nav style="display:flex;height:58px;border-top:1px solid var(--color-neutral-900)">
+    <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="3">
+      <button onClick="{{ tb.go }}" style="flex:1;border:0;background:transparent;color:{{ tb.fg }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;cursor:pointer"><i class="{{ tb.icon }}" style="font-size:22px"></i>{{ tb.label }}</button>
+    </sc-for>
+  </nav>
+  </sc-if>
+</div>
+
+<sc-if value="{{ playerOpen }}">
+<div style="position:fixed;inset:0;z-index:20;overflow-y:auto;background:radial-gradient(90% 55% at 15% 0%, var(--color-accent-900), var(--color-bg) 75%)">
+  <div style="max-width:960px;min-height:100%;margin:0 auto;padding:12px 20px 28px;display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <button onClick="{{ closePlayer }}" class="btn btn-icon btn-ghost" style="width:44px;height:44px"><i class="ph ph-caret-down" style="font-size:22px"></i></button>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-500)">Tocando de</span><span style="font-size:13px;color:var(--color-neutral-300)">{{ cur.genre }}</span></div>
+      <button onClick="{{ dlCur }}" class="btn btn-icon btn-ghost" style="width:44px;height:44px;color:{{ curDlFg }}"><i class="{{ curDlIcon }}" style="font-size:22px"></i></button>
+    </div>
+    <div style="flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:28px 40px">
+      <div style="flex:1 1 280px;max-width:440px;aspect-ratio:1;border-radius:var(--radius-lg);overflow:hidden;background:var(--color-accent-900);box-shadow:var(--shadow-md);margin:0 auto">
+        <sc-if value="{{ cur.hasArt }}"><img src="{{ cur.art }}" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></sc-if>
+        <sc-if value="{{ cur.noArt }}"><div style="width:100%;height:100%;display:flex;align-items:flex-end;padding:24px;color:var(--color-accent-300);font-size:64px;font-weight:500">{{ cur.ini }}</div></sc-if>
+      </div>
+      <div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:22px">
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+            <h2 style="margin:0;font-size:24px;font-weight:500;letter-spacing:-0.02em;line-height:1.2;text-wrap:pretty">{{ cur.title }}</h2>
+            <span style="font-size:15px;color:var(--color-neutral-400)">{{ cur.artist }}</span>
+          </div>
+          <button onClick="{{ toggleLikeCur }}" style="width:44px;height:44px;border:0;border-radius:999px;background:transparent;color:{{ curLikeFg }};cursor:pointer"><i class="{{ curLikeIcon }}" style="font-size:26px"></i></button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div onClick="{{ seekWave }}" style="height:72px;display:flex;align-items:center;gap:2px;cursor:pointer">
+            <sc-for list="{{ bars }}" as="b" hint-placeholder-count="64"><span style="flex:1;border-radius:2px;height:{{ b.h }};background:{{ b.c }}"></span></sc-for>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--color-neutral-500);font-variant-numeric:tabular-nums"><span>{{ tStr }}</span><span>{{ dStr }}</span></div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;max-width:380px;width:100%">
+          <button onClick="{{ toggleShuffle }}" class="btn btn-icon btn-ghost" style="width:44px;height:44px;color:{{ shufFg }}"><i class="ph ph-shuffle" style="font-size:20px"></i></button>
+          <button onClick="{{ prev }}" class="btn btn-icon btn-ghost" style="width:48px;height:48px"><i class="ph-fill ph-skip-back" style="font-size:26px"></i></button>
+          <button onClick="{{ togglePlay }}" style="width:72px;height:72px;border-radius:999px;border:1.5px solid var(--color-accent);background:transparent;color:var(--color-accent-200);cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 0 32px rgba(145,132,217,.25)" style-hover="background:var(--color-accent-900)"><i class="{{ playIconBig }}" style="font-size:30px"></i></button>
+          <button onClick="{{ next }}" class="btn btn-icon btn-ghost" style="width:48px;height:48px"><i class="ph-fill ph-skip-forward" style="font-size:26px"></i></button>
+          <button onClick="{{ toggleRepeat }}" class="btn btn-icon btn-ghost" style="width:44px;height:44px;color:{{ repFg }}"><i class="ph ph-repeat-once" style="font-size:20px"></i></button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:var(--radius-md);background:var(--color-surface);box-shadow:var(--shadow-sm)">
+          <i class="{{ bufIcon }}" style="font-size:20px;color:var(--color-accent)"></i>
+          <div style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-size:13px">{{ bufTitle }}</span><span style="font-size:12px;color:var(--color-neutral-500)">{{ bufSub }}</span></div>
+          <sc-if value="{{ showDlBtn }}"><button class="btn btn-secondary" onClick="{{ dlCur }}" style="height:32px">{{ dlBtnLabel }}</button></sc-if>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasGate }}">
+<div onClick="{{ closeGate }}" style="position:fixed;inset:0;z-index:30;background:rgba(10,11,18,.7);display:flex;align-items:flex-end;justify-content:center;padding:16px">
+  <div onClick="{{ stop }}" style="width:100%;max-width:400px;padding:22px;border-radius:var(--radius-lg);background:var(--color-surface);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;gap:14px;margin-bottom:auto;margin-top:auto">
+    <i class="ph ph-lock-simple" style="font-size:26px;color:var(--color-accent)"></i>
+    <div style="display:flex;flex-direction:column;gap:6px"><h3 style="margin:0;font-size:18px;font-weight:500">{{ gateTitle }}</h3><p style="margin:0;font-size:14px;line-height:1.5;color:var(--color-neutral-400);text-wrap:pretty">{{ gateBody }}</p></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-ghost" onClick="{{ closeGate }}" style="height:40px">Agora não</button><button class="btn btn-primary" onClick="{{ goLogin }}" style="height:40px">Entrar</button></div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasToast }}">
+<div style="position:fixed;left:50%;transform:translateX(-50%);bottom:{{ toastBottom }};z-index:40;max-width:calc(100% - 32px);padding:10px 14px;border-radius:var(--radius-md);background:var(--color-neutral-900);box-shadow:var(--shadow-md);font-size:13px;line-height:1.4;color:var(--color-text)">{{ toast }}</div>
+</sc-if>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;login&quot;,&quot;app&quot;],&quot;default&quot;:&quot;login&quot;,&quot;tsType&quot;:&quot;'login'|'app'&quot;},&quot;forceDemo&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;premiumEvery&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:3,&quot;min&quot;:2,&quot;max&quot;:8,&quot;tsType&quot;:&quot;number&quot;}}">
+const K = 'ondas-proto-';
+const DEMO = [
+  ['Maré Baixa','Lia Sombra','Ambient',214],['Concreto Molhado','Turbo Vício','Techno',356],['Neon na Chuva','Kaio Ruas','Synthwave',241],
+  ['Fio de Cobre','Bruma','Lo-fi',172],['Último Trem','Vera Noir','House',298],['Sal & Ferrugem','Os Alfaiates','Indie',203],
+  ['Céu de Sódio','Lia Sombra','Ambient',265],['Pressão 808','MC Lunar','Hip-hop',187],['Calçada Fria','Bruma','Lo-fi',149],
+  ['Ponto Cego','Turbo Vício','Techno',412],['Dobra','Kaio Ruas','Electronic',230],['Fim de Turno','Vera Noir','House',322]
+];
+const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const hash = str => { let h = 2166136261; for (const c of String(str)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+const ld = (k, d) => { try { return JSON.parse(localStorage.getItem(K + k)) ?? d; } catch (e) { return d; } };
+const sv = (k, v) => { try { localStorage.setItem(K + k, JSON.stringify(v)); } catch (e) {} };
+
+class Component extends DCLogic {
+  state = {
+    screen: null, user: ld('user', null), tab: 'home', tracks: [], loading: true, source: '',
+    cur: -1, playing: false, t: 0, dur: 0, buf: 0, waiting: false, playerOpen: false,
+    offline: false, cached: ld('cached', {}), dl: {}, liked: ld('liked', {}), q: '', genre: 'Tudo', seg: 'liked',
+    w: window.innerWidth, gate: null, email: '', pass: '', err: '', prefetch: ld('prefetch', true),
+    shuffle: false, repeat: false, toast: '', sizes: ld('sizes', {})
+  };
+  blobs = new Map();
+  componentDidMount() {
+    this.onResize = () => this.setState({ w: window.innerWidth });
+    window.addEventListener('resize', this.onResize);
+    const a = this.audio = new Audio(); a.preload = 'auto';
+    a.addEventListener('timeupdate', () => this.setState({ t: a.currentTime }));
+    a.addEventListener('durationchange', () => isFinite(a.duration) && this.setState({ dur: a.duration }));
+    a.addEventListener('progress', () => { const b = a.buffered; if (b.length && a.duration) this.setState({ buf: b.end(b.length - 1) / a.duration }); });
+    a.addEventListener('waiting', () => this.setState({ waiting: true }));
+    a.addEventListener('playing', () => this.setState({ waiting: false, playing: true }));
+    a.addEventListener('pause', () => this.setState({ playing: false }));
+    a.addEventListener('ended', () => this.ended());
+    a.addEventListener('error', () => { if (!a.src) return; this.flash('Stream indisponível — tocando prévia simulada'); this.simulate(); });
+    this.fetchTracks();
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); this.audio.pause(); clearInterval(this.sim); }
+  flash(msg) { clearTimeout(this.tt); this.setState({ toast: msg }); this.tt = setTimeout(() => this.setState({ toast: '' }), 3200); }
+  useDemo(source) {
+    const tracks = DEMO.map((d, i) => ({ id: 'demo' + i, title: d[0], artist: d[1], genre: d[2], dur: d[3], art: '', plays: 1200 + (hash(d[0]) % 90000), stream: '' }));
+    this.setState({ tracks, loading: false, source: source || 'Catálogo demo' });
+  }
+  async fetchTracks() {
+    if (this.props.forceDemo) return this.useDemo();
+    try {
+      const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 8000);
+      const hosts = (await (await fetch('https://api.audius.co', { signal: ctl.signal })).json()).data;
+      const host = hosts[Math.floor(Math.random() * hosts.length)];
+      const r = await (await fetch(host + '/v1/tracks/trending?app_name=ONDAS_PROTO&limit=24', { signal: ctl.signal })).json();
+      clearTimeout(to);
+      const tracks = r.data.filter(t => t.is_streamable !== false).map(t => ({
+        id: t.id, title: t.title, artist: (t.user && t.user.name) || '—', genre: t.genre || 'Outros', dur: t.duration || 0,
+        art: (t.artwork && (t.artwork['480x480'] || t.artwork['150x150'])) || '', plays: t.play_count || 0,
+        stream: host + '/v1/tracks/' + t.id + '/stream?app_name=ONDAS_PROTO'
+      }));
+      sv('meta', tracks);
+      this.setState({ tracks, loading: false, source: 'ao vivo · Audius' });
+    } catch (e) {
+      const meta = ld('meta', null);
+      if (meta && meta.length) this.setState({ tracks: meta, loading: false, source: 'metadados salvos no aparelho' });
+      else this.useDemo('catálogo demo (sem conexão com a API)');
+    }
+  }
+  premium(i) { const n = this.props.premiumEvery ?? 3; return i % n === n - 1; }
+  locked(i) { return !this.state.user && this.premium(i); }
+  async getBlob(id) {
+    if (this.blobs.has(id)) return this.blobs.get(id);
+    try { const c = await caches.open('ondas-offline'); const r = await c.match('/offline/' + id); if (r) { const b = await r.blob(); this.blobs.set(id, b); return b; } } catch (e) {}
+    return null;
+  }
+  async play(i) {
+    const s = this.state, tr = s.tracks[i]; if (!tr) return;
+    if (this.locked(i)) return this.setState({ gate: { kind: 'play', title: tr.title } });
+    if (s.offline && !s.cached[tr.id]) return this.flash('Sem conexão — essa faixa não está salva no aparelho');
+    clearInterval(this.sim); this.audio.pause();
+    if (this.objUrl) { URL.revokeObjectURL(this.objUrl); this.objUrl = null; }
+    this.setState({ cur: i, t: 0, dur: tr.dur, buf: s.cached[tr.id] ? 1 : 0, playing: true, waiting: true });
+    let src = tr.stream;
+    if (s.cached[tr.id]) { const b = await this.getBlob(tr.id); if (b) src = this.objUrl = URL.createObjectURL(b); else if (s.offline || !tr.stream) src = ''; }
+    if (!src) { this.audio.removeAttribute('src'); this.simulate(); }
+    else { this.audio.src = src; this.audio.play().catch(() => this.setState({ playing: false, waiting: false })); }
+    if (s.prefetch && s.user) this.prefetchNext(i);
+  }
+  simulate() {
+    clearInterval(this.sim);
+    this.audio.removeAttribute('src');
+    const tr = this.state.tracks[this.state.cur]; const cached = tr && this.state.cached[tr.id];
+    this.setState({ playing: true, waiting: false, dur: (tr && tr.dur) || 200 });
+    this.sim = setInterval(() => {
+      if (!this.state.playing) return;
+      const t = this.state.t + 0.25, d = this.state.dur;
+      if (t >= d) return this.ended();
+      this.setState({ t, buf: cached ? 1 : Math.min(1, Math.max(this.state.buf, (t + 40) / d)) });
+    }, 250);
+  }
+  isSim() { return !this.audio.getAttribute('src'); }
+  togglePlay() {
+    const s = this.state; if (s.cur < 0) return this.play(this.firstPlayable());
+    if (this.isSim()) this.setState({ playing: !s.playing });
+    else if (this.audio.paused) this.audio.play().catch(() => {}); else this.audio.pause();
+  }
+  firstPlayable() { return Math.max(0, this.state.tracks.findIndex((t, i) => !this.locked(i))); }
+  step(dir) {
+    const s = this.state, n = s.tracks.length; if (!n) return;
+    let i = s.cur;
+    for (let k = 0; k < n; k++) {
+      i = s.shuffle ? Math.floor(Math.random() * n) : (i + dir + n) % n;
+      if (!this.locked(i) && (!s.offline || s.cached[s.tracks[i].id])) return this.play(i);
+    }
+  }
+  ended() { if (this.state.repeat) { this.seek(0); if (!this.isSim()) this.audio.play(); } else this.step(1); }
+  seek(f) {
+    const d = this.state.dur || 0;
+    if (this.isSim()) this.setState({ t: f * d }); else if (isFinite(this.audio.duration)) this.audio.currentTime = f * this.audio.duration;
+  }
+  prefetchNext(i) {
+    const s = this.state; for (let k = 1; k < s.tracks.length; k++) {
+      const j = (i + k) % s.tracks.length; if (this.locked(j)) continue;
+      if (!s.cached[s.tracks[j].id]) this.download(s.tracks[j], true); return;
+    }
+  }
+  setDl(id, v) { this.setState(s => { const dl = { ...s.dl }; if (v == null) delete dl[id]; else dl[id] = v; return { dl }; }); }
+  markCached(id, size) {
+    this.setState(s => { const cached = { ...s.cached, [id]: true }, sizes = { ...s.sizes, [id]: size }; sv('cached', cached); sv('sizes', sizes); return { cached, sizes }; });
+  }
+  async download(tr, silent) {
+    const s = this.state, idx = s.tracks.indexOf(tr);
+    if (!s.user) return this.setState({ gate: { kind: 'dl', title: tr.title } });
+    if (s.cached[tr.id]) {
+      this.blobs.delete(tr.id); try { (await caches.open('ondas-offline')).delete('/offline/' + tr.id); } catch (e) {}
+      return this.setState(st => { const cached = { ...st.cached }; delete cached[tr.id]; sv('cached', cached); return { cached }; });
+    }
+    if (s.dl[tr.id] != null) return;
+    if (s.offline) return this.flash('Conecte-se para baixar');
+    this.setDl(tr.id, 0);
+    if (!tr.stream) {
+      let p = 0; const iv = setInterval(() => { p += 0.12; if (p >= 1) { clearInterval(iv); this.setDl(tr.id, null); this.markCached(tr.id, tr.dur * 16000); if (!silent) this.flash('Salva para ouvir offline'); } else this.setDl(tr.id, p); }, 160);
+      return;
+    }
+    try {
+      const res = await fetch(tr.stream); if (!res.ok) throw 0;
+      const len = +res.headers.get('content-length') || 0, rd = res.body.getReader(), chunks = []; let got = 0, last = 0;
+      for (;;) { const { done, value } = await rd.read(); if (done) break; chunks.push(value); got += value.length;
+        if (Date.now() - last > 150) { last = Date.now(); this.setDl(tr.id, len ? got / len : Math.min(0.95, got / 6e6)); } }
+      const blob = new Blob(chunks, { type: res.headers.get('content-type') || 'audio/mpeg' });
+      this.blobs.set(tr.id, blob);
+      try { await (await caches.open('ondas-offline')).put('/offline/' + tr.id, new Response(blob)); } catch (e) {}
+      this.setDl(tr.id, null); this.markCached(tr.id, blob.size);
+      if (!silent) this.flash('Salva para ouvir offline'); else this.flash('Buffer: próxima faixa salva no aparelho');
+    } catch (e) { this.setDl(tr.id, null); if (!silent) this.flash('Não foi possível baixar agora'); }
+  }
+  toggleLike(id) { this.setState(s => { const liked = { ...s.liked }; if (liked[id]) delete liked[id]; else liked[id] = true; sv('liked', liked); return { liked }; }); }
+  bars(tr, n, played, buf) {
+    const out = [], h = hash(tr ? tr.id : 'x');
+    for (let i = 0; i < n; i++) {
+      const v = Math.abs(Math.sin(h * 0.0001 + i * 0.55) * 0.6 + Math.sin(i * 0.17 + h % 7) * 0.4);
+      const f = (i + 0.5) / n;
+      out.push({ h: Math.round(18 + v * 82) + '%', c: f <= played ? 'var(--color-accent)' : f <= buf ? 'var(--color-neutral-600)' : 'var(--color-neutral-800)' });
+    }
+    return out;
+  }
+  renderVals() {
+    const s = this.state, p = this.props;
+    const screen = s.screen || (s.user ? 'app' : (p.startScreen ?? 'login'));
+    const wide = s.w >= 860, tracks = s.tracks, curT = tracks[s.cur];
+    const stop = e => e && e.stopPropagation && e.stopPropagation();
+    const go = tab => () => this.setState({ tab });
+    const isCur = i => i === s.cur;
+    const item = (tr) => {
+      const i = tracks.indexOf(tr), locked = this.locked(i), cached = !!s.cached[tr.id], dlv = s.dl[tr.id];
+      const unavailable = s.offline && !cached;
+      return {
+        title: tr.title, artist: tr.artist, art: tr.art, hasArt: !!tr.art, noArt: !tr.art, ini: tr.title.slice(0, 2),
+        locked, cached, isCur: isCur(i), curIcon: s.waiting && s.playing ? 'ph ph-circle-notch' : s.playing ? 'ph-fill ph-equalizer' : 'ph-fill ph-play',
+        meta: unavailable ? 'Indisponível offline' : [tr.artist, tr.genre, fmt(tr.dur)].join(' · '),
+        op: unavailable ? 0.4 : locked ? 0.7 : 1, tc: isCur(i) ? 'var(--color-accent-300)' : 'var(--color-text)',
+        bg: isCur(i) ? 'var(--color-accent-900)' : 'transparent',
+        likeIcon: s.liked[tr.id] ? 'ph-fill ph-heart' : 'ph ph-heart', likeFg: s.liked[tr.id] ? 'var(--color-accent)' : 'var(--color-neutral-500)',
+        isDl: dlv != null, notDl: dlv == null, dlPct: dlv != null ? Math.round(dlv * 100) + '%' : '',
+        dlIcon: cached ? 'ph-fill ph-arrow-circle-down' : 'ph ph-arrow-circle-down', dlFg: cached || dlv != null ? 'var(--color-accent-300)' : 'var(--color-neutral-500)',
+        play: () => this.play(i), like: e => { stop(e); this.toggleLike(tr.id); }, dl: e => { stop(e); this.download(tr); }
+      };
+    };
+    const genres = ['Tudo', ...[...new Set(tracks.map(t => t.genre))].slice(0, 7)];
+    let list = [], listTitle = '', emptyText = '', emptyIcon = 'ph ph-music-notes';
+    if (s.tab === 'home') { list = tracks.filter(t => s.genre === 'Tudo' || t.genre === s.genre); listTitle = 'Para você'; emptyText = s.loading ? '' : 'Nada por aqui.'; }
+    if (s.tab === 'search') { const q = s.q.trim().toLowerCase(); list = q ? tracks.filter(t => (t.title + ' ' + t.artist + ' ' + t.genre).toLowerCase().includes(q)) : tracks.slice(0, 8); listTitle = q ? list.length + ' resultados' : 'Sugestões'; emptyIcon = 'ph ph-magnifying-glass'; emptyText = 'Nenhuma faixa encontrada para “' + s.q + '”.'; }
+    if (s.tab === 'library') {
+      list = tracks.filter(t => s.seg === 'liked' ? s.liked[t.id] : s.cached[t.id]);
+      emptyIcon = s.seg === 'liked' ? 'ph ph-heart' : 'ph ph-cloud-slash';
+      emptyText = s.seg === 'liked' ? 'Toque no coração de uma faixa para guardá-la aqui.' : (s.user ? 'Baixe faixas para ouvir sem conexão. O buffer inteligente também salva a próxima faixa automaticamente.' : 'Downloads offline exigem uma conta.');
+    }
+    const featured = (s.genre === 'Tudo' ? tracks : tracks.filter(t => t.genre === s.genre)).slice(0, 8);
+    const dur = s.dur || (curT && curT.dur) || 0, played = dur ? s.t / dur : 0, buf = curT && s.cached[curT.id] ? 1 : Math.max(s.buf, played);
+    const mb = Object.keys(s.cached).reduce((a, k) => a + (s.sizes[k] || 0), 0) / 1048576;
+    const curCached = curT && s.cached[curT.id], curDl = curT && s.dl[curT.id];
+    const ahead = Math.max(0, buf * dur - s.t);
+    const liked = curT && s.liked[curT.id];
+    const tabs = [['home', 'Início', 'house'], ['search', 'Buscar', 'magnifying-glass'], ['library', 'Biblioteca', 'books']].map(([k, l, ic]) => ({
+      label: l, icon: (s.tab === k ? 'ph-fill ph-' : 'ph ph-') + ic, go: go(k),
+      fg: s.tab === k ? 'var(--color-accent-200)' : 'var(--color-neutral-500)', bg: s.tab === k ? 'var(--color-accent-900)' : 'transparent'
+    }));
+    const hasCur = !!curT;
+    const pIcon = s.waiting && s.playing ? 'ph ph-circle-notch' : s.playing ? 'ph-fill ph-pause' : 'ph-fill ph-play';
+    return {
+      isLogin: screen === 'login', isApp: screen === 'app', wide, narrow: !wide,
+      email: s.email, pass: s.pass, err: s.err, hasErr: !!s.err,
+      onEmail: e => this.setState({ email: e.target.value, err: '' }), onPass: e => this.setState({ pass: e.target.value, err: '' }),
+      doLogin: () => {
+        if (!/.+@.+\..+/.test(s.email)) return this.setState({ err: 'Informe um e-mail válido.' });
+        if (s.pass.length < 4) return this.setState({ err: 'A senha precisa ter ao menos 4 caracteres.' });
+        const user = { name: s.email.split('@')[0] }; sv('user', user);
+        this.setState({ user, screen: 'app', pass: '', gate: null }); this.flash('Bem-vindo, ' + user.name + ' — catálogo completo liberado');
+      },
+      doGuest: () => this.setState({ screen: 'app' }),
+      goLogin: () => this.setState({ screen: 'login', gate: null, playerOpen: false }),
+      logout: () => { sv('user', null); this.setState({ user: null, screen: 'login' }); },
+      loggedIn: !!s.user, isGuest: !s.user, initial: s.user ? s.user.name[0].toUpperCase() : 'V', userName: s.user ? s.user.name : 'Visitante',
+      planLabel: s.user ? 'Conta gratuita · catálogo completo + offline' : 'Somente faixas grátis',
+      tabs, tabTitle: { home: 'Início', search: 'Buscar', library: 'Biblioteca' }[s.tab],
+      isHome: s.tab === 'home', isSearch: s.tab === 'search', isLibrary: s.tab === 'library', goLibrary: go('library'),
+      netLabel: s.offline ? 'Offline' : 'Online', netIcon: s.offline ? 'ph ph-wifi-slash' : 'ph ph-wifi-high',
+      netFg: s.offline ? 'var(--color-accent-300)' : 'var(--color-neutral-400)', netBd: s.offline ? 'var(--color-accent-700)' : 'var(--color-neutral-800)',
+      toggleOffline: () => { const off = !s.offline; this.setState({ offline: off }); this.flash(off ? 'Modo offline: só faixas salvas no aparelho' : 'De volta online'); },
+      chips: genres.map(g => ({ label: g, go: () => this.setState({ genre: g }), bg: s.genre === g ? 'var(--color-accent-900)' : 'transparent', bd: s.genre === g ? 'var(--color-accent)' : 'var(--color-neutral-800)', fg: s.genre === g ? 'var(--color-accent-200)' : 'var(--color-neutral-300)' })),
+      source: s.source, loading: s.loading, featured: featured.map(item).map(f => ({ ...f, tc: f.isCur ? 'var(--color-accent-300)' : 'var(--color-text)' })),
+      q: s.q, onQ: e => this.setState({ q: e.target.value }),
+      togglePrefetch: () => { sv('prefetch', !s.prefetch); this.setState({ prefetch: !s.prefetch }); },
+      swJust: s.prefetch ? 'flex-end' : 'flex-start', swBg: s.prefetch ? 'var(--color-accent-900)' : 'transparent', swBd: s.prefetch ? 'var(--color-accent)' : 'var(--color-neutral-700)', swDot: s.prefetch ? 'var(--color-accent-300)' : 'var(--color-neutral-600)',
+      storage: Object.keys(s.cached).length + ' faixas · ' + mb.toFixed(1) + ' MB',
+      segs: [['liked', 'Curtidas', 'heart'], ['offline', 'No aparelho', 'arrow-circle-down']].map(([k, l, ic]) => ({ label: l, icon: 'ph ph-' + ic, go: () => this.setState({ seg: k }), bg: s.seg === k ? 'var(--color-surface)' : 'transparent', fg: s.seg === k ? 'var(--color-text)' : 'var(--color-neutral-500)' })),
+      rows: list.map(item), listTitle, hasListTitle: !!listTitle && list.length > 0, empty: !s.loading && list.length === 0, emptyText, emptyIcon,
+      mainPad: (wide ? (hasCur ? 90 : 16) : (hasCur ? 136 : 70)) + 'px',
+      showMini: hasCur && !wide, showBar: hasCur && wide,
+      cur: curT ? { title: curT.title, artist: curT.artist, art: curT.art, hasArt: !!curT.art, noArt: !curT.art, ini: curT.title.slice(0, 2), genre: curT.genre } : {},
+      progPct: (played * 100).toFixed(2) + '%', bufPct: (buf * 100).toFixed(2) + '%',
+      playIcon: pIcon, playIconBig: pIcon, tStr: fmt(s.t), dStr: fmt(dur),
+      bars: this.bars(curT, wide ? 90 : 56, played, buf), barsSmall: this.bars(curT, 70, played, buf),
+      togglePlay: e => { stop(e); this.togglePlay(); }, prev: e => { stop(e); this.step(-1); }, next: e => { stop(e); this.step(1); },
+      seekWave: e => { const r = e.currentTarget.getBoundingClientRect(); this.seek(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width))); },
+      openPlayer: () => this.setState({ playerOpen: true }), closePlayer: () => this.setState({ playerOpen: false }), playerOpen: s.playerOpen && hasCur,
+      toggleLikeCur: e => { stop(e); curT && this.toggleLike(curT.id); },
+      curLikeIcon: liked ? 'ph-fill ph-heart' : 'ph ph-heart', curLikeFg: liked ? 'var(--color-accent)' : 'var(--color-neutral-400)',
+      dlCur: () => curT && this.download(curT),
+      curDlIcon: curCached ? 'ph-fill ph-arrow-circle-down' : 'ph ph-arrow-circle-down', curDlFg: curCached ? 'var(--color-accent-300)' : 'var(--color-neutral-400)',
+      toggleShuffle: () => this.setState({ shuffle: !s.shuffle }), toggleRepeat: () => this.setState({ repeat: !s.repeat }),
+      shufFg: s.shuffle ? 'var(--color-accent)' : 'var(--color-neutral-500)', repFg: s.repeat ? 'var(--color-accent)' : 'var(--color-neutral-500)',
+      bufIcon: curCached ? 'ph-fill ph-arrow-circle-down' : curDl != null ? 'ph ph-download-simple' : 'ph ph-cloud',
+      bufTitle: curCached ? 'Salva no aparelho' : curDl != null ? 'Baixando… ' + Math.round(curDl * 100) + '%' : s.waiting && s.playing ? 'Carregando stream…' : 'Streaming',
+      bufSub: curCached ? 'Toca sem conexão' : curDl != null ? 'Disponível offline ao terminar' : fmt(ahead) + ' em buffer à frente',
+      showDlBtn: !curCached && curDl == null, dlBtnLabel: s.user ? 'Baixar' : 'Entrar p/ baixar',
+      hasGate: !!s.gate, closeGate: () => this.setState({ gate: null }), stop,
+      gateTitle: s.gate && s.gate.kind === 'dl' ? 'Downloads exigem conta' : 'Faixa para membros',
+      gateBody: s.gate ? (s.gate.kind === 'dl' ? 'Entre para salvar “' + s.gate.title + '” no aparelho e ouvir sem conexão.' : '“' + s.gate.title + '” faz parte do catálogo completo. Entre gratuitamente para ouvir — ou continue com as faixas grátis.') : '',
+      hasToast: !!s.toast, toast: s.toast, toastBottom: (wide ? (hasCur ? 92 : 20) : (hasCur ? 140 : 72)) + 'px'
+    };
+  }
+}
+</script>
+</body>
+</html>

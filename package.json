@@ -1,0 +1,16 @@
+{
+  "name": "ondas",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Ondas — player de música com estética de terminal",
+  "packageManager": "pnpm@12.14.0",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "pnpm --filter @ondas/web dev",
+    "build": "pnpm --filter @ondas/core build && pnpm --filter @ondas/web build",
+    "preview": "pnpm --filter @ondas/web preview",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @ondas/core test",
+    "test:e2e": "pnpm --filter @ondas/web test:e2e"
+  }
+}

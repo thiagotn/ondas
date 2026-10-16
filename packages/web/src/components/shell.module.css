@@ -1,0 +1,331 @@
+/* Casca do app: barra de abas, prompt, filtros, busca e painel da biblioteca. */
+
+.app {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── barra de abas ────────────────────────────────────────────── */
+.tabbar {
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-neutral-800);
+  font-size: 12px;
+}
+
+.lights {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+}
+
+.light {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+}
+
+.tab {
+  flex: 1;
+  min-width: 0;
+  max-width: 240px;
+  border: 0;
+  border-right: 1px solid var(--color-neutral-800);
+  background: transparent;
+  color: var(--color-neutral-500);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.tab:hover {
+  color: var(--color-text);
+}
+
+.tabActive {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.tabKey {
+  color: var(--color-neutral-600);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.palette {
+  border: 0;
+  border-left: 1px solid var(--color-neutral-800);
+  background: transparent;
+  color: var(--color-neutral-400);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  min-width: 44px;
+}
+
+.palette:hover {
+  color: var(--color-accent-200);
+}
+
+/* ── conteúdo ─────────────────────────────────────────────────── */
+.main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.content {
+  max-width: 980px;
+  padding: 16px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── prompt ───────────────────────────────────────────────────── */
+.prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 8px;
+  font-size: 14px;
+}
+
+.who {
+  color: var(--ansi-2);
+}
+
+.cwd {
+  color: var(--ansi-4);
+}
+
+.caret {
+  color: var(--color-accent);
+}
+
+.cursor {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.15em;
+  background: var(--color-accent);
+  vertical-align: middle;
+  animation: blink 1.1s steps(1) infinite;
+}
+
+.comment {
+  color: var(--color-neutral-500);
+}
+
+.loading {
+  color: var(--color-neutral-500);
+}
+
+/* ── aviso de visitante ───────────────────────────────────────── */
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 8px 10px;
+  border: 1px dashed var(--color-neutral-700);
+  border-radius: var(--radius-sm);
+}
+
+.noticeLabel {
+  color: var(--ansi-3);
+}
+
+.noticeText {
+  flex: 1;
+  min-width: 200px;
+  color: var(--color-neutral-300);
+}
+
+.link {
+  min-height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-300);
+  cursor: pointer;
+  padding: 0;
+}
+
+.link:hover {
+  color: var(--color-accent-100);
+}
+
+/* ── filtro de gênero ─────────────────────────────────────────── */
+.chips {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  margin: 0 -16px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+.chipsLabel {
+  color: var(--color-neutral-500);
+  margin-right: 6px;
+}
+
+.chip {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-neutral-400);
+  cursor: pointer;
+}
+
+.chip:hover {
+  color: var(--color-text);
+}
+
+.chipActive {
+  background: var(--color-accent-900);
+  color: var(--color-accent-200);
+}
+
+/* ── busca ────────────────────────────────────────────────────── */
+.search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--color-neutral-700);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.searchPrefix {
+  color: var(--color-accent);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  outline: none;
+  caret-color: var(--color-accent);
+}
+
+.searchCount {
+  color: var(--color-neutral-600);
+  font-size: 12px;
+}
+
+/* ── biblioteca ───────────────────────────────────────────────── */
+.panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+}
+
+.panelRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--color-neutral-800);
+}
+
+.panelRow:last-child {
+  border-bottom: 0;
+}
+
+.panelButton {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.panelButton:hover {
+  background: var(--color-neutral-900);
+}
+
+.panelLabel {
+  width: 9ch;
+  flex-shrink: 0;
+  color: var(--ansi-4);
+}
+
+.panelValue {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-neutral-300);
+}
+
+.panelMuted {
+  color: var(--color-neutral-500);
+}
+
+.logout {
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--ansi-1);
+  cursor: pointer;
+}
+
+.checkOn {
+  color: var(--ansi-2);
+}
+
+.checkOff {
+  color: var(--color-neutral-500);
+}
+
+.segments {
+  display: flex;
+  gap: 4px;
+}
+
+.segment {
+  min-height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-neutral-500);
+  cursor: pointer;
+}
+
+.segmentActive {
+  background: var(--color-accent-900);
+  color: var(--color-accent-200);
+}
+
+.empty {
+  padding: 16px 0;
+  color: var(--color-neutral-500);
+}

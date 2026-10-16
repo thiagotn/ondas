@@ -1,0 +1,7 @@
+packages:
+  - packages/*
+
+# Pacotes autorizados a rodar script de instalação (pnpm 12+).
+allowBuilds:
+  esbuild: true
+  sharp: true

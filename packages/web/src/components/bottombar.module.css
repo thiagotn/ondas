@@ -1,0 +1,183 @@
+/* Rodapé fixo: toast, linha do player e status line. */
+.bar {
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-neutral-800);
+  background: var(--color-surface);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.toast {
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--color-neutral-800);
+  color: var(--color-neutral-300);
+  background: var(--color-bg);
+}
+
+.toastMark {
+  color: var(--color-accent);
+}
+
+/* A linha inteira abre o player no clique; o foco do teclado fica no título. */
+.player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 4px 6px 4px 0;
+  cursor: pointer;
+}
+
+/* Bloco de modo, estilo vim: ocupa a altura inteira da linha. */
+.mode {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  color: var(--color-bg);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.modePlay {
+  background: var(--color-accent);
+}
+
+.modeIdle {
+  background: var(--color-neutral-500);
+}
+
+.lines {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.artist {
+  color: var(--color-neutral-500);
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-neutral-500);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.wave {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.skip {
+  width: 40px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--color-neutral-300);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.skip:hover {
+  background: var(--color-neutral-800);
+}
+
+.play {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-accent);
+  background: transparent;
+  color: var(--color-accent-200);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.play:hover {
+  background: var(--color-accent-900);
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 28px;
+  padding: 0 12px;
+  border-top: 1px solid var(--color-neutral-800);
+  font-size: 11px;
+  color: var(--color-neutral-500);
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+.net {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  min-height: 28px;
+  font: inherit;
+  color: var(--ansi-2);
+}
+
+.netToggle {
+  cursor: pointer;
+}
+
+.netOffline {
+  color: var(--ansi-1);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.legendKey {
+  color: var(--color-text);
+}
+
+/* O spinner de buffering gira; o resto da interface não anima. */
+.spin {
+  animation: ondas-spin 0.9s linear infinite;
+}
+
+@keyframes ondas-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

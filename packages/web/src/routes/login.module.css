@@ -1,0 +1,137 @@
+/* Tela de login: barra própria, logo ASCII e campos como linhas de prompt. */
+.screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-neutral-800);
+  color: var(--color-neutral-500);
+  font-size: 12px;
+}
+
+.topbarTitle {
+  flex: 1;
+  text-align: center;
+}
+
+.palette {
+  border: 0;
+  background: transparent;
+  color: var(--color-neutral-400);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+}
+
+.palette:hover {
+  color: var(--color-accent-200);
+}
+
+.content {
+  flex: 1;
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 640px;
+}
+
+.logo {
+  margin: 0;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--color-accent);
+}
+
+.intro {
+  color: var(--color-neutral-500);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  border-bottom: 1px solid var(--color-neutral-800);
+}
+
+.fieldLabel {
+  color: var(--ansi-2);
+  width: 9ch;
+  flex-shrink: 0;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  outline: none;
+  caret-color: var(--color-accent);
+}
+
+.error {
+  color: var(--ansi-1);
+}
+
+.buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.primary,
+.secondary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.primary {
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent-200);
+}
+
+.primary:hover {
+  background: var(--color-accent-900);
+}
+
+.secondary {
+  border: 1px solid var(--color-neutral-800);
+  color: var(--color-text);
+}
+
+.secondary:hover {
+  background: var(--color-neutral-900);
+}
+
+.key {
+  color: var(--color-neutral-500);
+}

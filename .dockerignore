@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/dev-dist
+**/.vite
+**/test-results
+**/playwright-report
+.git
+.github
+design_handoff_ondas_terminal_player
+*.log

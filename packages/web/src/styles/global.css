@@ -1,0 +1,82 @@
+/* Reset e base do terminal. Os tokens de cor vêm de `applyTheme()`. */
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/700.css';
+
+:root {
+  /* Fallbacks: valem só até o primeiro `applyTheme()` (Catppuccin Mocha). */
+  --color-bg: #1e1e2e;
+  --color-text: #cdd6f4;
+  --color-accent: #cba6f7;
+  --radius-sm: 4px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+#root {
+  min-height: 100%;
+}
+
+button,
+input {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+input::placeholder {
+  color: var(--color-neutral-600);
+}
+
+a {
+  color: var(--color-accent-300);
+}
+
+a:hover {
+  color: var(--color-accent-200);
+}
+
+::selection {
+  background: var(--color-accent-800);
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* O cursor é o único movimento da interface: o resto tem que parecer instantâneo. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

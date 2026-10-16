@@ -1,0 +1,401 @@
+/* Overlays: full player, gate de permissão e theme picker.
+   Todos usam o mesmo truque de rótulo sentado sobre a borda do painel. */
+
+.fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  overflow-y: auto;
+  background: var(--color-bg);
+  padding: 12px;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.backdropLight {
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 40;
+}
+
+.panel {
+  position: relative;
+  max-width: 980px;
+  min-height: calc(100% - 8px);
+  margin: 8px auto 0;
+  padding: 24px 18px 18px;
+  border: 1px solid var(--color-neutral-700);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.label {
+  position: absolute;
+  top: -10px;
+  left: 14px;
+  padding: 0 6px;
+  background: var(--color-bg);
+  color: var(--color-accent);
+}
+
+.close {
+  position: absolute;
+  top: -14px;
+  right: 10px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--color-neutral-700);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-neutral-400);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.close:hover {
+  color: var(--color-text);
+}
+
+/* ── full player ──────────────────────────────────────────────── */
+.body {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px 36px;
+}
+
+.cover {
+  flex: 1 1 260px;
+  max-width: 400px;
+  aspect-ratio: 1;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.coverAscii {
+  margin: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  color: var(--color-neutral-700);
+  font-size: 14px;
+  line-height: 1.1;
+}
+
+.info {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.infoHead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.infoLabel {
+  color: var(--color-neutral-500);
+  font-size: 12px;
+}
+
+.infoTitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.25;
+  text-wrap: pretty;
+}
+
+.infoArtist {
+  color: var(--ansi-5);
+}
+
+.waveBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wave {
+  font-size: 22px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  letter-spacing: 0;
+  cursor: pointer;
+  display: block;
+}
+
+.times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-neutral-500);
+  font-variant-numeric: tabular-nums;
+}
+
+.keycaps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.keycap {
+  min-width: 52px;
+  height: 56px;
+  padding: 0 10px;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-neutral-300);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.keycap:hover {
+  background: var(--color-neutral-900);
+}
+
+.keycapOn {
+  border-color: var(--color-accent);
+  color: var(--color-accent-200);
+}
+
+.keycapKey {
+  font-size: 10px;
+  color: var(--color-neutral-500);
+}
+
+.buffer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.bufferRow {
+  display: flex;
+  gap: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.bufferLabel {
+  width: 8ch;
+  flex-shrink: 0;
+  color: var(--ansi-4);
+}
+
+.bufferBar {
+  letter-spacing: 0;
+}
+
+.bufferPlayed {
+  color: var(--color-accent);
+}
+
+.bufferAhead {
+  color: var(--color-neutral-500);
+}
+
+.bufferRest {
+  color: var(--color-neutral-800);
+}
+
+.sourceLocal {
+  color: var(--ansi-2);
+}
+
+.sourceRemote {
+  color: var(--color-neutral-300);
+}
+
+.dlButton {
+  align-self: flex-start;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-300);
+  cursor: pointer;
+  font: inherit;
+}
+
+.dlButton:hover {
+  color: var(--color-accent-100);
+}
+
+/* ── gate ─────────────────────────────────────────────────────── */
+.gate {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  padding: 22px 18px 16px;
+  border: 1px solid var(--ansi-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gateLabel {
+  position: absolute;
+  top: -10px;
+  left: 12px;
+  padding: 0 6px;
+  background: var(--color-bg);
+  color: var(--ansi-3);
+}
+
+.gateBody {
+  color: var(--color-neutral-400);
+  text-wrap: pretty;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.primary {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-accent-200);
+  cursor: pointer;
+}
+
+.primary:hover {
+  background: var(--color-accent-900);
+}
+
+.secondary {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-neutral-300);
+  cursor: pointer;
+}
+
+.secondary:hover {
+  background: var(--color-neutral-900);
+}
+
+/* ── theme picker ─────────────────────────────────────────────── */
+.picker {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  padding: 22px 10px 12px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* A lista rola aqui dentro para o rótulo da borda não ser cortado. */
+.pickerList {
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pickerRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.pickerRowFocused {
+  background: var(--color-accent-900);
+}
+
+.pickerMark {
+  width: 2ch;
+  color: var(--color-accent);
+}
+
+.pickerName {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swatches {
+  display: flex;
+  border-radius: 2px;
+  overflow: hidden;
+  outline: 1px solid var(--color-neutral-800);
+}
+
+.swatchBg {
+  width: 14px;
+  height: 18px;
+}
+
+.swatch {
+  width: 12px;
+  height: 18px;
+}
+
+.pickerFooter {
+  padding: 8px 8px 0;
+  font-size: 11px;
+  color: var(--color-neutral-500);
+}

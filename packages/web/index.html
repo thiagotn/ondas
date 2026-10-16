@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>ondas</title>
+    <meta name="description" content="Ondas — streaming de música independente com estética de terminal." />
+    <meta name="theme-color" content="#1e1e2e" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ondas" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" href="/icons/icon-192.png" type="image/png" />
+    <script>
+      /**
+       * Aplica o tema salvo antes do primeiro paint: sem isto a tela pisca no
+       * tema padrão. Mantém a mesma derivação de `themeCssVars()` em `core`.
+       */
+      (function () {
+        var T = {
+          nocturne: ['#161826', '#e9e9ed', '#9184d9'],
+          'catppuccin-mocha': ['#1e1e2e', '#cdd6f4', '#cba6f7'],
+          tokyonight: ['#1a1b26', '#c0caf5', '#7aa2f7'],
+          dracula: ['#282a36', '#f8f8f2', '#bd93f9'],
+          'gruvbox-dark': ['#282828', '#ebdbb2', '#fabd2f'],
+          nord: ['#2e3440', '#d8dee9', '#88c0d0'],
+          'rose-pine': ['#191724', '#e0def4', '#ebbcba'],
+          'solarized-dark': ['#002b36', '#93a1a1', '#268bd2'],
+          'github-light': ['#ffffff', '#24292f', '#0969da'],
+        };
+        var id = 'catppuccin-mocha';
+        try {
+          var saved = localStorage.getItem('ondas-theme');
+          if (saved && T[saved]) id = saved;
+        } catch (e) {}
+        var t = T[id];
+        var r = document.documentElement.style;
+        r.setProperty('--color-bg', t[0]);
+        r.setProperty('--color-text', t[1]);
+        r.setProperty('--color-accent', t[2]);
+        r.setProperty('--color-surface', 'color-mix(in oklab, ' + t[1] + ' 6%, ' + t[0] + ')');
+        document.documentElement.style.colorScheme = id === 'github-light' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = id;
+        var meta = document.querySelector('meta[name=theme-color]');
+        if (meta) meta.setAttribute('content', t[0]);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
