@@ -59,6 +59,12 @@ Decisões que valem registrar:
 - **Catálogo com 3 níveis** (`core/src/catalog/resolve.ts`): Audius ao vivo →
   metadados em cache local → catálogo demo. Trocar o Audius por um backend
   próprio é implementar `CatalogClient` e injetar.
+- **Capa que se recupera de nó fora do ar.** As capas do Audius são servidas
+  pelo nó que guarda o arquivo, não por um CDN: um catálogo de 24 faixas
+  costuma espalhá-las por ~18 hosts, e basta um estar fora para a linha exibir
+  imagem quebrada. Como o caminho carrega o CID, qualquer outro nó devolve os
+  mesmos bytes — `artworkSources()` monta essa reserva e `TrackArt` troca de
+  host no `onError`. A lista usa a variante 150x150 (5KB contra 35KB).
 - **Faixa de largura total, conteúdo centralizado.** No desktop o fundo e as
   bordas da barra de abas, do rodapé e do toast vão de ponta a ponta, mas o
   conteúdo se alinha a uma coluna de `--content-max` (1080px). A rolagem

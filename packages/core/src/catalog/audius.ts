@@ -82,6 +82,7 @@ export class AudiusCatalogClient implements CatalogClient {
           genre: slugGenre(t.genre),
           dur: t.duration || 0,
           art: t.artwork?.['480x480'] || t.artwork?.['150x150'] || '',
+          artThumb: t.artwork?.['150x150'] || t.artwork?.['480x480'] || '',
           stream: `${host}/v1/tracks/${t.id}/stream?app_name=${APP_NAME}`,
         }));
     } finally {

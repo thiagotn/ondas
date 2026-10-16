@@ -200,3 +200,48 @@ test('transparência do fundo liga pelo painel de temas e volta ao opaco', async
   await expect(wallpaper).toHaveCount(0);
   expect(await bgA()).toContain('100%');
 });
+
+test('status line mantém os itens na mesma linha de base', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+
+  // Mede o texto, não a caixa: o indicador de rede tem altura própria por causa
+  // da área de toque, e era isso que o deixava ~6px acima dos vizinhos.
+  const topos = await page.evaluate(() => {
+    const linha = document.querySelector('[class*="statusInner"]')!;
+    return [...linha.children]
+      .filter((el) => el.textContent?.trim())
+      .map((el) => {
+        const r = document.createRange();
+        r.selectNodeContents(el);
+        return Math.round(r.getBoundingClientRect().top);
+      });
+  });
+  expect(topos.length).toBeGreaterThan(1);
+  expect(new Set(topos).size).toBe(1);
+});
+
+test('rótulos das abas cabem inteiros na barra', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+
+  // No estreito as abas dividiam a barra em três partes iguais: "~/buscar"
+  // sobrava espaço e "~/biblioteca" era cortada.
+  const abas = await page.evaluate(() =>
+    [...document.querySelectorAll('[class*="tabbarInner"] button')]
+      .filter((el) => el.textContent?.includes('~/'))
+      .map((el) => {
+        const r = document.createRange();
+        r.selectNodeContents(el);
+        return {
+          label: el.textContent!.trim(),
+          texto: Math.round(r.getBoundingClientRect().width),
+          caixa: Math.round(el.getBoundingClientRect().width),
+        };
+      }),
+  );
+  expect(abas).toHaveLength(3);
+  for (const aba of abas) expect(aba.texto).toBeLessThanOrEqual(aba.caixa);
+});

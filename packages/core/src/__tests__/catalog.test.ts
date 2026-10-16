@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AudiusCatalogClient } from '../catalog/audius.js';
 import { demoTracks } from '../catalog/demo.js';
-import { loadCatalog } from '../catalog/resolve.js';
+import { CATALOG_CACHE_MAX_AGE_MS, loadCatalog } from '../catalog/resolve.js';
 import type { Track } from '../types.js';
 
 const json = (body: unknown) =>
@@ -35,6 +35,7 @@ describe('AudiusCatalogClient', () => {
         genre: 'drumbass',
         dur: 356,
         art: 'g.jpg',
+        artThumb: 'p.jpg',
         stream: 'https://dn1.audius/v1/tracks/abc12/stream?app_name=ONDAS',
       },
     ]);
@@ -112,11 +113,29 @@ describe('loadCatalog', () => {
     const cached = demoTracks().slice(0, 3);
     const got = await loadCatalog({
       remote: remoteFail,
-      readCache: async () => cached,
+      readCache: async () => ({ tracks: cached, savedAt: Date.now() }),
       writeCache: async () => {},
     });
     expect(got.source).toBe('metadados em cache local');
     expect(got.tracks).toEqual(cached);
+  });
+
+  it('cache vencido cai para o demo em vez de mostrar capas mortas', async () => {
+    const agora = 1_700_000_000_000;
+    const base = {
+      remote: remoteFail,
+      readCache: async () => ({ tracks: demoTracks().slice(0, 3), savedAt: agora - CATALOG_CACHE_MAX_AGE_MS - 1 }),
+      writeCache: async () => {},
+      now: () => agora,
+    };
+    expect((await loadCatalog(base)).source).toBe('catálogo demo — api inacessível');
+
+    // No limite da validade ainda vale.
+    const noLimite = {
+      ...base,
+      readCache: async () => ({ tracks: demoTracks().slice(0, 3), savedAt: agora - CATALOG_CACHE_MAX_AGE_MS }),
+    };
+    expect((await loadCatalog(noLimite)).source).toBe('metadados em cache local');
   });
 
   it('nível 3: catálogo demo quando não há api nem cache', async () => {

@@ -45,8 +45,10 @@ export function promptLine(args: {
   seg: LibrarySegment;
   count: number;
   source: Catalog['source'] | '';
+  /** Há um refetch em andamento: o que está na tela ainda é o dado anterior. */
+  refreshing?: boolean;
 }): PromptLine {
-  const { tab, who, genre, q, seg, count, source } = args;
+  const { tab, who, genre, q, seg, count, source, refreshing } = args;
   if (tab === 'search') {
     const typed = q.trim().replace(/^#/, '');
     return {
@@ -68,7 +70,9 @@ export function promptLine(args: {
     who,
     cwd: '~/em-alta',
     cmd: `ondas trending --genero=${genre}`,
-    comment: `${count} faixas · fonte: ${source || '…'}`,
+    // Enquanto o refetch não volta, a lista na tela é a da sessão anterior:
+    // dizer "ao vivo" sem ressalva seria mentira.
+    comment: `${count} faixas · fonte: ${source || '…'}${refreshing ? ' · atualizando' : ''}`,
   };
 }
 

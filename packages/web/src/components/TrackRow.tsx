@@ -1,6 +1,7 @@
 import { CheckCircle, DownloadSimple, Heart } from '@phosphor-icons/react';
 import type { RowModel } from '../hooks/useTrackRows';
 import s from './row.module.css';
+import { TrackArt } from './TrackArt';
 
 export interface TrackRowProps {
   row: RowModel;
@@ -28,7 +29,7 @@ export function TrackRow({ row, showArt, onPlay, onLike, onDownload }: TrackRowP
         <span className={row.isCurrent ? `${s.idx} ${s.idxCurrent}` : s.idx}>{row.idx}</span>
         {showArt && (
           <span className={s.thumb}>
-            {track.art ? <img src={track.art} alt="" loading="lazy" decoding="async" /> : null}
+            <TrackArt sources={row.artSources} />
           </span>
         )}
         <span className={s.lines}>

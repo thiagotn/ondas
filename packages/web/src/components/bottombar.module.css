@@ -165,7 +165,12 @@
   overflow-x: auto;
 }
 
+/* O `min-height` existe pela área de toque do atalho de rede em dev. Sem o
+   flex, o texto encostava no topo dessa caixa de 28px e ficava ~6px acima de
+   "visitante" e da legenda, que são spans da altura da linha. */
 .net {
+  display: inline-flex;
+  align-items: center;
   border: 0;
   background: transparent;
   padding: 0;

@@ -62,6 +62,7 @@
   flex: 1;
   min-width: 0;
   max-width: 240px;
+  text-overflow: ellipsis;
   border: 0;
   border-right: 1px solid var(--color-neutral-800);
   background: transparent;
@@ -83,6 +84,14 @@
 .tabActive {
   background: var(--color-bg-a, var(--color-bg));
   color: var(--color-text);
+}
+
+/* No estreito o espaço é escasso: cada aba parte do tamanho do próprio rótulo
+   e só depois divide a sobra. Com a base zerada do `flex: 1`, as três ficavam
+   com um terço cada — "~/buscar" sobrava espaço e "~/biblioteca" era cortada.
+   No wide a regra não entra: lá a divisão igual é o que se quer. */
+.tabNarrow {
+  flex: 1 1 auto;
 }
 
 .tabKey {

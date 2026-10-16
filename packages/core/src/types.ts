@@ -10,6 +10,11 @@ export interface Track {
   dur: number;
   /** URL da capa (480x480 quando disponível). Vazio = sem capa. */
   art: string;
+  /**
+   * Capa pequena (150x150) para a lista: 5KB contra 35KB da grande, num thumb
+   * de 36px. `undefined` em catálogos que não oferecem variação de tamanho.
+   */
+  artThumb?: string;
   /** URL de stream. Vazio = faixa sem áudio (catálogo demo → playback simulado). */
   stream: string;
   /**

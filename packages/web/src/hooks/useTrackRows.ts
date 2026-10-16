@@ -1,4 +1,12 @@
-import { dlPct, fmtTime, genreAnsiVar, isLocked, type Track } from '@ondas/core';
+import {
+  artworkHosts,
+  artworkSources,
+  dlPct,
+  fmtTime,
+  genreAnsiVar,
+  isLocked,
+  type Track,
+} from '@ondas/core';
 import { useMemo } from 'react';
 import { useLibrary, usePlayer, useSession } from '../app/stores';
 import { useNetwork } from './useNetwork';
@@ -18,6 +26,8 @@ export interface RowModel {
   unavailable: boolean;
   genreColor: string;
   durLabel: string;
+  /** Capa pequena da lista, seguida dos nós alternativos. */
+  artSources: string[];
 }
 
 /**
@@ -32,6 +42,9 @@ export function useTrackRows(visible: readonly Track[], all: readonly Track[]): 
 
   return useMemo(() => {
     const indexById = new Map(all.map((t, i) => [t.id, i]));
+    // Os hosts do próprio catálogo são a reserva: se um nó cair, outro serve o
+    // mesmo CID.
+    const hosts = artworkHosts(all);
     return visible.map((track) => {
       const index = indexById.get(track.id) ?? 0;
       const isCurrent = index === cur;
@@ -49,6 +62,7 @@ export function useTrackRows(visible: readonly Track[], all: readonly Track[]): 
         unavailable: offline && !isCached,
         genreColor: genreAnsiVar(track.genre),
         durLabel: fmtTime(track.dur),
+        artSources: artworkSources(track.artThumb || track.art, hosts),
       };
     });
   }, [all, cached, cur, dl, liked, offline, playing, session, visible]);

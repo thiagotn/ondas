@@ -69,6 +69,21 @@ describe('promptLine', () => {
     });
   });
 
+  it('avisa quando o que está na tela ainda é o dado anterior', () => {
+    expect(
+      promptLine({
+        tab: 'home',
+        who: 'visitante',
+        genre: 'tudo',
+        q: '',
+        seg: 'liked',
+        count: 24,
+        source: 'audius api (ao vivo)',
+        refreshing: true,
+      }).comment,
+    ).toBe('24 faixas · fonte: audius api (ao vivo) · atualizando');
+  });
+
   it('home sem fonte ainda mostra reticências', () => {
     expect(
       promptLine({ tab: 'home', who: 'a', genre: 'tudo', q: '', seg: 'liked', count: 0, source: '' })

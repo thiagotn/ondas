@@ -31,7 +31,9 @@ export function TabBar() {
             type="button"
             onClick={() => goToTab(t.id)}
             aria-current={tab === t.id ? 'page' : undefined}
-            className={tab === t.id ? `${s.tab} ${s.tabActive}` : s.tab}
+            className={[s.tab, wide ? '' : s.tabNarrow, tab === t.id ? s.tabActive : '']
+              .filter(Boolean)
+              .join(' ')}
           >
             {wide && <span className={s.tabKey}>{i + 1}</span>}
             {t.label}

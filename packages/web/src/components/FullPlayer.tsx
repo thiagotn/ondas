@@ -1,4 +1,6 @@
 import {
+  artworkHosts,
+  artworkSources,
   barCount,
   bufferBar,
   bufferSourceLabel,
@@ -14,13 +16,16 @@ import {
   SkipBack,
   SkipForward,
 } from '@phosphor-icons/react';
+import { useMemo } from 'react';
 import * as controller from '../app/controller';
 import { playerStore, useLibrary, usePlayer, useSession } from '../app/stores';
 import { usePlayerOverlay } from '../hooks/usePlayerOverlay';
 import { useViewportWidth, useWide } from '../hooks/useWide';
+import { useCatalog } from '../query/catalog';
 import { PlayIcon } from './BottomBar';
 import { CassetteLogo } from './CassetteLogo';
 import s from './overlay.module.css';
+import { TrackArt } from './TrackArt';
 import { Waveform } from './Waveform';
 
 /** Overlay de tela cheia da faixa atual. Fechado pelo Esc e pelo botão voltar. */
@@ -33,6 +38,12 @@ export function FullPlayer({ track }: { track: Track }) {
   const cached = useLibrary((st) => !!st.cached[track.id]);
   const liked = useLibrary((st) => !!st.liked[track.id]);
   const downloading = useLibrary((st) => st.dl[track.id] ?? null);
+
+  const { data } = useCatalog();
+  const capa = useMemo(
+    () => artworkSources(track.art, artworkHosts(data?.tracks ?? [])),
+    [track.art, data?.tracks],
+  );
 
   const duration = dur || track.dur || 0;
   const played = duration ? t / duration : 0;
@@ -50,8 +61,8 @@ export function FullPlayer({ track }: { track: Track }) {
 
         <div className={s.body}>
           <div className={s.cover}>
-            {track.art ? (
-              <img src={track.art} alt="" decoding="async" />
+            {capa.length ? (
+              <TrackArt sources={capa} />
             ) : (
               <div className={s.coverLogo}>
                 <CassetteLogo playing={playing} progress={played} label />

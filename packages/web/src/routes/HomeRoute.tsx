@@ -9,7 +9,7 @@ import { useCatalog } from '../query/catalog';
 
 /** `~/em-alta`: trending filtrado por gênero. */
 export function HomeRoute() {
-  const { data, isLoading } = useCatalog();
+  const { data, isLoading, isFetching } = useCatalog();
   const genre = useUi((s) => s.genre);
   const user = useSession((s) => s.user);
   const liked = useLibrary((s) => s.liked);
@@ -30,6 +30,8 @@ export function HomeRoute() {
     seg: 'liked',
     count: visible.length,
     source: data?.source ?? '',
+    // Com cache persistido, o 1º paint é a lista da sessão anterior.
+    refreshing: isFetching && !isLoading,
   });
 
   return (
