@@ -75,12 +75,17 @@ func TestEsquemasEstranhosSaoRecusados(t *testing.T) {
 	}
 }
 
-// Um nome de domínio público que resolve para IP privado é o caso que uma
-// validação só da URL deixaria passar — e é o que o Control pega.
-func TestNomePublicoQueResolveParaPrivadoNaoConecta(t *testing.T) {
+// Um NOME que resolve para endereço interno é o caso que uma validação só da
+// URL deixaria passar — e é o que o Control pega, porque ele roda depois do DNS.
+// É a mesma mecânica que fecha o DNS rebinding.
+//
+// `localhost` de propósito: vem do /etc/hosts, então o teste não depende de DNS
+// externo. A versão anterior usava um domínio público que resolve para
+// 127.0.0.1 e falhava dentro do build Docker, onde aquele nome não resolvia —
+// teste de segurança não pode depender de registro de terceiro.
+func TestNomeQueResolveParaEnderecoInternoNaoConecta(t *testing.T) {
 	b := NewBaixador(1<<20, 3*time.Second)
-	// localtest.me resolve para 127.0.0.1 na internet pública.
-	_, _, err := b.Baixar(context.Background(), "http://localtest.me/musica.mp3", io.Discard)
+	_, _, err := b.Baixar(context.Background(), "http://localhost:9/musica.mp3", io.Discard)
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrDestinoVetado,
 		"o veto tem de acontecer na hora de conectar, não só na validação do nome")
