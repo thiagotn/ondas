@@ -113,9 +113,9 @@ func (r *R2) Tamanho(ctx context.Context, key string) (int64, error) {
 // um é 404 para o usuário, o outro é 503.
 var ErrObjetoAusente = errors.New("storage: objeto não existe")
 
-// KeyUploadStage é a key onde o navegador grava um arquivo antes de ele virar
-// faixa. Existe como função porque a API assina o PUT nesta key e o worker lê
-// desta key: duas cópias do formato divergiriam em silêncio.
+// KeyUploadStage é a key onde um cliente autenticado grava um arquivo antes de
+// ele virar faixa. Existe como função porque a API assina o PUT nesta key e o
+// worker lê desta key: duas cópias do formato divergiriam em silêncio.
 //
 // O dono vai NA KEY, e o worker a reconstrói do `user_id` do job em vez de
 // aceitar uma key guardada na linha. Assim, mesmo que algo escreva uma fonte
@@ -127,15 +127,21 @@ func KeyUploadStage(userID, uploadID string) string {
 	return fmt.Sprintf("stage/%s/%s.bin", userID, uploadID)
 }
 
-// URLAssinadaPUT devolve um PUT assinado: é o que deixa o navegador enviar o
-// arquivo DIRETO para o R2.
+// URLAssinadaPUT devolve um PUT assinado: é o que deixa o cliente enviar o
+// arquivo DIRETO para o R2 — o navegador, pela tela de envio, ou o node do
+// Hermes, pela skill do SoundCloud.
 //
 // Por que não passar os bytes pela API: o túnel da Cloudflare tem teto de
 // ~100MB por requisição (ADR 0007) e o link é residencial — subir por dentro
-// gastaria banda de upload do dono duas vezes (navegador→homelab→R2).
+// gastaria banda de upload do dono duas vezes (cliente→homelab→R2). Para o
+// node o desperdício é mais óbvio ainda: os bytes sairiam de casa para voltar.
 //
-// A assinatura não prende o Content-Type: o navegador manda o que quiser e o
-// que vale é o ffprobe do worker, não um header do cliente.
+// A URL devolvida é CREDENCIAL DE ESCRITA no bucket pelo prazo da validade.
+// Trate-a como segredo: ela não deve ir para log nem para a saída de um
+// programa que outra coisa vá ler.
+//
+// A assinatura não prende o Content-Type: o cliente manda o que quiser e o que
+// vale é o ffprobe do worker, não um header de fora.
 func (r *R2) URLAssinadaPUT(ctx context.Context, key string, validade time.Duration) (string, error) {
 	if validade <= 0 {
 		validade = r.ttl

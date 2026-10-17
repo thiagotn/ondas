@@ -216,6 +216,87 @@ func TestSemR2OAcervoResponde503EOLoginSegue(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code, "o login não depende do R2")
 }
 
+// O escopo do token, rota por rota. É documentação executável da divisão de
+// grupos do roteador: mover uma rota de um grupo para o outro compila e passa
+// em todo o resto da suíte — só este teste denuncia.
+func TestEscopoDoTokenNoAcervo(t *testing.T) {
+	r, pool, _ := montar(t, true)
+	dbtest.CriarUsuario(t, pool, "dono@exemplo.test")
+
+	casos := []struct {
+		metodo, caminho string
+		// entra: o token é aceito pela autenticação (o status final pode ser
+		// 404 ou 400; o que importa é não ser 401).
+		entra bool
+	}{
+		// Entrar com faixa nova: o node do Hermes precisa das quatro.
+		{http.MethodPost, "/api/acervo/ingest", true},
+		{http.MethodGet, "/api/acervo/ingest/33333333-3333-4333-8333-333333333333", true},
+		{http.MethodPost, "/api/acervo/upload", true},
+		{http.MethodPost, "/api/acervo/upload/33333333-3333-4333-8333-333333333333/finalizar", true},
+		// Mexer no acervo que já existe: nenhuma. É aqui que um token vazado
+		// viraria exfiltração ou destruição.
+		{http.MethodGet, "/api/acervo", false},
+		{http.MethodGet, "/api/acervo/33333333-3333-4333-8333-333333333333/audio", false},
+		{http.MethodGet, "/api/acervo/33333333-3333-4333-8333-333333333333/art", false},
+		{http.MethodDelete, "/api/acervo/33333333-3333-4333-8333-333333333333", false},
+	}
+
+	for _, c := range casos {
+		corpo := strings.NewReader(`{"url":"https://exemplo.test/a.mp3","bytes":1024}`)
+		req := httptest.NewRequest(c.metodo, c.caminho, corpo)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Ondas-Token", tokenDoBot)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if c.entra {
+			require.NotEqual(t, http.StatusUnauthorized, w.Code,
+				"%s %s deveria aceitar o token", c.metodo, c.caminho)
+			continue
+		}
+		require.Equal(t, http.StatusUnauthorized, w.Code,
+			"%s %s NÃO deveria aceitar o token", c.metodo, c.caminho)
+	}
+}
+
+// E o negativo com dados de verdade: com uma faixa existente no banco, um 401
+// não pode ser confundido com um 404 de id inexistente.
+func TestTokenNaoAlcancaOAcervoQueJaExiste(t *testing.T) {
+	b := novoBucket()
+	r, pool, _ := montarComBucket(t, b)
+	ctx := context.Background()
+	dono := dbtest.CriarUsuario(t, pool, "dono@exemplo.test")
+
+	id := "44444444-4444-4444-8444-444444444444"
+	audioKey := "u/" + dono + "/a/" + id + ".mp3"
+	tracks := acervo.NewTracks(pool)
+	_, err := tracks.Criar(ctx, acervo.Nova{
+		ID: id, UserID: dono, Title: "Minha", Artist: "Eu", Genre: "acervo", DurS: 10,
+		AudioKey: audioKey, AudioType: "audio/mpeg", SizeBytes: 1,
+	})
+	require.NoError(t, err)
+	b.semear(audioKey, 1)
+
+	for _, c := range []struct{ metodo, caminho string }{
+		{http.MethodGet, "/api/acervo"},
+		{http.MethodGet, "/api/acervo/" + id + "/audio"},
+		{http.MethodGet, "/api/acervo/" + id + "/art"},
+		{http.MethodDelete, "/api/acervo/" + id},
+	} {
+		req := httptest.NewRequest(c.metodo, c.caminho, nil)
+		req.Header.Set("X-Ondas-Token", tokenDoBot)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusUnauthorized, w.Code, "%s %s", c.metodo, c.caminho)
+	}
+
+	// E nada passou nem pela metade: a faixa está no banco e o objeto no bucket.
+	_, err = tracks.PorID(ctx, dono, id)
+	require.NoError(t, err, "o DELETE por token não pode ter apagado a linha")
+	require.False(t, b.foiApagado(audioKey), "nem o objeto")
+}
+
 func TestBotIngerePorToken(t *testing.T) {
 	r, pool, _ := montar(t, true)
 	dono := dbtest.CriarUsuario(t, pool, "dono@exemplo.test")

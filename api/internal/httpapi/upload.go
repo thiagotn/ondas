@@ -14,28 +14,35 @@ import (
 	"github.com/thiagotn/ondas/api/internal/storage"
 )
 
-// Envio de arquivo local pela PWA, em três passos:
+// Envio de arquivo, em três passos:
 //
 //  1. `POST /acervo/upload` reserva uma vaga e devolve um PUT assinado;
-//  2. o NAVEGADOR grava o arquivo direto no R2 com essa URL;
+//  2. o CLIENTE grava o arquivo direto no R2 com essa URL;
 //  3. `POST /acervo/upload/{id}/finalizar` enfileira a ingestão.
 //
 // Do passo 3 em diante é o mesmo job da fase 2 — mesmo worker, mesma fila,
-// mesmo `GET /acervo/ingest/{id}` para acompanhar. A tela de envio não precisa
-// de um segundo mecanismo de acompanhamento.
+// mesmo `GET /acervo/ingest/{id}` para acompanhar. Quem envia não precisa de um
+// segundo mecanismo de acompanhamento.
 //
-// Por que os bytes não passam pela API: o túnel da Cloudflare tem teto de
-// ~100MB por requisição (ADR 0007), e o link do homelab é residencial — subir
-// por dentro gastaria o upload do dono duas vezes (navegador→homelab→R2) e
-// seria mais lento que o caminho direto.
+// São dois clientes, não um: o NAVEGADOR, pela tela de envio, e o NODE do
+// Hermes, pela skill do SoundCloud — que baixa com scdl e sobe o arquivo
+// resultante, porque URL do SoundCloud é página e não mídia.
 //
-// Só sessão entra aqui, nunca o `X-Ondas-Token`: o token do bot existe para
-// ingerir URL, e não deve poder escrever objeto no bucket.
+// Por que os bytes não passam pela API, valendo para os dois: o túnel da
+// Cloudflare tem teto de ~100MB por requisição (ADR 0007), e o link do homelab
+// é residencial — subir por dentro gastaria o upload do dono duas vezes
+// (cliente→homelab→R2) e seria mais lento que o caminho direto. No caso do
+// node é pior ainda: os bytes sairiam de casa para voltar para casa.
+//
+// Sessão OU `X-Ondas-Token` entram aqui. O que limita o token não é o
+// middleware e sim a key, derivada do usuário autenticado: o pior que um token
+// vazado faz por aqui é pôr um arquivo no acervo do próprio dono dele —
+// exatamente o que `POST /ingest` já permitia, por URL.
 const (
 	// Prazo do PUT assinado. Tem de cobrir o envio inteiro: 15 minutos para
 	// 60MB ainda funciona num upload de ~70kB/s.
 	validadeUploadPUT = 15 * time.Minute
-	// Teto do nome do arquivo que a tela manda como título sugerido.
+	// Teto do nome do arquivo que o cliente manda como título de reserva.
 	maxNomeArquivo = 200
 )
 
@@ -100,8 +107,10 @@ func (s *Server) finalizarUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// A key é derivada do dono da SESSÃO, não de nada que o cliente mandou:
-	// não existe pedido capaz de finalizar o envio de outra pessoa.
+	// A key é derivada do dono AUTENTICADO — sessão ou token —, não de nada
+	// que o cliente mandou: não existe pedido capaz de finalizar o envio de
+	// outra pessoa. Dois clientes com o mesmo id de envio em mãos apontam para
+	// duas keys diferentes, uma na área de cada um.
 	key := storage.KeyUploadStage(user.ID, id)
 	tamanho, err := s.r2.Tamanho(r.Context(), key)
 	if errors.Is(err, storage.ErrObjetoAusente) {

@@ -123,6 +123,18 @@ func postJSON(t *testing.T, r http.Handler, cfg *config.Config, caminho, corpo, 
 	return rec
 }
 
+// postComToken é o postJSON do chamador de máquina: header de token e nenhum
+// cookie. Existe desde a skill do SoundCloud, que envia arquivo sem sessão.
+func postComToken(t *testing.T, r http.Handler, caminho, corpo, token string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, caminho, strings.NewReader(corpo))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Ondas-Token", token)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	return rec
+}
+
 // --- vaga de upload ---
 
 func TestVagaDeUploadAssinaUmPUTNaAreaDoProprioDono(t *testing.T) {
@@ -165,16 +177,46 @@ func TestVagaDeUploadExigeTamanho(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
-// O token do bot ingere URL; escrever objeto no bucket não é função dele.
-func TestVagaDeUploadNaoAceitaOTokenDoBot(t *testing.T) {
+// O token passou a entrar aqui com a skill do SoundCloud: o node baixa a faixa
+// e precisa de uma porta para o acervo. Este teste já afirmou o CONTRÁRIO (401)
+// e estava certo enquanto o único a enviar arquivo era o navegador.
+//
+// O que substitui o 401 como garantia é a área: o token não escolhe de quem é
+// a key — ela sai do usuário autenticado, que no caminho do token é sempre o
+// `INGEST_USER_EMAIL`.
+func TestVagaDeUploadPeloTokenAssinaNaAreaDoDonoConfigurado(t *testing.T) {
+	r, pool, _ := montarComBucket(t, novoBucket())
+	dono := dbtest.CriarUsuario(t, pool, "dono@exemplo.test") // o IngestUserEmail
+
+	rec := postComToken(t, r, "/api/acervo/upload", `{"bytes":1024}`, tokenDoBot)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var vaga vagaJSON
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &vaga))
+	u, err := url.Parse(vaga.URL)
+	require.NoError(t, err)
+	require.Equal(t, "/ondas-acervo/stage/"+dono+"/"+vaga.ID+".bin", u.Path)
+	require.NotEmpty(t, u.Query().Get("X-Amz-Signature"))
+}
+
+// A rota nova herda a validação do token. Sem este teste, uma troca de
+// middleware que aceitasse qualquer header passaria sem ninguém notar.
+func TestVagaDeUploadRecusaTokenErrado(t *testing.T) {
+	r, pool, _ := montarComBucket(t, novoBucket())
+	dbtest.CriarUsuario(t, pool, "dono@exemplo.test")
+
+	for _, ruim := range []string{tokenDoBot + "x", strings.ToUpper(tokenDoBot), " " + tokenDoBot, "errado"} {
+		rec := postComToken(t, r, "/api/acervo/upload", `{"bytes":1024}`, ruim)
+		require.Equal(t, http.StatusUnauthorized, rec.Code, "token %q não deveria entrar", ruim)
+	}
+}
+
+func TestVagaDeUploadSemCookieNemTokenNaoAbre(t *testing.T) {
 	r, _, _ := montarComBucket(t, novoBucket())
 
-	req := httptest.NewRequest(http.MethodPost, "/api/acervo/upload", strings.NewReader(`{"bytes":1024}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Ondas-Token", tokenDoBot)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
+	rec := postJSON(t, r, nil, "/api/acervo/upload", `{"bytes":1024}`, "")
 	require.Equal(t, http.StatusUnauthorized, rec.Code)
+	require.Contains(t, rec.Body.String(), "sessão expirada")
 }
 
 // --- finalizar ---
@@ -282,8 +324,60 @@ func TestFinalizarDuasVezesNaoCriaDoisJobs(t *testing.T) {
 	require.Equal(t, a.ID, c.ID)
 }
 
-// A área de espera de outro dono é inalcançável: a key vem da sessão, então
-// o mesmo id de envio em duas contas aponta para dois objetos diferentes.
+// O caminho completo do node do Hermes: vaga e finalizar só com token.
+//
+// As duas asserções do fim são o que trava a decisão de precedência de título:
+// a skill NÃO manda `title`, para as tags que o scdl escreveu ganharem, e manda
+// o nome do arquivo como reserva. Sem isto, alguém "conserta" a skill mandando
+// título e um álbum etiquetado volta a virar "01 - Faixa".
+func TestFinalizarPeloTokenEnfileiraNoAcervoDoDono(t *testing.T) {
+	b := novoBucket()
+	r, pool, _ := montarComBucket(t, b)
+	ctx := context.Background()
+	dono := dbtest.CriarUsuario(t, pool, "dono@exemplo.test")
+
+	rec := postComToken(t, r, "/api/acervo/upload", `{"bytes":2048}`, tokenDoBot)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var vaga vagaJSON
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &vaga))
+	b.semear("stage/"+dono+"/"+vaga.ID+".bin", 2048)
+
+	rec = postComToken(t, r, "/api/acervo/upload/"+vaga.ID+"/finalizar",
+		`{"nome":"Artista - Faixa.mp3"}`, tokenDoBot)
+	require.Equal(t, http.StatusAccepted, rec.Code, rec.Body.String())
+
+	var job jobJSON
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &job))
+	guardado, err := acervo.NewJobs(pool).PorID(ctx, dono, job.ID)
+	require.NoError(t, err)
+	require.Equal(t, acervo.FonteUpload(vaga.ID), guardado.SourceURL)
+	require.Empty(t, guardado.Title, "a skill não manda título: as tags do arquivo têm de ganhar")
+	require.Equal(t, "Artista - Faixa.mp3", guardado.TituloReserva)
+}
+
+// Compartilhar o id de envio não basta: o token resolve para outro usuário,
+// logo para outra key. É o mesmo recorte do teste de sessão abaixo, pelo outro
+// caminho de autenticação.
+func TestTokenNaoAlcancaOEnvioDeOutroDono(t *testing.T) {
+	b := novoBucket()
+	r, pool, cfg := montarComBucket(t, b)
+	dbtest.CriarUsuario(t, pool, "dono@exemplo.test")
+	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
+
+	rec := postJSON(t, r, cfg, "/api/acervo/upload", `{"bytes":2048}`, eu)
+	var vaga vagaJSON
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &vaga))
+	alheio := "stage/" + eu + "/" + vaga.ID + ".bin"
+	b.semear(alheio, 2048)
+
+	rec = postComToken(t, r, "/api/acervo/upload/"+vaga.ID+"/finalizar", `{}`, tokenDoBot)
+	require.Equal(t, http.StatusNotFound, rec.Code)
+	require.False(t, b.foiApagado(alheio), "o envio do outro não pode ser tocado")
+}
+
+// A área de espera de outro dono é inalcançável: a key vem do usuário
+// autenticado, então o mesmo id de envio em duas contas aponta para dois
+// objetos diferentes.
 func TestFinalizarNaoAlcancaOEnvioDeOutroDono(t *testing.T) {
 	b := novoBucket()
 	r, pool, cfg := montarComBucket(t, b)
@@ -301,9 +395,12 @@ func TestFinalizarNaoAlcancaOEnvioDeOutroDono(t *testing.T) {
 	require.False(t, b.foiApagado(alheio), "e o arquivo do outro não pode ser tocado")
 }
 
-// A fonte `upload:` é interna. A rota de ingestão — a única que aceita o token
-// de máquina — só admite http(s), então o bot não tem como pedir ao worker que
-// leia uma key qualquer do bucket.
+// A fonte `upload:` é interna: nasce só de um envio que o próprio dono fez.
+//
+// O token hoje alcança essa fonte, pelo `finalizar` — mas com a key derivada
+// do usuário autenticado. O que este teste guarda é a outra metade: `/ingest`
+// continua admitindo só http(s), então não há como pedir ao worker que leia uma
+// key arbitrária do bucket passando um `source_url` fabricado.
 func TestIngestNaoAceitaFonteDeUpload(t *testing.T) {
 	r, pool, cfg := montarComBucket(t, novoBucket())
 	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")

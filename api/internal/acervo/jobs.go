@@ -22,8 +22,9 @@ const MaxTentativas = 3
 
 // --- Fonte do job ---------------------------------------------------------
 
-// prefixoUpload marca um job cuja mídia JÁ ESTÁ no bucket, enviada pelo
-// navegador por URL assinada, em vez de ser baixada de uma URL pública.
+// prefixoUpload marca um job cuja mídia JÁ ESTÁ no bucket, gravada por um
+// cliente autenticado com URL assinada, em vez de ser baixada de uma URL
+// pública. Os dois clientes são a tela de envio da PWA e o node do Hermes.
 //
 // Guardamos só o id do envio, nunca a key: o worker reconstrói a key com o
 // `user_id` do próprio job (ver storage.KeyUploadStage). Assim a fonte
@@ -31,7 +32,7 @@ const MaxTentativas = 3
 // que ele valida contra o dono.
 const prefixoUpload = "upload:"
 
-// FonteUpload monta o valor de `source_url` de um envio pela PWA.
+// FonteUpload monta o valor de `source_url` de um envio de arquivo.
 func FonteUpload(uploadID string) string { return prefixoUpload + uploadID }
 
 // IDDoUpload devolve o id do envio quando a fonte é um upload. É o que faz o
@@ -51,8 +52,9 @@ type Job struct {
 	SourceURL string
 	Title     string
 	Artist    string
-	// TituloReserva é o nome do arquivo enviado pela tela: perde das tags do
-	// arquivo e ganha do "sem título" (ver migração 0003).
+	// TituloReserva é o nome do arquivo que o cliente enviou: perde das tags
+	// do arquivo e ganha do "sem título" (ver migração 0003). É o que faz as
+	// tags que o scdl escreve ganharem do nome do arquivo que ele gerou.
 	TituloReserva string
 	Status        string
 	Attempts      int
@@ -93,7 +95,7 @@ func (r *Jobs) Enfileirar(ctx context.Context, userID, url, title, artist string
 	return r.enfileirar(ctx, userID, url, title, artist, "")
 }
 
-// EnfileirarEnvio é o Enfileirar da tela de envio: além do título escolhido,
+// EnfileirarEnvio é o Enfileirar de um envio de arquivo: além do título escolhido,
 // guarda um título de RESERVA — o nome do arquivo — que só é usado se o
 // arquivo não tiver tag nenhuma. Método irmão em vez de um parâmetro a mais
 // porque o caminho do bot não tem nome de arquivo para informar.

@@ -232,14 +232,19 @@ func (w *Worker) VarrerAbandonados(ctx context.Context) (int, error) {
 }
 
 // origem busca os bytes da mídia. São duas fontes para uma pipeline só: URL
-// pública (baixador HTTP, com a trava de SSRF) e arquivo que o navegador já
-// gravou no bucket pela tela de envio.
+// pública (baixador HTTP, com a trava de SSRF) e arquivo que um cliente
+// autenticado já gravou no bucket — a tela de envio da PWA ou o node do
+// Hermes, pela skill do SoundCloud.
 //
 // A key do envio é RECONSTRUÍDA do `user_id` do job; o que está guardado na
-// linha é só um id (ver acervo.FonteUpload). Então uma fonte adulterada no
-// banco não vira um caminho que o worker obedece — e a rota com token de
-// máquina (`POST /acervo/ingest`) só aceita http(s), de modo que o bot não
-// alcança esta fonte de jeito nenhum.
+// linha é só um id (ver acervo.FonteUpload). É essa reconstrução, e não o
+// middleware da API, que protege esta fonte: uma fonte adulterada no banco não
+// vira caminho que o worker obedece, porque o worker nunca lê um caminho — ele
+// monta o dele a partir do dono do job.
+//
+// Vale dizer o que mudou aqui: desde a skill do SoundCloud, o token de máquina
+// ALCANÇA esta fonte, pelo `finalizar`. Antes não alcançava, e o comentário
+// antigo se apoiava nisso. A garantia que continua de pé é a de cima.
 func (w *Worker) origem(ctx context.Context, job *acervo.Job, destino io.Writer) (string, int64, error) {
 	id, ok := acervo.IDDoUpload(job.SourceURL)
 	if !ok {

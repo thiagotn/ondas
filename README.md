@@ -59,6 +59,8 @@ a fase 3 da ADR 0013.)
 | `DELETE /api/acervo/{id}` | apaga a faixa e os objetos |
 | `POST /api/acervo/ingest` | enfileira ingestão por URL — cookie **ou** `X-Ondas-Token` |
 | `GET /api/acervo/ingest/{id}` | `pending \| processing \| ready \| error` |
+| `POST /api/acervo/upload` | reserva vaga e devolve **PUT assinado** do R2 — cookie **ou** `X-Ondas-Token` |
+| `POST /api/acervo/upload/{id}/finalizar` | enfileira a ingestão do arquivo já gravado — cookie **ou** `X-Ondas-Token` |
 
 Rodar local (precisa de um Postgres; `docker run -e POSTGRES_PASSWORD=… -p 55432:5432 postgres:16-alpine`):
 

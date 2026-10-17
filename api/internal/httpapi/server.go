@@ -76,21 +76,46 @@ func (s *Server) Router() http.Handler {
 		})
 
 		// Nada aqui é público: o acervo é privado por definição.
+		//
+		// O corte entre os dois grupos abaixo é **entrar com faixa nova** vs.
+		// **mexer no acervo que já existe**. Não é um detalhe de arrumação: é
+		// onde mora o teto do token de máquina.
 		r.Route("/acervo", func(r chi.Router) {
 			r.Use(s.exigirAcervo)
 
-			// A ingestão aceita os dois chamadores: a PWA pelo cookie e o bot
-			// do Telegram pelo X-Ondas-Token.
-			r.With(s.exigirSessaoOuToken).Post("/ingest", s.ingerir)
-			r.With(s.exigirSessaoOuToken).Get("/ingest/{id}", s.statusIngestao)
+			// Entrar com faixa nova: a PWA pelo cookie, e o node do Hermes
+			// pelo X-Ondas-Token.
+			//
+			// O envio de arquivo entrou aqui (antes era só sessão) porque a
+			// skill do SoundCloud não tem URL de mídia para mandar: URL do
+			// SoundCloud é página, e o worker do cluster não tem scdl. Quem
+			// baixa é o node, e aí os bytes só existem no disco dele — a
+			// única porta para o acervo é o PUT assinado.
+			//
+			// Isso não afrouxa a autorização, porque ela nunca esteve no
+			// middleware: a key é derivada do usuário AUTENTICADO
+			// (`stage/<dono>/<uuid>.bin`), nunca de algo que o pedido mandou.
+			// O teto do token continua sendo "não alcança faixa de outra
+			// pessoa, não lê e não apaga o acervo" — e nunca foi "não grava
+			// objeto no bucket", já que `POST /ingest` sempre pôde pedir ao
+			// worker que gravasse uma mídia baixada de qualquer URL.
+			r.Group(func(r chi.Router) {
+				r.Use(s.exigirSessaoOuToken)
+				r.Post("/ingest", s.ingerir)
+				r.Get("/ingest/{id}", s.statusIngestao)
+				r.Post("/upload", s.pedirVagaDeUpload)
+				r.Post("/upload/{id}/finalizar", s.finalizarUpload)
+			})
 
+			// Mexer no acervo que já existe: só sessão, nunca token.
+			//
+			// É aqui que um token vazado viraria exfiltração (listar, baixar)
+			// ou destruição (apagar), e não em criar um objeto na própria área
+			// de espera. `TestEscopoDoTokenNoAcervo` trava esta divisão: mover
+			// uma rota de grupo sem querer compila, e só o teste denuncia.
 			r.Group(func(r chi.Router) {
 				r.Use(s.exigirSessao)
 				r.Get("/", s.listarAcervo)
-				// Envio de arquivo local: só sessão. O token do bot ingere
-				// URL e não deve poder escrever objeto no bucket.
-				r.Post("/upload", s.pedirVagaDeUpload)
-				r.Post("/upload/{id}/finalizar", s.finalizarUpload)
 				r.Get("/{id}/audio", s.audio)
 				r.Get("/{id}/art", s.arte)
 				r.Delete("/{id}", s.removerFaixa)
