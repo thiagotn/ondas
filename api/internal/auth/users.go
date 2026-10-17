@@ -103,3 +103,19 @@ func (u *Users) ByID(ctx context.Context, id string) (*User, error) {
 	}
 	return &user, nil
 }
+
+// PorEmail resolve o dono configurado para a ingestão por token (o bot não tem
+// sessão, então é o e-mail do ConfigMap que diz de quem é a faixa).
+func (u *Users) PorEmail(ctx context.Context, email string) (*User, error) {
+	var user User
+	err := u.pool.QueryRow(ctx,
+		`SELECT id, email, name FROM users WHERE lower(email) = lower($1)`, email).
+		Scan(&user.ID, &user.Email, &user.Name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNaoEncontrado
+	}
+	if err != nil {
+		return nil, fmt.Errorf("users: porEmail: %w", err)
+	}
+	return &user, nil
+}

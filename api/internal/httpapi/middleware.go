@@ -4,11 +4,25 @@ import (
 	"context"
 	"net/http"
 	"strings"
+
+	"github.com/thiagotn/ondas/api/internal/auth"
 )
 
 type chaveCtx string
 
 const chaveUsuario chaveCtx = "usuario"
+
+// comUsuario/usuarioDe isolam a chave do contexto: os dois caminhos de
+// autenticação (cookie e token do bot) gravam o usuário do mesmo jeito, e os
+// handlers leem sem repetir o type assertion.
+func comUsuario(ctx context.Context, user *auth.User) context.Context {
+	return context.WithValue(ctx, chaveUsuario, user)
+}
+
+func usuarioDe(ctx context.Context) *auth.User {
+	user, _ := ctx.Value(chaveUsuario).(*auth.User)
+	return user
+}
 
 // clienteIP confia no CF-Connecting-IP porque o único caminho de entrada do
 // cluster é o túnel da Cloudflare — o RemoteAddr aqui é sempre o IP interno do
@@ -47,6 +61,6 @@ func (s *Server) exigirSessao(next http.Handler) http.Handler {
 			escreverErro(w, http.StatusUnauthorized, "sessão expirada")
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), chaveUsuario, user)))
+		next.ServeHTTP(w, r.WithContext(comUsuario(r.Context(), user)))
 	})
 }

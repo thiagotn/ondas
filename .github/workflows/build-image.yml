@@ -61,6 +61,9 @@ jobs:
           go-version: '1.26'
           cache-dependency-path: api/go.sum
 
+      - name: Garantir ffmpeg (testes de mídia se pulam sem ele)
+        run: command -v ffprobe >/dev/null || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+
       - name: Testes da API (Go)
         run: go test ./...
         working-directory: api
@@ -92,6 +95,9 @@ jobs:
           - name: ondas-api
             context: api
             dockerfile: api/Dockerfile
+          - name: ondas-worker
+            context: api
+            dockerfile: api/Dockerfile.worker
     steps:
       - uses: actions/checkout@v4
 
@@ -143,12 +149,20 @@ jobs:
         run: |
           set -euo pipefail
           TAG="sha-${GITHUB_SHA}"
-          # Seleção por nome, não por posição: com duas imagens no mesmo
+          # Seleção por nome, não por posição: com três imagens no mesmo
           # kustomization, `.images[0]` viraria uma roleta e um dia escreveria
           # a tag da PWA na API.
-          for IMG in ondas ondas-api; do
-            yq -i "(.images[] | select(.name == \"ghcr.io/thiagotn/${IMG}\")).newTag = \"${TAG}\"" \
-              helm/apps/ondas/kustomization.yaml
+          for IMG in ondas ondas-api ondas-worker; do
+            SELETOR=".images[] | select(.name == \"ghcr.io/thiagotn/${IMG}\")"
+            # Imagem que não está no kustomization faria o `yq -i` não escrever
+            # NADA, em silêncio, e o deploy seguiria com a tag velha. Falhar
+            # aqui é melhor que descobrir isso num rollback.
+            if [ -z "$(yq "(${SELETOR}).newTag" helm/apps/ondas/kustomization.yaml)" ] \
+               || [ "$(yq "(${SELETOR}).newTag" helm/apps/ondas/kustomization.yaml)" = "null" ]; then
+              echo "::error::ghcr.io/thiagotn/${IMG} não está em helm/apps/ondas/kustomization.yaml"
+              exit 1
+            fi
+            yq -i "(${SELETOR}).newTag = \"${TAG}\"" helm/apps/ondas/kustomization.yaml
           done
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -156,6 +170,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Tag já é ${TAG}; nada a commitar."
           else
-            git commit -m "deploy(ondas): ${TAG} (pwa + api) [skip ci]"
+            git commit -m "deploy(ondas): ${TAG} (pwa + api + worker) [skip ci]"
             git push
           fi

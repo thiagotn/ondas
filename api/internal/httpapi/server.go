@@ -11,8 +11,10 @@ import (
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/thiagotn/ondas/api/internal/acervo"
 	"github.com/thiagotn/ondas/api/internal/auth"
 	"github.com/thiagotn/ondas/api/internal/config"
+	"github.com/thiagotn/ondas/api/internal/storage"
 )
 
 type Server struct {
@@ -21,16 +23,37 @@ type Server struct {
 	users    *auth.Users
 	sessions *auth.Sessions
 	limiter  *auth.Limiter
+	tracks   *acervo.Tracks
+	jobs     *acervo.Jobs
+	// nil quando não há credencial de R2: o acervo responde 503 e o login
+	// segue funcionando.
+	r2 *storage.R2
 }
 
 func New(cfg *config.Config, pool *pgxpool.Pool) *Server {
-	return &Server{
+	s := &Server{
 		cfg:      cfg,
 		pool:     pool,
 		users:    auth.NewUsers(pool),
 		sessions: auth.NewSessions(cfg.SessionSecret, time.Duration(cfg.SessionMaxAgeS)*time.Second),
 		limiter:  auth.NewLimiter(cfg.LoginAttempts, time.Duration(cfg.LoginWindowS)*time.Second),
+		tracks:   acervo.NewTracks(pool),
+		jobs:     acervo.NewJobs(pool),
 	}
+	if !cfg.AcervoConfigurado() {
+		slog.Warn("acervo desligado: sem credencial de R2 (R2_ACCOUNT_ID/KEY/SECRET)")
+		return s
+	}
+	r2, err := storage.New(cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey,
+		cfg.R2Bucket, time.Duration(cfg.R2SignedURLTTLS)*time.Second)
+	if err != nil {
+		// Credencial presente mas inválida é erro de configuração, não motivo
+		// para derrubar o login de quem já tem conta.
+		slog.Error("acervo desligado: R2 inválido", "erro", err)
+		return s
+	}
+	s.r2 = r2
+	return s
 }
 
 // Router monta as rotas sob `/api`. Não há CORS: a API é servida na mesma
@@ -50,6 +73,24 @@ func (s *Server) Router() http.Handler {
 			r.Post("/login", s.login)
 			r.Post("/logout", s.logout)
 			r.With(s.exigirSessao).Get("/me", s.me)
+		})
+
+		// Nada aqui é público: o acervo é privado por definição.
+		r.Route("/acervo", func(r chi.Router) {
+			r.Use(s.exigirAcervo)
+
+			// A ingestão aceita os dois chamadores: a PWA pelo cookie e o bot
+			// do Telegram pelo X-Ondas-Token.
+			r.With(s.exigirSessaoOuToken).Post("/ingest", s.ingerir)
+			r.With(s.exigirSessaoOuToken).Get("/ingest/{id}", s.statusIngestao)
+
+			r.Group(func(r chi.Router) {
+				r.Use(s.exigirSessao)
+				r.Get("/", s.listarAcervo)
+				r.Get("/{id}/audio", s.audio)
+				r.Get("/{id}/art", s.arte)
+				r.Delete("/{id}", s.removerFaixa)
+			})
 		})
 	})
 	return r
@@ -136,8 +177,7 @@ func (s *Server) logout(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {
-	user, _ := r.Context().Value(chaveUsuario).(*auth.User)
-	escreverJSON(w, http.StatusOK, user)
+	escreverJSON(w, http.StatusOK, usuarioDe(r.Context()))
 }
 
 func (s *Server) gravarCookie(w http.ResponseWriter, userID string) {

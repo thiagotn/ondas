@@ -41,9 +41,10 @@ Variáveis de ambiente (opcionais, em `packages/web/.env.local`):
 
 ## API do acervo (`api/`, Go)
 
-A PWA é estática e pública; a API existe só para o que é **privado**: conta de verdade e, nas
-fases seguintes, as faixas próprias guardadas no Cloudflare R2. Ela é servida na **mesma origem**,
-sob `/api` — o que dispensa CORS e deixa o cookie de sessão same-site.
+A PWA é estática e pública; a API existe só para o que é **privado**: conta de verdade e as faixas
+próprias, guardadas num bucket R2 **privado**. Ela é servida na **mesma origem**, sob `/api` — o
+que dispensa CORS e deixa o cookie de sessão same-site. (A PWA ainda não consome o acervo: isso é
+a fase 3 da ADR 0013.)
 
 | Rota | O que faz |
 | --- | --- |
@@ -52,6 +53,12 @@ sob `/api` — o que dispensa CORS e deixa o cookie de sessão same-site.
 | `POST /api/auth/logout` | limpa o cookie |
 | `GET /api/auth/me` | sessão atual; 401 quando não há |
 | `GET /api/healthz` / `readyz` | probes — `readyz` confere o banco, `healthz` não |
+| `GET /api/acervo` | faixas do dono, no formato do `Track` do core |
+| `GET /api/acervo/{id}/audio` | **302** para URL assinada do R2 |
+| `GET /api/acervo/{id}/art` | idem para a capa (`?p=thumb` para a de 150) |
+| `DELETE /api/acervo/{id}` | apaga a faixa e os objetos |
+| `POST /api/acervo/ingest` | enfileira ingestão por URL — cookie **ou** `X-Ondas-Token` |
+| `GET /api/acervo/ingest/{id}` | `pending \| processing \| ready \| error` |
 
 Rodar local (precisa de um Postgres; `docker run -e POSTGRES_PASSWORD=… -p 55432:5432 postgres:16-alpine`):
 
@@ -72,8 +79,40 @@ para o banco real não apague o acervo.
 TEST_DATABASE_URL='postgres://postgres:teste@127.0.0.1:55432/ondas_test' go test ./...
 ```
 
+### Ingestão (o contrato que o bot do Telegram vai chamar)
+
+```bash
+# Enfileira. 202 com id; 200 (mesmo id) se a mesma URL já estava a caminho.
+curl -X POST https://music.thiagotn.com/api/acervo/ingest \
+  -H "X-Ondas-Token: $TOKEN" -H 'content-type: application/json' \
+  -d '{"url":"https://exemplo.com/musica.mp3","title":"opcional","artist":"opcional"}'
+
+# Acompanha.
+curl -H "X-Ondas-Token: $TOKEN" https://music.thiagotn.com/api/acervo/ingest/<id>
+```
+
+Quem faz o trabalho é o **worker** (`cmd/worker`, imagem própria com ffmpeg): baixa a URL, examina
+com ffprobe, extrai a capa embutida em 480 e 150, sobe no R2 privado e grava a faixa. `title` e
+`artist` do pedido ganham das tags do arquivo; o que faltar vem das tags.
+
+Três coisas que o worker **recusa**, de propósito:
+
+- **endereço não público** — ele roda dentro do cluster, então `10.43.x.x` (services), `100.64/10`
+  (malha), `169.254.169.254` e companhia são vetados. A checagem é na hora de conectar, com o IP
+  já resolvido, e vale para cada salto de redirect: validar só o nome deixaria passar DNS
+  rebinding;
+- **arquivo grande demais** — teto em `INGEST_MAX_MB`, medido nos bytes que chegam, sem acreditar
+  no `Content-Length`;
+- **formato que o navegador não toca** — a régua é a tag `<audio>` (mp3, aac, flac, opus, wav), e
+  quem decide o que o arquivo é é o ffprobe, não o `Content-Type` da origem.
+
+O áudio nunca é servido pelo homelab: `/audio` responde **302** para uma URL assinada do R2, com
+validade de uma hora. Os bytes não passam pelo túnel, e a assinatura é refeita a cada play — por
+isso ela não vence dentro do cache de 24h do catálogo.
+
 Decisões registradas em `docs/adr/0013-ondas-acervo-privado.md` no repo `homelab`: cookie HMAC em
-vez de JWT, argon2id, migrações no start, rate-limit por `CF-Connecting-IP`.
+vez de JWT, argon2id, migrações sob advisory lock, rate-limit por `CF-Connecting-IP`, bucket R2
+privado com URL assinada e a trava de SSRF do worker.
 
 ## Arquitetura
 

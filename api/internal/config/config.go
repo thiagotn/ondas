@@ -33,6 +33,43 @@ type Config struct {
 	// (hostPort mascara), então o rate-limit dele é global, não por cliente.
 	LoginAttempts int `envconfig:"LOGIN_ATTEMPTS" default:"8"`
 	LoginWindowS  int `envconfig:"LOGIN_WINDOW_S" default:"300"`
+
+	// --- Acervo (fase 2) ---
+
+	// Bucket R2 PRIVADO: sem domínio público, sem r2.dev. Credenciais em
+	// secret out-of-git; no git ficam só bucket e TTL (ADR 0011).
+	R2AccountID       string `envconfig:"R2_ACCOUNT_ID"`
+	R2AccessKeyID     string `envconfig:"R2_ACCESS_KEY_ID"`
+	R2SecretAccessKey string `envconfig:"R2_SECRET_ACCESS_KEY"`
+	R2Bucket          string `envconfig:"R2_BUCKET" default:"ondas-acervo"`
+	// Validade da URL assinada. Precisa cobrir a escuta inteira de uma faixa:
+	// o navegador segue o 302 uma vez e depois pede os Range direto no R2,
+	// com a URL em que caiu. Curto demais quebra o seek de quem pausou.
+	R2SignedURLTTLS int `envconfig:"R2_SIGNED_URL_TTL" default:"3600"`
+
+	// Token de máquina do bot do Telegram, guardado como SHA-256 do valor
+	// real: a API só precisa verificar, então o segredo em claro não precisa
+	// existir no cluster.
+	IngestTokenSHA256 string `envconfig:"INGEST_TOKEN_SHA256"`
+	// Dono das faixas que entram por token (o bot não tem sessão).
+	IngestUserEmail string `envconfig:"INGEST_USER_EMAIL"`
+
+	// Tetos da ingestão. O worker baixa de uma URL arbitrária: sem teto, um
+	// arquivo enorme enche o emptyDir e derruba o pod.
+	IngestMaxMB    int `envconfig:"INGEST_MAX_MB" default:"60"`
+	IngestTimeoutS int `envconfig:"INGEST_TIMEOUT_S" default:"180"`
+	WorkerPollS    int `envconfig:"WORKER_POLL_S" default:"5"`
+}
+
+// AcervoConfigurado diz se há credencial de R2. Sem ela a API sobe normalmente
+// e só o acervo responde 503: um secret ausente não deve derrubar o login.
+func (c *Config) AcervoConfigurado() bool {
+	return c.R2AccountID != "" && c.R2AccessKeyID != "" && c.R2SecretAccessKey != ""
+}
+
+// IngestPorTokenConfigurado diz se o caminho do bot está pronto.
+func (c *Config) IngestPorTokenConfigurado() bool {
+	return c.IngestTokenSHA256 != "" && c.IngestUserEmail != ""
 }
 
 func Load() (*Config, error) {
