@@ -142,3 +142,90 @@ func TestConfiguracaoIncompletaFalhaNaConstrucao(t *testing.T) {
 	_, err = NewComEndpoint("host", true, "k", "s", "bkt", 0)
 	require.Error(t, err)
 }
+
+// --- CORS ------------------------------------------------------------------
+
+// s3Cors guarda o XML do PUT e o devolve no GET, como o bucket faria.
+type s3Cors struct {
+	xmlRecebido string
+	query       string
+	metodo      string
+}
+
+func (f *s3Cors) handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		f.metodo = r.Method
+		f.query = r.URL.RawQuery
+		if r.Method == http.MethodPut {
+			b, _ := io.ReadAll(r.Body)
+			f.xmlRecebido = string(b)
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(f.xmlRecebido))
+	}
+}
+
+func TestAplicarCORSMandaAPoliticaQueAPWAPrecisa(t *testing.T) {
+	f := &s3Cors{}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	u, err := url.Parse(srv.URL)
+	require.NoError(t, err)
+	r2, err := NewComEndpoint(u.Host, false, "chave", "segredo", "ondas-acervo", time.Hour)
+	require.NoError(t, err)
+
+	require.NoError(t, r2.AplicarCORS(context.Background(), "https://music.thiagotn.com"))
+
+	require.Equal(t, http.MethodPut, f.metodo)
+	require.Contains(t, f.query, "cors")
+
+	// O que a PWA precisa, item por item — cada um por um motivo concreto.
+	require.Contains(t, f.xmlRecebido, "<AllowedOrigin>https://music.thiagotn.com</AllowedOrigin>")
+	require.Contains(t, f.xmlRecebido, "<AllowedMethod>GET</AllowedMethod>")
+	require.Contains(t, f.xmlRecebido, "<AllowedMethod>HEAD</AllowedMethod>")
+	// `range`: sem ele não há seek.
+	require.Contains(t, f.xmlRecebido, "<AllowedHeader>range</AllowedHeader>")
+	// `content-length` exposto: é o que a barra de progresso do download
+	// offline lê.
+	require.Contains(t, f.xmlRecebido, "<ExposeHeader>content-length</ExposeHeader>")
+	require.Contains(t, f.xmlRecebido, "<ExposeHeader>content-range</ExposeHeader>")
+	require.Contains(t, f.xmlRecebido, "<ExposeHeader>accept-ranges</ExposeHeader>")
+
+	// Escrita NÃO entra: o upload é do worker, por dentro, com credencial.
+	require.NotContains(t, f.xmlRecebido, "<AllowedMethod>PUT</AllowedMethod>")
+	require.NotContains(t, f.xmlRecebido, "<AllowedMethod>DELETE</AllowedMethod>")
+	// E nada de curinga de origem num bucket privado.
+	require.NotContains(t, f.xmlRecebido, "<AllowedOrigin>*</AllowedOrigin>")
+}
+
+func TestLerCORSDevolveOQueFoiGravado(t *testing.T) {
+	f := &s3Cors{}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	u, err := url.Parse(srv.URL)
+	require.NoError(t, err)
+	r2, err := NewComEndpoint(u.Host, false, "chave", "segredo", "ondas-acervo", time.Hour)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	require.NoError(t, r2.AplicarCORS(ctx, "https://music.thiagotn.com"))
+
+	politica, err := r2.LerCORS(ctx)
+	require.NoError(t, err)
+	require.Contains(t, politica, "https://music.thiagotn.com")
+	require.Contains(t, politica, "CORSRule")
+}
+
+func TestAplicarCORSSemOrigemFalha(t *testing.T) {
+	f := &s3Cors{}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	u, _ := url.Parse(srv.URL)
+	r2, err := NewComEndpoint(u.Host, false, "chave", "segredo", "ondas-acervo", time.Hour)
+	require.NoError(t, err)
+
+	require.Error(t, r2.AplicarCORS(context.Background(), ""))
+	require.Empty(t, f.metodo, "não deveria ter saído requisição")
+}

@@ -5,13 +5,16 @@ package storage
 
 import (
 	"context"
+	"encoding/xml"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/cors"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
@@ -96,4 +99,58 @@ func (r *R2) Tamanho(ctx context.Context, key string) (int64, error) {
 		return 0, fmt.Errorf("storage: stat %s: %w", key, err)
 	}
 	return info.Size, nil
+}
+
+// --- CORS do bucket -------------------------------------------------------
+
+// A política do bucket do acervo, como código e não como JSON colado num
+// painel: fica versionada, revisável e aplicável de novo sem depender de
+// ninguém lembrar o que estava lá.
+//
+// Por que `GET` precisa de CORS aqui, ao contrário das fotos do prumo (ADR
+// 0011): o player da PWA usa `crossOrigin='anonymous'` no `<audio>`, o que põe
+// a resposta final do redirect sob checagem de CORS, e o download offline faz
+// `fetch` e lê `res.body`, que exige resposta não-opaca. Sem isto o áudio
+// simplesmente não toca — e o erro no console não aponta para o bucket.
+func politicaCORS(origem string) *cors.Config {
+	return cors.NewConfig([]cors.Rule{{
+		ID:            "ondas-pwa",
+		AllowedOrigin: []string{origem},
+		// Só leitura: o upload é do worker, por dentro, com credencial.
+		AllowedMethod: []string{http.MethodGet, http.MethodHead},
+		// `range` é o que permite o seek; os condicionais deixam o navegador
+		// revalidar o que já tem em cache em vez de baixar de novo.
+		AllowedHeader: []string{"range", "if-match", "if-none-match"},
+		// Sem expor estes, o JavaScript do download offline não consegue ler o
+		// tamanho e a barra de progresso fica cega.
+		ExposeHeader:  []string{"content-length", "content-range", "accept-ranges", "etag"},
+		MaxAgeSeconds: 3600,
+	}})
+}
+
+// AplicarCORS grava a política no bucket.
+func (r *R2) AplicarCORS(ctx context.Context, origem string) error {
+	if origem == "" {
+		return fmt.Errorf("storage: origem da PWA vazia")
+	}
+	if err := r.client.SetBucketCors(ctx, r.bucket, politicaCORS(origem)); err != nil {
+		return fmt.Errorf("storage: aplicar CORS em %s: %w", r.bucket, err)
+	}
+	return nil
+}
+
+// LerCORS devolve a política que está no bucket, em XML, para conferência.
+func (r *R2) LerCORS(ctx context.Context) (string, error) {
+	cfg, err := r.client.GetBucketCors(ctx, r.bucket)
+	if err != nil {
+		return "", fmt.Errorf("storage: ler CORS de %s: %w", r.bucket, err)
+	}
+	if cfg == nil {
+		return "", nil
+	}
+	xmlBytes, err := xml.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(xmlBytes), nil
 }
