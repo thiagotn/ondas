@@ -29,13 +29,50 @@ export interface LoadCatalogDeps {
   /** Injetável para teste. */
   now?: () => number;
   onError?: (err: unknown) => void;
+  /**
+   * Segunda fonte: as faixas próprias, que só existem logado. Opcional porque
+   * o visitante não tem acervo — e porque a cadeia de 3 níveis do catálogo
+   * público continua valendo sozinha, exatamente como antes.
+   */
+  acervo?: (signal?: AbortSignal) => Promise<Track[]>;
 }
 
 /**
  * Cadeia de 3 níveis do handoff: API ao vivo → metadados em cache local →
  * catálogo demo. O rótulo devolvido é exibido no comentário do prompt.
+ *
+ * Com `deps.acervo`, as faixas próprias entram NA FRENTE da lista — é o acervo
+ * de quem está logado, e é o que ele quer ver primeiro. A posição é inofensiva
+ * para o heurístico `[pro]` do protótipo: faixa do acervo vem com
+ * `premium: false` explícito, e o selo só aparece para quem NÃO tem sessão.
+ *
+ * As duas fontes são buscadas em paralelo e são independentes: acervo fora do
+ * ar não derruba o catálogo público, e vice-versa. Quem falha some da lista em
+ * vez de virar erro de tela.
  */
 export async function loadCatalog(deps: LoadCatalogDeps, options?: TrendingOptions): Promise<Catalog> {
+  // Dispara as duas antes de esperar qualquer uma: sequencial somaria as
+  // latências sem necessidade.
+  const doAcervo = deps.acervo?.(options?.signal);
+  const publico = resolvePublico(deps, options);
+  const [proprias, catalogo] = await Promise.all([
+    doAcervo?.catch((err) => {
+      // Visitante sem sessão é o caso normal, não falha: o `semSessao` do
+      // AcervoError existe para não poluir o log com o óbvio.
+      if (!(err instanceof Error) || !('semSessao' in err) || !err.semSessao) {
+        deps.onError?.(err);
+      }
+      return [] as Track[];
+    }) ?? Promise.resolve([] as Track[]),
+    publico,
+  ]);
+
+  if (!proprias.length) return catalogo;
+  return { ...catalogo, tracks: [...proprias, ...catalogo.tracks], acervo: proprias.length };
+}
+
+/** A cadeia de 3 níveis do catálogo público, intacta. */
+async function resolvePublico(deps: LoadCatalogDeps, options?: TrendingOptions): Promise<Catalog> {
   if (deps.forceDemo) return { tracks: demoTracks(), source: 'catálogo demo' };
   try {
     const tracks = await deps.remote.trending(options);

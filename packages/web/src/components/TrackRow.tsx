@@ -43,6 +43,10 @@ export function TrackRow({ row, showArt, onPlay, onLike, onDownload }: TrackRowP
         </span>
       </button>
 
+      {/* Antes de [pro] e [off]: a origem da faixa é o que o dono procura
+          primeiro na linha. [meu] e [pro] nunca aparecem juntos — faixa do
+          acervo vem com premium: false e o selo [pro] só existe sem sessão. */}
+      {row.minha && <span className={`${s.tag} ${s.tagMeu}`}>[meu]</span>}
       {row.locked && <span className={`${s.tag} ${s.tagPro}`}>[pro]</span>}
       {row.cached && <span className={`${s.tag} ${s.tagOff}`}>[off]</span>}
       {row.dlLabel && <span className={`${s.tag} ${s.tagDl}`}>[{row.dlLabel}]</span>}

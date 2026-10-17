@@ -25,7 +25,10 @@ cleanupOutdatedCaches();
 registerRoute(
   new NavigationRoute(createHandlerBoundToURL('index.html'), {
     // O healthz é das probes do k8s e do monitor da Homepage: precisa ir à rede.
-    denylist: [/^\/healthz$/, /^\/sw\.js$/],
+    // `/api/` também: as chamadas do app não são navegações e já passam direto,
+    // mas abrir /api/acervo na barra de endereços É uma navegação — sem isto o
+    // SW devolveria o shell do app no lugar do JSON, o que atrapalha depurar.
+    denylist: [/^\/healthz$/, /^\/sw\.js$/, /^\/api\//],
   }),
 );
 

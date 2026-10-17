@@ -101,6 +101,12 @@
   font-size: 12px;
 }
 
+/* Magenta: não colide com o amarelo do [pro], o verde do [off] nem o ciano do
+   download. É a cor que sobra nos 8 ANSI básicos para "isto é seu". */
+.tagMeu {
+  color: var(--ansi-5);
+}
+
 .tagPro {
   color: var(--ansi-3);
 }

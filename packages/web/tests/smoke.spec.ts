@@ -10,8 +10,68 @@ async function blockAudius(page: Page) {
   await page.route('**/*.audius.co/**', (route) => route.abort());
 }
 
+/** Faixas do acervo que a API falsa devolve para quem está logado. */
+const ACERVO = [
+  {
+    id: 'acervo:11111111-1111-4111-8111-111111111111',
+    title: 'Fita Caseira',
+    artist: 'Eu Mesmo',
+    genre: 'acervo',
+    dur: 184,
+    art: '',
+    stream: '/api/acervo/11111111-1111-4111-8111-111111111111/audio',
+    premium: false,
+  },
+];
+
+/**
+ * A API do acervo, de mentira.
+ *
+ * O build de produção que os testes servem não tem backend, e a auth agora é
+ * de verdade — sem isto, nenhum login passaria. O stub imita o CONTRATO da API
+ * real: mesmos status e mesmas mensagens em pt-BR, porque é isso que a tela
+ * exibe cru.
+ *
+ * Risco assumido: stub e API podem divergir. O contrato de verdade é coberto
+ * pelos testes Go (status e mensagem de cada rota); aqui o que se testa é a
+ * PWA reagindo a ele.
+ */
+async function stubApi(page: Page) {
+  let logado = false;
+
+  await page.route('**/api/auth/login', async (route) => {
+    const { email, password } = JSON.parse(route.request().postData() ?? '{}');
+    if (!/.+@.+\..+/.test(email ?? '')) {
+      return route.fulfill({ status: 400, json: { error: 'e-mail inválido' } });
+    }
+    if ((password ?? '').length < 8) {
+      return route.fulfill({ status: 400, json: { error: 'senha precisa de 8+ caracteres' } });
+    }
+    logado = true;
+    return route.fulfill({ status: 200, json: { name: email.split('@')[0], email } });
+  });
+
+  await page.route('**/api/auth/logout', async (route) => {
+    logado = false;
+    return route.fulfill({ status: 200, json: { status: 'ok' } });
+  });
+
+  await page.route('**/api/auth/me', async (route) =>
+    logado
+      ? route.fulfill({ status: 200, json: { name: 'thiago', email: 'thiago@ondas.app' } })
+      : route.fulfill({ status: 401, json: { error: 'sessão expirada' } }),
+  );
+
+  await page.route('**/api/acervo', async (route) =>
+    logado
+      ? route.fulfill({ status: 200, json: { tracks: ACERVO } })
+      : route.fulfill({ status: 401, json: { error: 'sessão expirada' } }),
+  );
+}
+
 test.beforeEach(async ({ page }) => {
   await blockAudius(page);
+  await stubApi(page);
 });
 
 /**
@@ -93,7 +153,8 @@ test('login libera o catálogo e a biblioteca mostra a conta', async ({ page }) 
   await page.goto('/login');
   await skipSplash(page);
   await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
-  await page.getByPlaceholder('••••').fill('senha');
+  // 8+ caracteres: a régua é do servidor agora (argon2id), não mais do protótipo.
+  await page.getByPlaceholder('••••').fill('senha-forte');
   await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
 
   await expect(page.getByText(/autenticado como thiago/)).toBeVisible();
@@ -106,6 +167,50 @@ test('login libera o catálogo e a biblioteca mostra a conta', async ({ page }) 
   await expect(page.getByText('catálogo completo + offline')).toBeVisible();
   await expect(page.getByText('0 faixas · 0.0 MB')).toBeVisible();
   await expect(page.getByText('vazio — pressione [l] ou o coração para curtir.')).toBeVisible();
+});
+
+test('o acervo aparece só logado, marcado como [meu], e some ao sair', async ({ page }) => {
+  // A linha da lista é um botão cujo nome acessível traz índice, título,
+  // artista e gênero. Usar isso em vez de getByText evita casar com o título
+  // que a barra de baixo mostra da faixa atual.
+  const linha = (titulo: string) => page.getByRole('button', { name: new RegExp(titulo) });
+
+  await page.goto('/login');
+  await skipSplash(page);
+
+  // Visitante: nada do acervo, e a fonte é só a pública.
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+  await expect(page.getByText(/catálogo demo/)).toBeVisible();
+  await expect(linha('Fita Caseira')).toBeHidden();
+  await expect(page.getByText(/\+ acervo/)).toBeHidden();
+
+  // Entrando, as faixas próprias entram na frente da lista.
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
+  await page.getByPlaceholder('••••').fill('senha-forte');
+  await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
+
+  // `^01` prova que é a PRIMEIRA da lista, não só que está nela.
+  await expect(page.getByRole('button', { name: /^01 Fita Caseira/ })).toBeVisible();
+  await expect(page.getByText('[meu]')).toBeVisible();
+  // A linha do prompt passa a admitir as duas fontes.
+  await expect(page.getByText(/\+ acervo \(1\)/)).toBeVisible();
+
+  // O gênero `acervo` vira filtro próprio, de graça. O chip selecionado vem
+  // entre colchetes, daí o exact para não casar com a linha da faixa.
+  await page.getByRole('button', { name: 'acervo', exact: true }).click();
+  await expect(linha('Fita Caseira')).toBeVisible();
+  await expect(linha('Maré Baixa')).toBeHidden();
+  await page.getByRole('button', { name: 'tudo', exact: true }).click();
+  await expect(linha('Maré Baixa')).toBeVisible();
+
+  // Saindo, o acervo some — e o selo [meu] com ele.
+  await page.keyboard.press('3');
+  await page.getByRole('button', { name: /sair/ }).click();
+  await expect(linha('Fita Caseira')).toBeHidden();
+  await expect(page.getByText('[meu]')).toBeHidden();
+  await expect(page.getByText(/\+ acervo/)).toBeHidden();
 });
 
 test('busca filtra por artista e mostra a mensagem de grep vazio', async ({ page }) => {

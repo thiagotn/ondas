@@ -22,6 +22,12 @@ export interface Track {
    * as regras de acesso caem no heurístico do protótipo (ver `access.ts`).
    */
   premium?: boolean;
+  /**
+   * De onde a faixa veio. `acervo` são as faixas próprias, que só existem para
+   * quem está logado — a lista marca essas e o resto segue igual. `undefined`
+   * é o catálogo público (nenhum código antigo precisou mudar por causa disto).
+   */
+  source?: 'audius' | 'acervo';
 }
 
 export interface User {
@@ -73,6 +79,13 @@ export type CatalogSource =
 export interface Catalog {
   tracks: Track[];
   source: CatalogSource;
+  /**
+   * Quantas faixas do acervo entraram na lista. Fica fora de `source` de
+   * propósito: `CatalogSource` descreve de onde vieram os metadados PÚBLICOS e
+   * continua sendo um conjunto fechado de rótulos — compor string ali faria o
+   * tipo deixar de dizer qualquer coisa.
+   */
+  acervo?: number;
 }
 
 /** Barra da waveform: caractere de bloco + a cor (CSS var) que lhe cabe. */

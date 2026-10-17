@@ -124,6 +124,28 @@ O áudio nunca é servido pelo homelab: `/audio` responde **302** para uma URL a
 validade de uma hora. Os bytes não passam pelo túnel, e a assinatura é refeita a cada play — por
 isso ela não vence dentro do cache de 24h do catálogo.
 
+### A PWA com as duas fontes
+
+Logado, o catálogo passa a ter duas origens: o Audius (público) e o acervo (privado). O
+`loadCatalog` de `core` busca as duas **em paralelo** e são independentes — acervo fora do ar não
+derruba o catálogo público e vice-versa; quem falha some da lista em vez de virar erro de tela.
+
+As faixas próprias entram **na frente**, marcadas com `[meu]`, e o gênero `acervo` vira um filtro
+de graça nos chips. A linha do prompt admite as duas:
+`# 13 faixas · fonte: audius api (ao vivo) + acervo (1)`.
+
+Três armadilhas tratadas aqui, todas com teste:
+
+- **`cur` é índice**, e a lista muda de tamanho ao entrar e ao sair. O `controller.setTracks`
+  reancora pelo `curId`, senão o player mostraria uma faixa e tocaria outra.
+- **`premium: false` explícito** nas faixas do acervo: com `undefined`, o heurístico do protótipo
+  (`index % 3`) marcaria música própria como `[pro]`.
+- **`restore()` não derruba a sessão sem rede.** A PWA é instalada e abre offline; só um **401**
+  invalida, porque só ele significa "o servidor disse que não".
+
+Ao sair, o catálogo do logado é removido do cache persistido: os metadados das faixas próprias não
+ficam no aparelho esperando o próximo visitante.
+
 Decisões registradas em `docs/adr/0013-ondas-acervo-privado.md` no repo `homelab`: cookie HMAC em
 vez de JWT, argon2id, migrações sob advisory lock, rate-limit por `CF-Connecting-IP`, bucket R2
 privado com URL assinada e a trava de SSRF do worker.

@@ -1,5 +1,6 @@
 import {
   firstPlayable,
+  indexOfTrack,
   onEnded,
   playability,
   prefetchTarget,
@@ -15,6 +16,8 @@ import {
   setMediaPosition,
 } from '../platform/mediaSession';
 import { applyTheme, storeTheme } from '../theme/applyTheme';
+import { queryClient } from '../query/client';
+import { catalogKey } from '../query/catalog';
 import { auth, connectivity, engine, offlineStore } from './services';
 import { libraryStore, playerStore, sessionStore, uiStore } from './stores';
 
@@ -30,6 +33,13 @@ let online = true;
 
 export function setTracks(next: readonly Track[]): void {
   tracks = next;
+  // A lista muda de tamanho ao entrar (o acervo entra na frente) e ao sair.
+  // Como `cur` é posição nela, sem reancorar pelo `curId` o player mostraria
+  // uma faixa e tocaria outra.
+  const player = playerStore.getState();
+  if (!player.curId) return;
+  const reancorado = indexOfTrack(next, player.curId);
+  if (reancorado !== player.cur) player.patch({ cur: reancorado });
 }
 
 export function setOnline(next: boolean): void {
@@ -219,6 +229,10 @@ export function setTheme(id: ThemeId): void {
 export async function logout(): Promise<void> {
   await auth.logout();
   sessionStore.getState().setUser(null);
+  // O catálogo do logado tem as faixas do acervo, e ele fica persistido em
+  // IndexedDB. Sair sem apagar deixaria os metadados das faixas próprias no
+  // aparelho à espera do próximo visitante.
+  queryClient.removeQueries({ queryKey: catalogKey(true) });
 }
 
 export function toggleSimulatedOffline(): void {

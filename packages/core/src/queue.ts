@@ -65,3 +65,19 @@ export function prefetchTarget(ctx: QueueContext, from: number): number {
   }
   return -1;
 }
+
+/**
+ * Onde a faixa atual ficou na lista nova.
+ *
+ * `cur` é POSIÇÃO numa lista que muda de tamanho: ao entrar, as faixas do
+ * acervo entram na frente; ao sair, elas somem. Sem reancorar, o player
+ * passaria a apontar para outra faixa — mostrando uma e tocando outra. O
+ * `curId` existe justamente para sobreviver a isso.
+ *
+ * Devolve -1 quando a faixa não está mais na lista (saiu do acervo, por
+ * exemplo), que é o mesmo que "nada carregado" para o resto do código.
+ */
+export function indexOfTrack(tracks: readonly Track[], id: string | null): number {
+  if (!id) return -1;
+  return tracks.findIndex((t) => t.id === id);
+}

@@ -1,4 +1,4 @@
-import { AudiusCatalogClient, LocalAuthService } from '@ondas/core';
+import { AcervoCatalogClient, AudiusCatalogClient, HttpAuthService } from '@ondas/core';
 import { BrowserConnectivity } from '../platform/BrowserConnectivity';
 import { CacheOfflineStore } from '../platform/CacheOfflineStore';
 import { IdbKeyValueStore } from '../platform/IdbKeyValueStore';
@@ -6,10 +6,18 @@ import { WebPlayerEngine } from '../platform/WebPlayerEngine';
 
 /** Implementações web dos ports de `core`. Trocar de plataforma é trocar este arquivo. */
 export const kv = new IdbKeyValueStore();
-export const auth = new LocalAuthService(kv);
+/**
+ * Auth contra a nossa API. O `LocalAuthService` continua existindo em `core`
+ * como implementação de referência dos testes de domínio — aqui, em produção,
+ * a senha é conferida no servidor (argon2id) e a sessão é um cookie HttpOnly
+ * que este código não consegue ler.
+ */
+export const auth = new HttpAuthService(kv);
 export const offlineStore = new CacheOfflineStore();
 export const connectivity = new BrowserConnectivity();
 export const catalogClient = new AudiusCatalogClient();
+/** Segunda fonte do catálogo: as faixas próprias, só para quem está logado. */
+export const acervoClient = new AcervoCatalogClient();
 export const engine = new WebPlayerEngine();
 
 /** Flag de dev: força o catálogo demo sem bater na API. */

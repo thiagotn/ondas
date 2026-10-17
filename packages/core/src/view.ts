@@ -45,10 +45,12 @@ export function promptLine(args: {
   seg: LibrarySegment;
   count: number;
   source: Catalog['source'] | '';
+  /** Quantas faixas próprias entraram na lista (ver `Catalog.acervo`). */
+  acervo?: number;
   /** Há um refetch em andamento: o que está na tela ainda é o dado anterior. */
   refreshing?: boolean;
 }): PromptLine {
-  const { tab, who, genre, q, seg, count, source, refreshing } = args;
+  const { tab, who, genre, q, seg, count, source, acervo, refreshing } = args;
   if (tab === 'search') {
     const typed = q.trim().replace(/^#/, '');
     return {
@@ -71,8 +73,12 @@ export function promptLine(args: {
     cwd: '~/em-alta',
     cmd: `ondas trending --genero=${genre}`,
     // Enquanto o refetch não volta, a lista na tela é a da sessão anterior:
-    // dizer "ao vivo" sem ressalva seria mentira.
-    comment: `${count} faixas · fonte: ${source || '…'}${refreshing ? ' · atualizando' : ''}`,
+    // dizer "ao vivo" sem ressalva seria mentira. E quando o acervo entra, a
+    // fonte deixa de ser uma só — dizer apenas "audius" esconderia metade.
+    comment:
+      `${count} faixas · fonte: ${source || '…'}` +
+      (acervo ? ` + acervo (${acervo})` : '') +
+      (refreshing ? ' · atualizando' : ''),
   };
 }
 

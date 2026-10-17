@@ -57,10 +57,10 @@ func diagnosticar(_ []string) error {
 	// Apaga mesmo se algo falhar no meio: nada de lixo acumulando em diag/.
 	defer func() {
 		if err := r2.Remover(context.WithoutCancel(ctx), key); err != nil {
-			fmt.Printf("4/4 apagar .......... FALHOU: %v\n", err)
+			fmt.Printf("limpeza ............ FALHOU: %v\n", err)
 			return
 		}
-		fmt.Println("4/4 apagar .......... ok")
+		fmt.Println("limpeza ............ ok (objeto de teste removido)")
 	}()
 
 	if err := r2.Enviar(ctx, key, "application/octet-stream",
@@ -87,6 +87,11 @@ func diagnosticar(_ []string) error {
 		return err
 	}
 	req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", bytesPedidos-1))
+	// Origin como o navegador manda: o player usa crossOrigin='anonymous', então
+	// a resposta FINAL do redirect passa por checagem de CORS. O preflight
+	// (OPTIONS) só prova a política; é esta resposta que precisa carregar o
+	// Allow-Origin — sem ele o áudio não toca e o erro não aponta para o bucket.
+	req.Header.Set("Origin", cfg.OrigemPWA)
 	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
 	if err != nil {
 		return fmt.Errorf("3/4 a url assinada não respondeu: %w", err)
@@ -108,6 +113,21 @@ func diagnosticar(_ []string) error {
 	}
 	fmt.Printf("3/4 range ........... ok (206, %d bytes, content-range %q)\n",
 		len(corpo), resp.Header.Get("Content-Range"))
+
+	permitida := resp.Header.Get("Access-Control-Allow-Origin")
+	expostos := resp.Header.Get("Access-Control-Expose-Headers")
+	switch {
+	case permitida == "":
+		fmt.Printf("4/4 cors ............ FALTA: a resposta não trouxe "+
+			"Access-Control-Allow-Origin para %s.\n"+
+			"                     O áudio NÃO vai tocar na PWA. Falta colar a\n"+
+			"                     política de CORS no painel (worker cors).\n", cfg.OrigemPWA)
+	case permitida != cfg.OrigemPWA && permitida != "*":
+		fmt.Printf("4/4 cors ............ ATENÇÃO: allow-origin é %q, esperado %q\n",
+			permitida, cfg.OrigemPWA)
+	default:
+		fmt.Printf("4/4 cors ............ ok (allow-origin %q, expose %q)\n", permitida, expostos)
+	}
 
 	fmt.Println("\nA credencial faz tudo o que o acervo precisa.")
 	return nil

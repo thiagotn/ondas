@@ -28,6 +28,8 @@ export interface RowModel {
   durLabel: string;
   /** Capa pequena da lista, seguida dos nós alternativos. */
   artSources: string[];
+  /** Faixa do acervo pessoal — a lista marca com `[meu]`. */
+  minha: boolean;
 }
 
 /**
@@ -63,6 +65,7 @@ export function useTrackRows(visible: readonly Track[], all: readonly Track[]): 
         genreColor: genreAnsiVar(track.genre),
         durLabel: fmtTime(track.dur),
         artSources: artworkSources(track.artThumb || track.art, hosts),
+        minha: track.source === 'acervo',
       };
     });
   }, [all, cached, cur, dl, liked, offline, playing, session, visible]);

@@ -1,6 +1,12 @@
 import type { OfflineStore, OfflineUsage } from '@ondas/core';
 
 const CACHE_NAME = 'ondas-offline';
+/**
+ * Chave do cache. A barra inicial não é enfeite: ids do acervo têm a forma
+ * `acervo:<uuid>`, e sem o `/offline/` na frente o `acervo:` seria lido como
+ * ESQUEMA de URL (`new URL('acervo:123')` é uma URL válida e absurda). Com o
+ * prefixo, o `:` cai no segundo segmento do caminho, onde é legal.
+ */
 const keyOf = (id: string) => '/offline/' + id;
 
 /**

@@ -30,6 +30,9 @@ export function HomeRoute() {
     seg: 'liked',
     count: visible.length,
     source: data?.source ?? '',
+    // Quando o acervo entra, a fonte deixa de ser uma só: dizer apenas
+    // "audius" esconderia metade da lista.
+    ...(data?.acervo ? { acervo: data.acervo } : {}),
     // Com cache persistido, o 1º paint é a lista da sessão anterior.
     refreshing: isFetching && !isLoading,
   });
