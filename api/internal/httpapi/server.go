@@ -87,6 +87,10 @@ func (s *Server) Router() http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(s.exigirSessao)
 				r.Get("/", s.listarAcervo)
+				// Envio de arquivo local: só sessão. O token do bot ingere
+				// URL e não deve poder escrever objeto no bucket.
+				r.Post("/upload", s.pedirVagaDeUpload)
+				r.Post("/upload/{id}/finalizar", s.finalizarUpload)
 				r.Get("/{id}/audio", s.audio)
 				r.Get("/{id}/art", s.arte)
 				r.Delete("/{id}", s.removerFaixa)

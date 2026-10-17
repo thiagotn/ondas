@@ -48,13 +48,14 @@ type Worker struct {
 	baixador Baixador
 	trabalho string
 	prazo    time.Duration
+	maxBytes int64
 }
 
 func New(jobs *acervo.Jobs, tracks *acervo.Tracks, r2 *storage.R2,
-	baixador Baixador, dirTrabalho string, prazo time.Duration) *Worker {
+	baixador Baixador, dirTrabalho string, prazo time.Duration, maxBytes int64) *Worker {
 	return &Worker{
 		jobs: jobs, tracks: tracks, r2: r2, baixador: baixador,
-		trabalho: dirTrabalho, prazo: prazo,
+		trabalho: dirTrabalho, prazo: prazo, maxBytes: maxBytes,
 	}
 }
 
@@ -104,6 +105,7 @@ func (w *Worker) processar(ctx context.Context, job *acervo.Job) {
 		log.Error("faixa gravada mas job não fechou", "track", track.ID, "erro", err)
 		return
 	}
+	w.descartarEnvio(ctx, job, log)
 	log.Info("ingestão pronta", "track", track.ID, "titulo", track.Title, "dur", track.DurS)
 }
 
@@ -120,6 +122,8 @@ func mensagemDeErro(err error) string {
 		return "url inválida"
 	case errors.Is(err, ingest.ErrGrandeDemais):
 		return err.Error()
+	case errors.Is(err, storage.ErrObjetoAusente):
+		return "o arquivo enviado não está mais no bucket — refaça o envio"
 	case errors.Is(err, ingest.ErrSemAudio):
 		return "o arquivo não tem faixa de áudio"
 	case errors.Is(err, ingest.ErrFormatoNaoToca):
@@ -145,7 +149,7 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 	if err != nil {
 		return nil, err
 	}
-	tipoDeclarado, tamanho, err := w.baixador.Baixar(ctx, job.SourceURL, arquivo)
+	tipoDeclarado, tamanho, err := w.origem(ctx, job, arquivo)
 	if cerr := arquivo.Close(); err == nil && cerr != nil {
 		err = cerr
 	}
@@ -172,9 +176,12 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 	artKey, thumbKey := w.capas(ctx, dir, bruto, job.UserID, trackID, midia, log)
 
 	nova := acervo.Nova{
-		ID:          trackID,
-		UserID:      job.UserID,
-		Title:       primeiroNaoVazio(job.Title, midia.Titulo, "sem título"),
+		ID:     trackID,
+		UserID: job.UserID,
+		// Ordem: título escolhido no pedido > tags do arquivo > nome do
+		// arquivo enviado > padrão. O nome do arquivo entra DEPOIS das tags
+		// de propósito: um álbum etiquetado não deve virar "01 - Faixa".
+		Title:       primeiroNaoVazio(job.Title, midia.Titulo, job.TituloReserva, "sem título"),
 		Artist:      primeiroNaoVazio(job.Artist, midia.Artista, "acervo"),
 		Genre:       "acervo",
 		DurS:        midia.DuracaoS,
@@ -192,6 +199,78 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 		return nil, fmt.Errorf("gravar faixa: %w", err)
 	}
 	return track, nil
+}
+
+// IdadeAbandono é o tempo após o qual um arquivo na área de espera é lixo.
+//
+// Folgado de propósito: o pior caso de um job legítimo é 3 tentativas com
+// recuperação de travado a cada 15 minutos — menos de uma hora. 24h não corre
+// risco de apagar arquivo que ainda vai ser ingerido.
+const IdadeAbandono = 24 * time.Hour
+
+// VarrerAbandonados apaga o que subiu e nunca foi finalizado: aba fechada no
+// meio do envio, usuário que desistiu, erro de rede entre o PUT e o
+// `finalizar`. Sem isto esses bytes ficam pagando armazenamento para sempre,
+// sem nenhuma linha no banco que os aponte.
+//
+// Devolve quantos apagou. Erro de um objeto não interrompe os outros: a
+// varredura é oportunista e roda de novo daqui a pouco.
+func (w *Worker) VarrerAbandonados(ctx context.Context) (int, error) {
+	keys, err := w.r2.StageAbandonados(ctx, IdadeAbandono)
+	if err != nil {
+		return 0, err
+	}
+	apagados := 0
+	for _, k := range keys {
+		if err := w.r2.Remover(ctx, k); err != nil {
+			slog.Warn("abandonado continuou no bucket", "key", k, "erro", err)
+			continue
+		}
+		apagados++
+	}
+	return apagados, nil
+}
+
+// origem busca os bytes da mídia. São duas fontes para uma pipeline só: URL
+// pública (baixador HTTP, com a trava de SSRF) e arquivo que o navegador já
+// gravou no bucket pela tela de envio.
+//
+// A key do envio é RECONSTRUÍDA do `user_id` do job; o que está guardado na
+// linha é só um id (ver acervo.FonteUpload). Então uma fonte adulterada no
+// banco não vira um caminho que o worker obedece — e a rota com token de
+// máquina (`POST /acervo/ingest`) só aceita http(s), de modo que o bot não
+// alcança esta fonte de jeito nenhum.
+func (w *Worker) origem(ctx context.Context, job *acervo.Job, destino io.Writer) (string, int64, error) {
+	id, ok := acervo.IDDoUpload(job.SourceURL)
+	if !ok {
+		return w.baixador.Baixar(ctx, job.SourceURL, destino)
+	}
+	tipo, n, err := w.r2.Baixar(ctx, storage.KeyUploadStage(job.UserID, id), destino, w.maxBytes)
+	if err != nil {
+		return "", 0, err
+	}
+	// O teto é reconferido aqui, e não só no `finalizar` da API, porque a URL
+	// assinada do PUT segue válida por 15 minutos: o arquivo pode ter sido
+	// trocado por um maior DEPOIS da conferência. Sem isto, o emptyDir de 1Gi
+	// enche e o pod morre.
+	if w.maxBytes > 0 && n > w.maxBytes {
+		return "", 0, fmt.Errorf("%w de %d bytes", ingest.ErrGrandeDemais, w.maxBytes)
+	}
+	return tipo, n, nil
+}
+
+// descartarEnvio apaga o arquivo da área de espera depois que a faixa ficou
+// pronta: os bytes já estão no objeto definitivo, com tipo e extensão certos,
+// e manter a cópia crua seria pagar armazenamento duas vezes.
+//
+// Só no sucesso. Numa falha o objeto fica, porque o job ainda pode ser
+// retentado; quem recolhe o que sobrou é a varredura de abandonados.
+func (w *Worker) descartarEnvio(ctx context.Context, job *acervo.Job, log *slog.Logger) {
+	id, ok := acervo.IDDoUpload(job.SourceURL)
+	if !ok {
+		return
+	}
+	w.limpar(ctx, log, storage.KeyUploadStage(job.UserID, id))
 }
 
 // capas é best-effort: faixa sem arte embutida é normal e não deve reprovar a

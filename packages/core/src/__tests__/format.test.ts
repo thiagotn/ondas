@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dlPct, fmtMB, fmtTime, genreAnsiVar, hash, slugGenre } from '../format.js';
+import { barraDeProgresso, dlPct, fmtMB, fmtTime, genreAnsiVar, hash, slugGenre } from '../format.js';
 
 describe('fmtTime', () => {
   it('formata m:ss', () => {
@@ -58,5 +58,26 @@ describe('dlPct', () => {
     expect(dlPct(0.42)).toBe(' 42%');
     expect(dlPct(0.07)).toBe('  7%');
     expect(dlPct(1)).toBe('100%');
+  });
+});
+
+describe('barraDeProgresso', () => {
+  it('mantém a largura em colunas do começo ao fim', () => {
+    for (const f of [0, 0.01, 0.33, 0.5, 0.99, 1]) {
+      // Largura constante: 12 colunas + os dois colchetes.
+      expect(barraDeProgresso(f)).toHaveLength(14);
+    }
+  });
+
+  it('vai de vazia a cheia', () => {
+    expect(barraDeProgresso(0)).toBe('[············]');
+    expect(barraDeProgresso(0.5)).toBe('[######······]');
+    expect(barraDeProgresso(1)).toBe('[############]');
+  });
+
+  it('aguenta valor fora da faixa e NaN', () => {
+    expect(barraDeProgresso(-1)).toBe(barraDeProgresso(0));
+    expect(barraDeProgresso(9)).toBe(barraDeProgresso(1));
+    expect(barraDeProgresso(Number.NaN)).toBe(barraDeProgresso(0));
   });
 });

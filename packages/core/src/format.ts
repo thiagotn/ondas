@@ -38,3 +38,17 @@ export function genreAnsiVar(genre: string): string {
 export function dlPct(progress: number): string {
   return String(Math.round(progress * 100)).padStart(3, ' ') + '%';
 }
+
+/**
+ * Barra de progresso em caracteres, no estilo do terminal: `[####······]`.
+ *
+ * Pura e aqui dentro porque é a única parte do envio que precisa ficar
+ * estável: a largura é em colunas, então um arredondamento errado faz a barra
+ * mudar de tamanho no meio do upload e o layout tremer.
+ */
+export function barraDeProgresso(fracao: number, largura = 12): string {
+  const colunas = Math.max(1, Math.floor(largura));
+  const limpa = Number.isFinite(fracao) ? Math.min(1, Math.max(0, fracao)) : 0;
+  const cheias = Math.round(limpa * colunas);
+  return '[' + '#'.repeat(cheias) + '·'.repeat(colunas - cheias) + ']';
+}

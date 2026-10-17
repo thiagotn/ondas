@@ -1,8 +1,14 @@
-import { AcervoCatalogClient, AudiusCatalogClient, HttpAuthService } from '@ondas/core';
+import {
+  AcervoCatalogClient,
+  AcervoUploader,
+  AudiusCatalogClient,
+  HttpAuthService,
+} from '@ondas/core';
 import { BrowserConnectivity } from '../platform/BrowserConnectivity';
 import { CacheOfflineStore } from '../platform/CacheOfflineStore';
 import { IdbKeyValueStore } from '../platform/IdbKeyValueStore';
 import { WebPlayerEngine } from '../platform/WebPlayerEngine';
+import { enviarParaR2 } from '../platform/XhrEnviador';
 
 /** Implementações web dos ports de `core`. Trocar de plataforma é trocar este arquivo. */
 export const kv = new IdbKeyValueStore();
@@ -18,6 +24,11 @@ export const connectivity = new BrowserConnectivity();
 export const catalogClient = new AudiusCatalogClient();
 /** Segunda fonte do catálogo: as faixas próprias, só para quem está logado. */
 export const acervoClient = new AcervoCatalogClient();
+/**
+ * Envio de arquivo local para o acervo. Os bytes vão do navegador DIRETO para
+ * o R2 (PUT assinado); a nossa API só reserva a vaga e enfileira a ingestão.
+ */
+export const acervoUploader = new AcervoUploader<File>({ enviarBytes: enviarParaR2 });
 export const engine = new WebPlayerEngine();
 
 /** Flag de dev: força o catálogo demo sem bater na API. */

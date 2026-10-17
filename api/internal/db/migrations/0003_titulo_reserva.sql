@@ -1,0 +1,11 @@
+-- Título de reserva do job de ingestão.
+--
+-- A tela de envio manda o nome do arquivo aqui, e não em `title`, por causa da
+-- ordem de precedência que a gente quer: as TAGS do arquivo ganham do nome do
+-- arquivo. Se o nome viesse em `title`, um álbum bem etiquetado viraria
+-- "01 - Faixa" — porque `title` é a escolha explícita de quem pediu e, por
+-- desenho, ganha das tags.
+--
+-- Assim a ordem fica: title (escolhido) > tags do arquivo > reserva (nome do
+-- arquivo) > "sem título".
+ALTER TABLE ingest_jobs ADD COLUMN IF NOT EXISTS fallback_title text NOT NULL DEFAULT '';

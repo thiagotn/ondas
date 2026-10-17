@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -94,12 +95,114 @@ func (r *R2) Remover(ctx context.Context, key string) error {
 }
 
 // Tamanho confere que o objeto existe e quantos bytes tem.
+//
+// O erro de objeto ausente vem traduzido para ErrObjetoAusente: quem chama
+// precisa distinguir "o arquivo não chegou" (404 para o usuário) de "o R2 não
+// respondeu" (503), e essa diferença não deve virar comparação de string.
 func (r *R2) Tamanho(ctx context.Context, key string) (int64, error) {
 	info, err := r.client.StatObject(ctx, r.bucket, key, minio.StatObjectOptions{})
 	if err != nil {
-		return 0, fmt.Errorf("storage: stat %s: %w", key, err)
+		return 0, fmt.Errorf("storage: stat %s: %w", key, traduzirErro(err))
 	}
 	return info.Size, nil
+}
+
+// --- Área de espera dos uploads -------------------------------------------
+
+// ErrObjetoAusente distingue "não existe" de "não deu para falar com o R2" —
+// um é 404 para o usuário, o outro é 503.
+var ErrObjetoAusente = errors.New("storage: objeto não existe")
+
+// KeyUploadStage é a key onde o navegador grava um arquivo antes de ele virar
+// faixa. Existe como função porque a API assina o PUT nesta key e o worker lê
+// desta key: duas cópias do formato divergiriam em silêncio.
+//
+// O dono vai NA KEY, e o worker a reconstrói do `user_id` do job em vez de
+// aceitar uma key guardada na linha. Assim, mesmo que algo escreva uma fonte
+// arbitrária no banco, o worker só consegue ler da área daquele usuário.
+//
+// Prefixo próprio (`stage/`, não `u/<dono>/stage/`) para a varredura de
+// abandonados poder listar só a área de espera, sem passear pelo acervo todo.
+func KeyUploadStage(userID, uploadID string) string {
+	return fmt.Sprintf("stage/%s/%s.bin", userID, uploadID)
+}
+
+// URLAssinadaPUT devolve um PUT assinado: é o que deixa o navegador enviar o
+// arquivo DIRETO para o R2.
+//
+// Por que não passar os bytes pela API: o túnel da Cloudflare tem teto de
+// ~100MB por requisição (ADR 0007) e o link é residencial — subir por dentro
+// gastaria banda de upload do dono duas vezes (navegador→homelab→R2).
+//
+// A assinatura não prende o Content-Type: o navegador manda o que quiser e o
+// que vale é o ffprobe do worker, não um header do cliente.
+func (r *R2) URLAssinadaPUT(ctx context.Context, key string, validade time.Duration) (string, error) {
+	if validade <= 0 {
+		validade = r.ttl
+	}
+	u, err := r.client.PresignedPutObject(ctx, r.bucket, key, validade)
+	if err != nil {
+		return "", fmt.Errorf("storage: assinar PUT %s: %w", key, err)
+	}
+	return u.String(), nil
+}
+
+// Baixar lê um objeto do bucket. É o que o worker usa na fonte `upload:`, no
+// lugar do baixador HTTP.
+//
+// `limite` é um teto de LEITURA, não uma política: copia no máximo limite+1
+// bytes, para quem chama poder detectar o excesso e escolher a mensagem — o
+// mesmo arranjo do baixador HTTP, que também não decide sozinho.
+func (r *R2) Baixar(ctx context.Context, key string, destino io.Writer, limite int64) (string, int64, error) {
+	obj, err := r.client.GetObject(ctx, r.bucket, key, minio.GetObjectOptions{})
+	if err != nil {
+		return "", 0, fmt.Errorf("storage: abrir %s: %w", key, traduzirErro(err))
+	}
+	defer obj.Close()
+	// O GetObject do minio é preguiçoso: objeto ausente só aparece aqui.
+	info, err := obj.Stat()
+	if err != nil {
+		return "", 0, fmt.Errorf("storage: stat %s: %w", key, traduzirErro(err))
+	}
+	leitor := io.Reader(obj)
+	if limite > 0 {
+		leitor = io.LimitReader(obj, limite+1)
+	}
+	n, err := io.Copy(destino, leitor)
+	if err != nil {
+		return "", 0, fmt.Errorf("storage: ler %s: %w", key, err)
+	}
+	return info.ContentType, n, nil
+}
+
+// StageAbandonados lista as keys da área de espera mais velhas que `idade`.
+//
+// Um upload que subiu e nunca foi finalizado (o usuário fechou a aba) fica
+// pagando armazenamento sem nenhuma linha no banco que o aponte. Como a área
+// tem prefixo próprio, a varredura é uma listagem curta.
+func (r *R2) StageAbandonados(ctx context.Context, idade time.Duration) ([]string, error) {
+	limite := time.Now().Add(-idade)
+	var keys []string
+	for obj := range r.client.ListObjects(ctx, r.bucket, minio.ListObjectsOptions{
+		Prefix: prefixoStage, Recursive: true,
+	}) {
+		if obj.Err != nil {
+			return keys, fmt.Errorf("storage: listar %s: %w", prefixoStage, obj.Err)
+		}
+		if obj.LastModified.Before(limite) {
+			keys = append(keys, obj.Key)
+		}
+	}
+	return keys, nil
+}
+
+const prefixoStage = "stage/"
+
+func traduzirErro(err error) error {
+	if resp := minio.ToErrorResponse(err); resp.Code == "NoSuchKey" || resp.StatusCode == http.StatusNotFound {
+		return ErrObjetoAusente
+	}
+	return err
 }
 
 // --- CORS do bucket -------------------------------------------------------
@@ -128,11 +231,14 @@ type RegraCORS struct {
 func regrasCORS(origem string) []RegraCORS {
 	return []RegraCORS{{
 		AllowedOrigins: []string{origem},
-		// Só leitura: o upload é do worker, por dentro, com credencial.
-		AllowedMethods: []string{http.MethodGet, http.MethodHead},
+		// `PUT` entrou com a tela de envio: o navegador grava o arquivo
+		// direto no bucket, por URL assinada, para os bytes não passarem
+		// pelo túnel (teto de ~100MB) nem pelo upload residencial do dono.
+		AllowedMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut},
 		// `range` é o que permite o seek; os condicionais deixam o navegador
-		// revalidar o que já tem em cache em vez de baixar de novo.
-		AllowedHeaders: []string{"range", "if-match", "if-none-match"},
+		// revalidar o que já tem em cache em vez de baixar de novo;
+		// `content-type` é o que o XHR do envio manda junto com o arquivo.
+		AllowedHeaders: []string{"range", "if-match", "if-none-match", "content-type"},
 		// Sem expor estes, o JavaScript do download offline não consegue ler o
 		// tamanho e a barra de progresso fica cega.
 		ExposeHeaders: []string{"content-length", "content-range", "accept-ranges", "etag"},

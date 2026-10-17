@@ -194,8 +194,17 @@ func TestAplicarCORSMandaAPoliticaQueAPWAPrecisa(t *testing.T) {
 	require.Contains(t, f.xmlRecebido, "<ExposeHeader>content-range</ExposeHeader>")
 	require.Contains(t, f.xmlRecebido, "<ExposeHeader>accept-ranges</ExposeHeader>")
 
-	// Escrita NÃO entra: o upload é do worker, por dentro, com credencial.
-	require.NotContains(t, f.xmlRecebido, "<AllowedMethod>PUT</AllowedMethod>")
+	// `PUT` entrou com a tela de envio (fase 4): o navegador grava o arquivo
+	// direto no bucket por URL assinada. A asserção que estava aqui dizia o
+	// contrário, e era correta enquanto o único a escrever era o worker.
+	// Permitir o método no CORS não autoriza ninguém: sem a assinatura da
+	// API, o PUT do navegador é recusado pelo próprio R2.
+	require.Contains(t, f.xmlRecebido, "<AllowedMethod>PUT</AllowedMethod>")
+	// `content-type` é o header que o XHR do envio manda com o arquivo.
+	require.Contains(t, f.xmlRecebido, "<AllowedHeader>content-type</AllowedHeader>")
+
+	// Apagar, não: nenhuma tela apaga objeto direto no bucket — quem remove é
+	// a API (faixa) e o worker (área de espera), por dentro.
 	require.NotContains(t, f.xmlRecebido, "<AllowedMethod>DELETE</AllowedMethod>")
 	// E nada de curinga de origem num bucket privado.
 	require.NotContains(t, f.xmlRecebido, "<AllowedOrigin>*</AllowedOrigin>")

@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { uiStore, useLibrary, useSession, useUi } from '../app/stores';
 import { LibraryPanel } from '../components/LibraryPanel';
 import { TabScaffold } from '../components/TabScaffold';
+import { UploadPanel } from '../components/UploadPanel';
 import { TrackList } from '../components/TrackList';
 import { useTrackRows } from '../hooks/useTrackRows';
 import { useCatalog } from '../query/catalog';
@@ -41,6 +42,8 @@ export function LibraryRoute() {
   return (
     <TabScaffold line={line}>
       <LibraryPanel />
+      {/* Enviar arquivo só faz sentido com conta: o acervo é por usuário. */}
+      {user && <UploadPanel />}
       <div className={s.segments}>
         {SEGMENTS.map(([id, label]) => (
           <button

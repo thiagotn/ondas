@@ -106,6 +106,7 @@ func run() error {
 		ingest.NewBaixador(int64(cfg.IngestMaxMB)<<20, prazo),
 		dirTrabalho,
 		prazo,
+		int64(cfg.IngestMaxMB)<<20,
 	)
 
 	srv := servidorDeSaude()
@@ -121,7 +122,21 @@ func run() error {
 
 	tick := time.NewTicker(intervalo)
 	defer tick.Stop()
+	// A varredura da área de espera é horária, não a cada rodada: listar o
+	// bucket a cada 5 segundos seria pagar requisição de listagem para quase
+	// sempre não achar nada. Começa já na primeira rodada, para um reinício
+	// recolher o que ficou da vez anterior.
+	var proximaVarredura time.Time
 	for {
+		if time.Now().After(proximaVarredura) {
+			if n, err := w.VarrerAbandonados(ctx); err != nil {
+				slog.Warn("varredura da área de espera", "erro", err)
+			} else if n > 0 {
+				slog.Info("envios abandonados apagados", "quantidade", n)
+			}
+			proximaVarredura = time.Now().Add(intervaloVarredura)
+		}
+
 		feitos, err := w.Rodar(ctx)
 		if err != nil && ctx.Err() == nil {
 			slog.Error("rodada do worker", "erro", err)
@@ -142,6 +157,9 @@ func run() error {
 // servidorDeSaude expõe /healthz (kubelet). Não confere o banco de propósito:
 // Postgres piscando não é motivo para matar um worker que está no meio de um
 // download.
+// De quanto em quanto tempo a área de espera é varrida.
+const intervaloVarredura = time.Hour
+
 func servidorDeSaude() *http.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {

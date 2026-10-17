@@ -3,6 +3,7 @@ package acervo
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -19,6 +20,27 @@ var (
 // (rede piscando) costumam passar na segunda.
 const MaxTentativas = 3
 
+// --- Fonte do job ---------------------------------------------------------
+
+// prefixoUpload marca um job cuja mídia JÁ ESTÁ no bucket, enviada pelo
+// navegador por URL assinada, em vez de ser baixada de uma URL pública.
+//
+// Guardamos só o id do envio, nunca a key: o worker reconstrói a key com o
+// `user_id` do próprio job (ver storage.KeyUploadStage). Assim a fonte
+// guardada no banco não é um caminho que o worker obedece — é um identificador
+// que ele valida contra o dono.
+const prefixoUpload = "upload:"
+
+// FonteUpload monta o valor de `source_url` de um envio pela PWA.
+func FonteUpload(uploadID string) string { return prefixoUpload + uploadID }
+
+// IDDoUpload devolve o id do envio quando a fonte é um upload. É o que faz o
+// worker escolher entre ler do bucket e baixar da internet.
+func IDDoUpload(fonte string) (string, bool) {
+	id, ok := strings.CutPrefix(fonte, prefixoUpload)
+	return id, ok && id != ""
+}
+
 // Tempo após o qual um job travado em `processing` volta para a fila — é o
 // worker que morreu no meio, não um trabalho em andamento.
 const PrazoTravado = 15 * time.Minute
@@ -29,12 +51,15 @@ type Job struct {
 	SourceURL string
 	Title     string
 	Artist    string
-	Status    string
-	Attempts  int
-	Error     string
-	TrackID   string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	// TituloReserva é o nome do arquivo enviado pela tela: perde das tags do
+	// arquivo e ganha do "sem título" (ver migração 0003).
+	TituloReserva string
+	Status        string
+	Attempts      int
+	Error         string
+	TrackID       string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type Jobs struct{ pool *pgxpool.Pool }
@@ -42,12 +67,14 @@ type Jobs struct{ pool *pgxpool.Pool }
 func NewJobs(pool *pgxpool.Pool) *Jobs { return &Jobs{pool: pool} }
 
 const colunasJob = `id, user_id, source_url, coalesce(title, ''), coalesce(artist, ''),
-	status, attempts, coalesce(error, ''), coalesce(track_id::text, ''), created_at, updated_at`
+	coalesce(fallback_title, ''), status, attempts, coalesce(error, ''),
+	coalesce(track_id::text, ''), created_at, updated_at`
 
 func scanJob(row pgx.Row) (*Job, error) {
 	var j Job
 	err := row.Scan(&j.ID, &j.UserID, &j.SourceURL, &j.Title, &j.Artist,
-		&j.Status, &j.Attempts, &j.Error, &j.TrackID, &j.CreatedAt, &j.UpdatedAt)
+		&j.TituloReserva, &j.Status, &j.Attempts, &j.Error, &j.TrackID,
+		&j.CreatedAt, &j.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrJobNaoEncontrado
 	}
@@ -63,6 +90,18 @@ func scanJob(row pgx.Row) (*Job, error) {
 // pedido repetido é esperado: o bot reenvia quando o usuário toca no botão de
 // novo ou quando o Telegram repete a entrega.
 func (r *Jobs) Enfileirar(ctx context.Context, userID, url, title, artist string) (job *Job, novo bool, err error) {
+	return r.enfileirar(ctx, userID, url, title, artist, "")
+}
+
+// EnfileirarEnvio é o Enfileirar da tela de envio: além do título escolhido,
+// guarda um título de RESERVA — o nome do arquivo — que só é usado se o
+// arquivo não tiver tag nenhuma. Método irmão em vez de um parâmetro a mais
+// porque o caminho do bot não tem nome de arquivo para informar.
+func (r *Jobs) EnfileirarEnvio(ctx context.Context, userID, fonte, title, artist, reserva string) (job *Job, novo bool, err error) {
+	return r.enfileirar(ctx, userID, fonte, title, artist, reserva)
+}
+
+func (r *Jobs) enfileirar(ctx context.Context, userID, url, title, artist, reserva string) (job *Job, novo bool, err error) {
 	var t, a *string
 	if title != "" {
 		t = &title
@@ -73,11 +112,11 @@ func (r *Jobs) Enfileirar(ctx context.Context, userID, url, title, artist string
 	// ON CONFLICT no índice parcial de jobs ativos: sem DO UPDATE, porque
 	// reenviar não deve mexer no que já está sendo processado.
 	j, err := scanJob(r.pool.QueryRow(ctx, `
-		INSERT INTO ingest_jobs (user_id, source_url, title, artist)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO ingest_jobs (user_id, source_url, title, artist, fallback_title)
+		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (user_id, source_url) WHERE status IN ('pending', 'processing')
 		DO NOTHING
-		RETURNING `+colunasJob, userID, url, t, a))
+		RETURNING `+colunasJob, userID, url, t, a, reserva))
 	if err == nil {
 		return j, true, nil
 	}

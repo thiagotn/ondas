@@ -38,6 +38,10 @@ const ACERVO = [
  */
 async function stubApi(page: Page) {
   let logado = false;
+  // O acervo cresce durante o teste de envio: é assim que se prova que a
+  // faixa nova aparece na lista depois da ingestão.
+  const acervo = ACERVO.map((t) => ({ ...t }));
+  let enviosRecebidos = 0;
 
   await page.route('**/api/auth/login', async (route) => {
     const { email, password } = JSON.parse(route.request().postData() ?? '{}');
@@ -64,8 +68,72 @@ async function stubApi(page: Page) {
 
   await page.route('**/api/acervo', async (route) =>
     logado
-      ? route.fulfill({ status: 200, json: { tracks: ACERVO } })
+      ? route.fulfill({ status: 200, json: { tracks: acervo } })
       : route.fulfill({ status: 401, json: { error: 'sessão expirada' } }),
+  );
+
+  // --- envio de arquivo (fase 4) ---
+
+  // 1) a vaga: a API devolve um PUT assinado. Aqui ele aponta para um bucket
+  //    de mentira, servido por `page.route` — o teste prova que os bytes vão
+  //    para FORA da nossa origem, que é o ponto do desenho.
+  await page.route('**/api/acervo/upload', async (route) => {
+    if (!logado) return route.fulfill({ status: 401, json: { error: 'sessão expirada' } });
+    const { bytes } = JSON.parse(route.request().postData() ?? '{}');
+    if (bytes > 60 * 1024 * 1024) {
+      return route.fulfill({
+        status: 413,
+        json: { error: 'arquivo grande demais: o limite é 60 MB' },
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      json: {
+        id: 'envio-1',
+        url: 'https://bucket.falso/ondas-acervo/stage/u/envio-1.bin',
+        expiraEmS: 900,
+        maxBytes: 60 * 1024 * 1024,
+      },
+    });
+  });
+
+  await page.route('https://bucket.falso/**', async (route) => {
+    if (route.request().method() !== 'PUT') return route.fallback();
+    enviosRecebidos += 1;
+    return route.fulfill({ status: 200, body: '' });
+  });
+
+  // 2) o finalizar: enfileira a MESMA ingestão da fase 2.
+  await page.route('**/api/acervo/upload/*/finalizar', async (route) => {
+    const { nome } = JSON.parse(route.request().postData() ?? '{}');
+    // O arquivo tem de ter chegado ao bucket ANTES de finalizar.
+    if (enviosRecebidos === 0) {
+      return route.fulfill({ status: 404, json: { error: 'o arquivo não chegou ao bucket' } });
+    }
+    acervo.push({
+      id: 'acervo:22222222-2222-4222-8222-222222222222',
+      title: String(nome || 'sem título'),
+      artist: 'acervo',
+      genre: 'acervo',
+      dur: 7,
+      art: '',
+      stream: '/api/acervo/22222222-2222-4222-8222-222222222222/audio',
+      premium: false,
+    });
+    return route.fulfill({ status: 202, json: { id: 'job-1', status: 'pending', url: 'upload:envio-1' } });
+  });
+
+  // 3) o acompanhamento, igual ao da ingestão por URL.
+  await page.route('**/api/acervo/ingest/*', async (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        id: 'job-1',
+        status: 'ready',
+        url: 'upload:envio-1',
+        trackId: 'acervo:22222222-2222-4222-8222-222222222222',
+      },
+    }),
   );
 }
 
@@ -211,6 +279,49 @@ test('o acervo aparece só logado, marcado como [meu], e some ao sair', async ({
   await expect(linha('Fita Caseira')).toBeHidden();
   await expect(page.getByText('[meu]')).toBeHidden();
   await expect(page.getByText(/\+ acervo/)).toBeHidden();
+});
+
+test('enviar arquivo sobe para o bucket, processa e a faixa entra no acervo', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+
+  // Visitante não tem para onde enviar: o acervo é por conta.
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+  await page.keyboard.press('3');
+  await expect(page.getByText('enviar', { exact: true })).toBeHidden();
+
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
+  await page.getByPlaceholder('••••').fill('senha-forte');
+  await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
+  await page.keyboard.press('3');
+
+  await expect(page.getByText('enviar', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '[+ arquivo]' }).click();
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'Noite_Fria.mp3',
+    mimeType: 'audio/mpeg',
+    buffer: Buffer.from('nao e um mp3 de verdade, o stub nao examina'),
+  });
+
+  // O nome aparece limpo (sem extensão, sem underscore) e o envio conclui.
+  await expect(page.getByText('Noite Fria', { exact: true })).toBeVisible();
+  await expect(page.getByText('pronto', { exact: true })).toBeVisible();
+
+  // E a faixa entrou no catálogo — que foi relido por causa da ingestão. Os
+  // chips de gênero e a contagem da fonte moram na aba `em-alta`, não aqui.
+  await page.keyboard.press('1');
+  await expect(page.getByText(/\+ acervo \(2\)/)).toBeVisible();
+  await page.getByRole('button', { name: 'acervo', exact: true }).click();
+  await expect(page.getByRole('button', { name: /Noite Fria/ })).toBeVisible();
+
+  // Dispensar a linha concluída do painel não mexe na faixa.
+  await page.keyboard.press('3');
+  await page.getByRole('button', { name: 'dispensar Noite Fria' }).click();
+  await expect(page.getByText('pronto', { exact: true })).toBeHidden();
+  await page.keyboard.press('1');
+  await expect(page.getByRole('button', { name: /Noite Fria/ })).toBeVisible();
 });
 
 test('busca filtra por artista e mostra a mensagem de grep vazio', async ({ page }) => {

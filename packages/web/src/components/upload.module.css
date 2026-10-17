@@ -1,0 +1,39 @@
+/* Painel `enviar` da biblioteca. */
+
+.escondido {
+  display: none;
+}
+
+.nome {
+  width: 18ch;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-neutral-300);
+}
+
+.estado {
+  flex: 1;
+  min-width: 0;
+}
+
+/* A barra é desenhada com caracteres: `font-variant-numeric` evita o número
+   da porcentagem mudar de largura e empurrar a barra a cada atualização. */
+.barra {
+  color: var(--ansi-6);
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+}
+
+.processando {
+  color: var(--ansi-3);
+}
+
+.pronto {
+  color: var(--ansi-2);
+}
+
+.erro {
+  color: var(--ansi-1);
+}
