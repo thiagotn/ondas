@@ -7,4 +7,5 @@
 .git
 .github
 design_handoff_ondas_terminal_player
+api
 *.log

@@ -11,7 +11,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/ondas
 
 jobs:
   # Portões de qualidade antes de publicar imagem: tipos, regras de domínio e o smoke da PWA.
@@ -41,6 +40,15 @@ jobs:
       - name: Smoke da PWA (Playwright)
         run: pnpm test:e2e
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: api/go.sum
+
+      - name: Testes da API (Go)
+        run: go test ./...
+        working-directory: api
+
       - name: Guardar o relatório quando o smoke falhar
         if: failure()
         uses: actions/upload-artifact@v4
@@ -49,12 +57,23 @@ jobs:
           path: packages/web/playwright-report
           retention-days: 7
 
+  # Duas imagens: a PWA estática e a API do acervo. A matriz mantém um job só
+  # para as duas, e o write-back abaixo acontece uma vez, com as duas tags.
   build-push:
     needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    strategy:
+      matrix:
+        include:
+          - name: ondas
+            context: .
+            dockerfile: Dockerfile
+          - name: ondas-api
+            context: api
+            dockerfile: api/Dockerfile
     steps:
       - uses: actions/checkout@v4
 
@@ -71,7 +90,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}
           tags: |
             type=sha,format=long
             type=raw,value=latest,enable={{is_default_branch}}
@@ -79,12 +98,13 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
   # GitOps: após publicar a imagem, atualiza a tag no repo homelab (privado) e dá push.
   # O Argo CD detecta o commit e faz o rollout — o cluster NÃO recebe nada deste CI (read-only).
@@ -105,13 +125,19 @@ jobs:
         run: |
           set -euo pipefail
           TAG="sha-${GITHUB_SHA}"
-          yq -i ".images[0].newTag = \"${TAG}\"" helm/apps/ondas/kustomization.yaml
+          # Seleção por nome, não por posição: com duas imagens no mesmo
+          # kustomization, `.images[0]` viraria uma roleta e um dia escreveria
+          # a tag da PWA na API.
+          for IMG in ondas ondas-api; do
+            yq -i "(.images[] | select(.name == \"ghcr.io/thiagotn/${IMG}\")).newTag = \"${TAG}\"" \
+              helm/apps/ondas/kustomization.yaml
+          done
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add helm/apps/ondas/kustomization.yaml
           if git diff --cached --quiet; then
             echo "Tag já é ${TAG}; nada a commitar."
           else
-            git commit -m "deploy(ondas): ${TAG} [skip ci]"
+            git commit -m "deploy(ondas): ${TAG} (pwa + api) [skip ci]"
             git push
           fi

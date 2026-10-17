@@ -39,6 +39,33 @@ Variáveis de ambiente (opcionais, em `packages/web/.env.local`):
 - `VITE_DEFAULT_OPACITY=0.85` — opacidade inicial do fundo (0,3–1) para quem
   ainda não escolheu uma; o valor salvo pelo usuário sempre tem prioridade.
 
+## API do acervo (`api/`, Go)
+
+A PWA é estática e pública; a API existe só para o que é **privado**: conta de verdade e, nas
+fases seguintes, as faixas próprias guardadas no Cloudflare R2. Ela é servida na **mesma origem**,
+sob `/api` — o que dispensa CORS e deixa o cookie de sessão same-site.
+
+| Rota | O que faz |
+| --- | --- |
+| `POST /api/auth/signup` | cria conta (fechado por allowlist) e já devolve o cookie |
+| `POST /api/auth/login` | 8 tentativas por IP em 5min, depois 429 |
+| `POST /api/auth/logout` | limpa o cookie |
+| `GET /api/auth/me` | sessão atual; 401 quando não há |
+| `GET /api/healthz` / `readyz` | probes — `readyz` confere o banco, `healthz` não |
+
+Rodar local (precisa de um Postgres; `docker run -e POSTGRES_PASSWORD=… -p 55432:5432 postgres:16-alpine`):
+
+```bash
+cd api
+DATABASE_URL='postgres://postgres:teste@127.0.0.1:55432/ondas?sslmode=disable' \
+SESSION_SECRET='qualquer-coisa-local' SESSION_INSECURE=true SIGNUP_ALLOWLIST='voce@email.com' \
+go run ./cmd/api
+go test ./...
+```
+
+Decisões registradas em `docs/adr/0013-ondas-acervo-privado.md` no repo `homelab`: cookie HMAC em
+vez de JWT, argon2id, migrações no start, rate-limit por `CF-Connecting-IP`.
+
 ## Arquitetura
 
 **`core` não enxerga o DOM.** O `tsconfig` dele exclui a lib DOM de propósito:
