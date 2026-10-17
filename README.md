@@ -106,15 +106,19 @@ Três coisas que o worker **recusa**, de propósito:
 - **formato que o navegador não toca** — a régua é a tag `<audio>` (mp3, aac, flac, opus, wav), e
   quem decide o que o arquivo é é o ffprobe, não o `Content-Type` da origem.
 
-O worker tem dois subcomandos de operação, que rodam como Job com a imagem que já está no nó:
+O worker tem três subcomandos de operação, que rodam como Job com a imagem que já está no nó:
 
 ```bash
-worker cors https://music.thiagotn.com   # grava a política de CORS no bucket e lê de volta
-worker conferir <track-id>               # objeto no bucket + URL assinada honrando Range (206)
+worker diag                 # grava/lê/apaga um objeto de descarte: prova a credencial
+worker cors [origem]        # imprime a política de CORS para colar no painel da Cloudflare
+worker conferir <track-id>  # objeto no bucket + URL assinada honrando Range (206)
 ```
 
-A política de CORS fica em `internal/storage/r2.go` — código versionado em vez de JSON colado num
-painel, e a credencial não precisa sair do cluster para aplicá-la.
+A política de CORS vive em `internal/storage/r2.go` e sai em duas formas da **mesma** regra: o XML
+do S3 API e o JSON do painel. Aplicar CORS é **configuração de bucket** e exige token
+`Admin Read & Write`, que na Cloudflare é de **conta inteira** e não dá para escopar — então o
+caminho normal é colar o JSON no painel, e o token do app segue sendo `Object Read & Write`
+escopado ao bucket, o mínimo de que ele precisa.
 
 O áudio nunca é servido pelo homelab: `/audio` responde **302** para uma URL assinada do R2, com
 validade de uma hora. Os bytes não passam pelo túnel, e a assinatura é refeita a cada play — por

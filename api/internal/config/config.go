@@ -42,6 +42,8 @@ type Config struct {
 	R2AccessKeyID     string `envconfig:"R2_ACCESS_KEY_ID"`
 	R2SecretAccessKey string `envconfig:"R2_SECRET_ACCESS_KEY"`
 	R2Bucket          string `envconfig:"R2_BUCKET" default:"ondas-acervo"`
+	// Origem da PWA, usada na política de CORS do bucket.
+	OrigemPWA string `envconfig:"ORIGEM_PWA" default:"https://music.thiagotn.com"`
 	// Validade da URL assinada. Precisa cobrir a escuta inteira de uma faixa:
 	// o navegador segue o 302 uma vez e depois pede os Range direto no R2,
 	// com a URL em que caiu. Curto demais quebra o seek de quem pausou.

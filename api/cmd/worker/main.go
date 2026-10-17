@@ -9,12 +9,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -31,14 +29,22 @@ const dirTrabalho = "/tmp"
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
-	// `worker cors <origem>` aplica a política de CORS do bucket e sai. Mora
-	// aqui, e não num `aws-cli` avulso, por três motivos: a imagem já está no
-	// nó (o aws-cli seriam ~400MB de pull novo), a política fica versionada
-	// como código em vez de JSON colado num painel, e a credencial não precisa
-	// sair do cluster.
+	// `worker cors [origem]` imprime a política de CORS para colar no painel,
+	// ou a aplica se o token tiver permissão de administração — ver cors.go
+	// para o porquê de imprimir ser o caminho normal.
 	if len(os.Args) > 1 && os.Args[1] == "cors" {
 		if err := aplicarCORS(os.Args[2:]); err != nil {
 			slog.Error("cors", "erro", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// `worker diag` exercita a credencial com um objeto de descarte: gravar,
+	// tamanho, Range por URL assinada e apagar.
+	if len(os.Args) > 1 && os.Args[1] == "diag" {
+		if err := diagnosticar(os.Args[2:]); err != nil {
+			slog.Error("diag", "erro", err)
 			os.Exit(1)
 		}
 		return
@@ -58,45 +64,6 @@ func main() {
 		slog.Error("encerrando", "erro", err)
 		os.Exit(1)
 	}
-}
-
-func aplicarCORS(args []string) error {
-	if len(args) != 1 {
-		return errors.New("uso: worker cors https://origem.da.pwa")
-	}
-	origem := args[0]
-
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
-	if !cfg.AcervoConfigurado() {
-		return errors.New("sem credencial de R2 (R2_ACCOUNT_ID/ACCESS_KEY_ID/SECRET_ACCESS_KEY)")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	r2, err := storage.New(cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey,
-		cfg.R2Bucket, time.Duration(cfg.R2SignedURLTTLS)*time.Second)
-	if err != nil {
-		return err
-	}
-	if err := r2.AplicarCORS(ctx, origem); err != nil {
-		return err
-	}
-	// Ler de volta é o que prova que gravou — o PUT pode devolver 200 e o
-	// bucket ficar sem nada se a política for recusada em silêncio.
-	politica, err := r2.LerCORS(ctx)
-	if err != nil {
-		return fmt.Errorf("gravou mas não deu para conferir: %w", err)
-	}
-	if !strings.Contains(politica, origem) {
-		return fmt.Errorf("a política no bucket não contém %q:\n%s", origem, politica)
-	}
-	slog.Info("CORS aplicado", "bucket", cfg.R2Bucket, "origem", origem)
-	fmt.Println(politica)
-	return nil
 }
 
 func run() error {

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -216,6 +217,55 @@ func TestLerCORSDevolveOQueFoiGravado(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, politica, "https://music.thiagotn.com")
 	require.Contains(t, politica, "CORSRule")
+}
+
+// As duas representações saem da MESMA regra: se divergirem, o painel e a API
+// configuram coisas diferentes e o sintoma aparece longe daqui ("o áudio não
+// toca").
+func TestPoliticaJSONDoPainelBateComOXMLDaAPI(t *testing.T) {
+	f := &s3Cors{}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	u, _ := url.Parse(srv.URL)
+	r2, err := NewComEndpoint(u.Host, false, "chave", "segredo", "ondas-acervo", time.Hour)
+	require.NoError(t, err)
+	require.NoError(t, r2.AplicarCORS(context.Background(), "https://music.thiagotn.com"))
+
+	politica, err := PoliticaCORSJSON("https://music.thiagotn.com")
+	require.NoError(t, err)
+
+	var regras []RegraCORS
+	require.NoError(t, json.Unmarshal([]byte(politica), &regras))
+	require.Len(t, regras, 1)
+	r := regras[0]
+
+	// Cada valor do JSON tem de estar no XML que foi para o bucket.
+	for _, v := range r.AllowedOrigins {
+		require.Contains(t, f.xmlRecebido, "<AllowedOrigin>"+v+"</AllowedOrigin>")
+	}
+	for _, v := range r.AllowedMethods {
+		require.Contains(t, f.xmlRecebido, "<AllowedMethod>"+v+"</AllowedMethod>")
+	}
+	for _, v := range r.AllowedHeaders {
+		require.Contains(t, f.xmlRecebido, "<AllowedHeader>"+v+"</AllowedHeader>")
+	}
+	for _, v := range r.ExposeHeaders {
+		require.Contains(t, f.xmlRecebido, "<ExposeHeader>"+v+"</ExposeHeader>")
+	}
+	require.Equal(t, 3600, r.MaxAgeSeconds)
+}
+
+func TestPoliticaJSONTemAsChavesQueOPainelEspera(t *testing.T) {
+	politica, err := PoliticaCORSJSON("https://music.thiagotn.com")
+	require.NoError(t, err)
+	// Nomes exatos do painel da Cloudflare — plural, maiúsculas como estão.
+	for _, chave := range []string{
+		"AllowedOrigins", "AllowedMethods", "AllowedHeaders", "ExposeHeaders", "MaxAgeSeconds",
+	} {
+		require.Contains(t, politica, `"`+chave+`"`)
+	}
+	_, err = PoliticaCORSJSON("")
+	require.Error(t, err)
 }
 
 func TestAplicarCORSSemOrigemFalha(t *testing.T) {

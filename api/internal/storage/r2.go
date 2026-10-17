@@ -5,6 +5,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -112,20 +113,65 @@ func (r *R2) Tamanho(ctx context.Context, key string) (int64, error) {
 // a resposta final do redirect sob checagem de CORS, e o download offline faz
 // `fetch` e lê `res.body`, que exige resposta não-opaca. Sem isto o áudio
 // simplesmente não toca — e o erro no console não aponta para o bucket.
-func politicaCORS(origem string) *cors.Config {
-	return cors.NewConfig([]cors.Rule{{
-		ID:            "ondas-pwa",
-		AllowedOrigin: []string{origem},
+// RegraCORS é a política numa forma só, da qual saem as duas representações
+// que o R2 aceita: o XML do S3 API e o JSON do painel da Cloudflare. Fonte
+// única porque duas cópias da mesma política divergem — e a divergência
+// aparece como "o áudio não toca", longe daqui.
+type RegraCORS struct {
+	AllowedOrigins []string `json:"AllowedOrigins"`
+	AllowedMethods []string `json:"AllowedMethods"`
+	AllowedHeaders []string `json:"AllowedHeaders"`
+	ExposeHeaders  []string `json:"ExposeHeaders"`
+	MaxAgeSeconds  int      `json:"MaxAgeSeconds"`
+}
+
+func regrasCORS(origem string) []RegraCORS {
+	return []RegraCORS{{
+		AllowedOrigins: []string{origem},
 		// Só leitura: o upload é do worker, por dentro, com credencial.
-		AllowedMethod: []string{http.MethodGet, http.MethodHead},
+		AllowedMethods: []string{http.MethodGet, http.MethodHead},
 		// `range` é o que permite o seek; os condicionais deixam o navegador
 		// revalidar o que já tem em cache em vez de baixar de novo.
-		AllowedHeader: []string{"range", "if-match", "if-none-match"},
+		AllowedHeaders: []string{"range", "if-match", "if-none-match"},
 		// Sem expor estes, o JavaScript do download offline não consegue ler o
 		// tamanho e a barra de progresso fica cega.
-		ExposeHeader:  []string{"content-length", "content-range", "accept-ranges", "etag"},
+		ExposeHeaders: []string{"content-length", "content-range", "accept-ranges", "etag"},
 		MaxAgeSeconds: 3600,
-	}})
+	}}
+}
+
+// PoliticaCORSJSON devolve a política no formato que o painel da Cloudflare
+// aceita (R2 -> bucket -> Settings -> CORS policy).
+//
+// Existe porque aplicar CORS é **configuração de bucket**, e isso exige token
+// `Admin Read & Write`, que na Cloudflare é de CONTA INTEIRA e não dá para
+// escopar a um bucket. Um token assim guardado no cluster seria pior que uma
+// colagem no painel, então o caminho recomendado é colar isto — gerado do
+// mesmo lugar que a política aplicada por `AplicarCORS`, para não divergirem.
+func PoliticaCORSJSON(origem string) (string, error) {
+	if origem == "" {
+		return "", fmt.Errorf("storage: origem da PWA vazia")
+	}
+	b, err := json.MarshalIndent(regrasCORS(origem), "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func politicaCORS(origem string) *cors.Config {
+	regras := make([]cors.Rule, 0, 1)
+	for _, r := range regrasCORS(origem) {
+		regras = append(regras, cors.Rule{
+			ID:            "ondas-pwa",
+			AllowedOrigin: r.AllowedOrigins,
+			AllowedMethod: r.AllowedMethods,
+			AllowedHeader: r.AllowedHeaders,
+			ExposeHeader:  r.ExposeHeaders,
+			MaxAgeSeconds: r.MaxAgeSeconds,
+		})
+	}
+	return cors.NewConfig(regras)
 }
 
 // AplicarCORS grava a política no bucket.
