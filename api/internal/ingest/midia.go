@@ -144,6 +144,13 @@ func Examinar(ctx context.Context, caminho string) (*Midia, error) {
 // `lado` é o lado maior; a proporção é preservada e nunca ampliamos uma capa
 // pequena (`force_original_aspect_ratio=decrease` + `min(...)`), senão uma arte
 // de 100px viraria um borrão de 480.
+//
+// `-q:v 2` não é afinação: sem ele o encoder mjpeg do ffmpeg não usa qualidade
+// nenhuma como alvo, e sim o BITRATE padrão de 200kbps — que para uma imagem
+// única dá um arquivo pequeno e chapado. Medido numa capa real de 600x600: o
+// padrão gerou 44KB a 34dB de PSNR (artefato visível em detalhe), e `-q:v 2`
+// gerou 92KB a 42dB, que é perda imperceptível. `TestCapaNaoSaiChapada` trava
+// isso comparando com uma codificação quase sem perda da mesma fonte.
 func ExtrairCapa(ctx context.Context, origem, destino string, lado int) error {
 	escala := fmt.Sprintf(
 		"scale='min(%d,iw)':'min(%d,ih)':force_original_aspect_ratio=decrease", lado, lado)
@@ -155,6 +162,7 @@ func ExtrairCapa(ctx context.Context, origem, destino string, lado int) error {
 		"-an",           // o áudio não interessa aqui
 		"-map", "0:v:0", // só a capa
 		"-vframes", "1",
+		"-q:v", "2",
 		"-vf", escala,
 		"-f", "image2",
 		destino,

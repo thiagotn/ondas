@@ -3,9 +3,11 @@ package ingest
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -160,6 +162,65 @@ func TestCapaEmbutidaEhDetectadaEExtraidaSemAmpliar(t *testing.T) {
 	iThumb, err := os.Stat(thumb)
 	require.NoError(t, err)
 	require.Less(t, iThumb.Size(), iGrande.Size())
+}
+
+// A capa tinha de sair chapada para esta trava fazer sentido: o encoder mjpeg
+// do ffmpeg, sem `-q:v`, mira um BITRATE (200kbps) em vez de uma qualidade, e
+// come o detalhe de uma foto.
+//
+// A referência é a MESMA fonte codificada quase sem perda (`-q:v 1`), e não o
+// PNG original, de propósito: assim a subamostragem de croma do JPEG está dos
+// dois lados e o que a medida isola é só a quantização — que é o que o `-q:v`
+// controla. Com o padrão isto dá ~34dB; com `-q:v 2`, ~45dB.
+func TestCapaNaoSaiChapada(t *testing.T) {
+	exigirFFmpeg(t)
+	dir := t.TempDir()
+
+	// Ruído, e não um padrão de barras: o alvo de bitrate do encoder só aperta
+	// quando a imagem tem detalhe que não comprime. Medido aqui: com
+	// `testsrc2` o padrão dá 45dB e passaria neste teste; com ruído dá 31dB.
+	// A semente deixa a medida repetível.
+	fonte := filepath.Join(dir, "fonte.png")
+	rodar(t, "ffmpeg", "-v", "error", "-y",
+		"-f", "lavfi", "-i", "color=c=gray:s=600x600:d=1,noise=alls=40:all_seed=42",
+		"-frames:v", "1", fonte)
+
+	som := gerarAudio(t, dir, "som.mp3", "libmp3lame", 1, "Com Capa", "Alguém")
+	comCapa := filepath.Join(dir, "com-capa.mp3")
+	rodar(t, "ffmpeg", "-v", "error", "-y", "-i", som, "-i", fonte,
+		"-map", "0:a", "-map", "1:v", "-c", "copy",
+		"-disposition:v:0", "attached_pic", comCapa)
+
+	saida := filepath.Join(dir, "capa.jpg")
+	require.NoError(t, ExtrairCapa(context.Background(), comCapa, saida, 600))
+
+	referencia := filepath.Join(dir, "ref.jpg")
+	rodar(t, "ffmpeg", "-v", "error", "-y", "-i", comCapa,
+		"-an", "-map", "0:v:0", "-vframes", "1", "-q:v", "1", "-f", "image2", referencia)
+
+	db := psnr(t, saida, referencia)
+	require.Greater(t, db, 40.0,
+		"capa saiu a %.1fdB da referência quase sem perda — qualidade no chão", db)
+}
+
+// psnr devolve a diferença média entre duas imagens, em decibéis. Quanto maior,
+// mais parecidas; acima de ~40dB a diferença não se vê.
+func psnr(t *testing.T, a, b string) float64 {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	saida, err := exec.CommandContext(ctx, "ffmpeg", "-nostdin",
+		"-i", a, "-i", b, "-lavfi", "psnr=stats_file=-", "-f", "null", "-").CombinedOutput()
+	require.NoError(t, err, "ffmpeg psnr: %s", saida)
+
+	m := regexp.MustCompile(`psnr_avg:([0-9.]+|inf)`).FindSubmatch(saida)
+	require.NotNil(t, m, "não achei o psnr na saída do ffmpeg: %s", saida)
+	if string(m[1]) == "inf" {
+		return math.Inf(1) // imagens idênticas
+	}
+	v, err := strconv.ParseFloat(string(m[1]), 64)
+	require.NoError(t, err)
+	return v
 }
 
 func TestExtrairCapaFalhaEmArquivoSemCapa(t *testing.T) {

@@ -2,11 +2,13 @@ import { gateCopy, type Gate as GateModel } from '@ondas/core';
 import { useNavigate } from 'react-router-dom';
 import { uiStore } from '../app/stores';
 import { usePlayerOverlay } from '../hooks/usePlayerOverlay';
+import { useWide } from '../hooks/useWide';
 import s from './overlay.module.css';
 
 /** "permissão negada": faixa [pro] para visitante, ou download sem conta. */
 export function Gate({ gate }: { gate: GateModel }) {
   const navigate = useNavigate();
+  const wide = useWide();
   const { isPlayerOpen, closePlayer } = usePlayerOverlay();
   const copy = gateCopy(gate);
   const close = () => uiStore.getState().closeGate();
@@ -34,10 +36,10 @@ export function Gate({ gate }: { gate: GateModel }) {
               navigate('/login');
             }}
           >
-            [enter] entrar
+            {wide ? '[enter] entrar' : 'entrar'}
           </button>
           <button type="button" className={s.secondary} onClick={close}>
-            [esc] agora não
+            {wide ? '[esc] agora não' : 'agora não'}
           </button>
         </div>
       </div>

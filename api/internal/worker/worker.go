@@ -25,10 +25,19 @@ import (
 	"github.com/thiagotn/ondas/api/internal/storage"
 )
 
-// Tamanhos das capas: 480 para o fundo/player e 150 para o thumb da lista —
-// os mesmos que a PWA já pede do Audius.
+// Tamanhos das capas: a grande para o player e o fundo, a pequena para o thumb
+// da lista.
+//
+// A grande é 960 e não 480 (o que a PWA pede do Audius) porque o player mostra
+// a capa com 400px de CSS: numa tela 2x isso são 800px físicos, e 480 ali é
+// ampliação — foi o que gerou a queixa de nitidez. Como `ExtrairCapa` nunca
+// amplia, pedir 960 é pedir "o que a fonte tiver até 960", sem custo quando a
+// arte é menor.
+//
+// Mudar estes números não mexe no que já está no acervo: a key de cada capa
+// fica guardada na faixa, e só a ingestão nova usa o valor daqui.
 const (
-	ladoCapa  = 480
+	ladoCapa  = 960
 	ladoThumb = 150
 )
 
@@ -287,13 +296,14 @@ func (w *Worker) capas(ctx context.Context, dir, origem, userID, trackID string,
 	}
 	for _, c := range []struct {
 		lado    int
-		sufixo  string
 		destino *string
 	}{
-		{ladoCapa, "480", &artKey},
-		{ladoThumb, "150", &thumbKey},
+		{ladoCapa, &artKey},
+		{ladoThumb, &thumbKey},
 	} {
-		local := filepath.Join(dir, "capa-"+c.sufixo+".jpg")
+		// O nome sai do próprio lado: eram dois lugares para manter em acordo,
+		// e a key é o que a PWA pede depois.
+		local := filepath.Join(dir, fmt.Sprintf("capa-%d.jpg", c.lado))
 		if err := ingest.ExtrairCapa(ctx, origem, local, c.lado); err != nil {
 			log.Warn("capa não extraída", "lado", c.lado, "erro", err)
 			continue
@@ -303,7 +313,7 @@ func (w *Worker) capas(ctx context.Context, dir, origem, userID, trackID string,
 			log.Warn("capa sem arquivo", "lado", c.lado, "erro", err)
 			continue
 		}
-		key := fmt.Sprintf("u/%s/art/%s-%s.jpg", userID, trackID, c.sufixo)
+		key := fmt.Sprintf("u/%s/art/%s-%d.jpg", userID, trackID, c.lado)
 		if err := w.enviarArquivo(ctx, local, key, "image/jpeg", info.Size()); err != nil {
 			log.Warn("capa não subiu", "lado", c.lado, "erro", err)
 			continue

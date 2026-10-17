@@ -201,6 +201,46 @@ test('visitante entra, troca de tema, toca e abre o full player', async ({ page 
   await expect(page.getByRole('heading', { name: 'Maré Baixa' })).toBeHidden();
 });
 
+test('o player esconde os atalhos no estreito e mantém as ações numa linha', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+  await page.getByRole('button', { name: /Maré Baixa/ }).click();
+  await page.getByRole('button', { name: 'Abrir player' }).click();
+  await expect(page.getByRole('heading', { name: 'Maré Baixa' })).toBeVisible();
+
+  // O mesmo breakpoint do `useWide`: no celular não há teclado, então a letra
+  // da tecla e os `[esc]`/`[d]` são ruído.
+  const largo = page.viewportSize()!.width >= 860;
+
+  const letras = page.locator('[class*="keycapKey"]');
+  await expect(letras).toHaveCount(largo ? 7 : 0);
+
+  const painel = page.locator('[class*="overlay_panel"], [class*="panel"]').first();
+  const texto = (await painel.innerText()).replace(/\s+/g, ' ');
+  if (largo) {
+    expect(texto).toContain('[esc] fechar');
+  } else {
+    expect(texto).not.toMatch(/\[(esc|d)\]/);
+  }
+
+  // As sete ações numa fileira só — e dentro da caixa, sem transbordar.
+  const caixas = await page.locator('[class*="keycaps"] > button').evaluateAll((els) =>
+    els.map((el) => {
+      const r = el.getBoundingClientRect();
+      return { topo: Math.round(r.top), direita: Math.round(r.right) };
+    }),
+  );
+  expect(caixas).toHaveLength(7);
+  expect(new Set(caixas.map((c) => c.topo)).size).toBe(1);
+
+  const limite = await page
+    .locator('[class*="keycaps"]')
+    .first()
+    .evaluate((el) => Math.round(el.getBoundingClientRect().right));
+  for (const c of caixas) expect(c.direita).toBeLessThanOrEqual(limite);
+});
+
 test('faixa [pro] abre o gate de permissão para visitante', async ({ page }) => {
   await page.goto('/login');
   await skipSplash(page);

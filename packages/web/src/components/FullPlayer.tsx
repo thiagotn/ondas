@@ -45,6 +45,12 @@ export function FullPlayer({ track }: { track: Track }) {
     [track.art, data?.tracks],
   );
 
+  // No celular não há teclado, então a legenda da tecla some — e sem ela as
+  // sete ações cabem numa linha só. Mesmo critério das abas (TabBar) e da
+  // legenda do rodapé (BottomBar), que já faziam isso; o player é que ficou
+  // para trás.
+  const dica = (tecla: string) => (wide ? tecla : undefined);
+
   const duration = dur || track.dur || 0;
   const played = duration ? t / duration : 0;
   const bufFraction = cached ? 1 : Math.max(buf, played);
@@ -56,7 +62,7 @@ export function FullPlayer({ track }: { track: Track }) {
       <div className={s.panel}>
         <span className={s.label}>agora-tocando — #{track.genre}</span>
         <button type="button" className={s.close} onClick={closePlayer}>
-          [esc] fechar
+          {wide ? '[esc] fechar' : 'fechar'}
         </button>
 
         <div className={s.body}>
@@ -92,26 +98,26 @@ export function FullPlayer({ track }: { track: Track }) {
               </div>
             </div>
 
-            <div className={s.keycaps}>
+            <div className={wide ? s.keycaps : `${s.keycaps} ${s.keycapsLinha}`}>
               <Keycap
-                keyLabel="s"
+                keyLabel={dica('s')}
                 active={shuffle}
                 ariaLabel="Aleatório"
                 onClick={() => playerStore.getState().toggleShuffle()}
               >
                 <Shuffle size={19} />
               </Keycap>
-              <Keycap keyLabel="p" ariaLabel="Faixa anterior" onClick={() => controller.step(-1)}>
+              <Keycap keyLabel={dica('p')} ariaLabel="Faixa anterior" onClick={() => controller.step(-1)}>
                 <SkipBack size={19} weight="fill" />
               </Keycap>
-              <Keycap keyLabel="espaço" active ariaLabel={playing ? 'Pausar' : 'Tocar'} onClick={controller.togglePlay}>
+              <Keycap keyLabel={dica('espaço')} active ariaLabel={playing ? 'Pausar' : 'Tocar'} onClick={controller.togglePlay}>
                 <PlayIcon playing={playing} waiting={waiting} size={19} />
               </Keycap>
-              <Keycap keyLabel="n" ariaLabel="Próxima faixa" onClick={() => controller.step(1)}>
+              <Keycap keyLabel={dica('n')} ariaLabel="Próxima faixa" onClick={() => controller.step(1)}>
                 <SkipForward size={19} weight="fill" />
               </Keycap>
               <Keycap
-                keyLabel="r"
+                keyLabel={dica('r')}
                 active={repeat}
                 ariaLabel="Repetir faixa"
                 onClick={() => playerStore.getState().toggleRepeat()}
@@ -119,7 +125,7 @@ export function FullPlayer({ track }: { track: Track }) {
                 <RepeatOnce size={19} />
               </Keycap>
               <Keycap
-                keyLabel="l"
+                keyLabel={dica('l')}
                 active={liked}
                 ariaLabel={liked ? 'Descurtir' : 'Curtir'}
                 onClick={() => controller.toggleLike(track.id)}
@@ -127,7 +133,7 @@ export function FullPlayer({ track }: { track: Track }) {
                 <Heart size={19} weight={liked ? 'fill' : 'regular'} />
               </Keycap>
               <Keycap
-                keyLabel="d"
+                keyLabel={dica('d')}
                 active={cached}
                 ariaLabel={cached ? 'Remover do aparelho' : 'Baixar'}
                 onClick={() => void controller.download(track)}
@@ -157,7 +163,8 @@ export function FullPlayer({ track }: { track: Track }) {
                   className={s.dlButton}
                   onClick={() => void controller.download(track)}
                 >
-                  {user ? '[d] baixar para offline' : '[d] entrar para baixar'}
+                  {wide ? '[d] ' : ''}
+                  {user ? 'baixar para offline' : 'entrar para baixar'}
                 </button>
               )}
             </div>
@@ -176,7 +183,8 @@ function Keycap({
   onClick,
 }: {
   children: React.ReactNode;
-  keyLabel: string;
+  /** Ausente no estreito: sem teclado, a letra é só ruído. */
+  keyLabel?: string;
   active?: boolean;
   ariaLabel: string;
   onClick(): void;
@@ -189,7 +197,7 @@ function Keycap({
       onClick={onClick}
     >
       {children}
-      <span className={s.keycapKey}>{keyLabel}</span>
+      {keyLabel && <span className={s.keycapKey}>{keyLabel}</span>}
     </button>
   );
 }
