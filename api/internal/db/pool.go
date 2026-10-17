@@ -36,16 +36,53 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
+// Chave do advisory lock das migrações: arbitrária, mas fixa. Advisory locks
+// são globais ao banco, e o banco `ondas` não é compartilhado com outro app.
+const chaveLockMigracao int64 = 0x0D5A_0001
+
+// Teto para esperar o lock. Esperar é o certo — o outro pod termina em ~1s —,
+// mas sem teto um lock preso penduraria o boot calado para sempre.
+const esperaLockMigracao = 30 * time.Second
+
 // Migrate aplica os arquivos de `migrations/` em ordem, uma vez cada.
 //
 // Roda no start do processo (não num initContainer) porque são poucas, são
 // idempotentes e assim não há um segundo lugar para manter em sincronia.
+//
+// Tudo corre sob um advisory lock porque dois pods sobem juntos em qualquer
+// rollout (maxSurge) — e `CREATE TABLE IF NOT EXISTS` NÃO é atômico no
+// Postgres: as duas sessões passam pela checagem de existência e uma estoura
+// com duplicate key em pg_type. Foi exatamente o que derrubou o primeiro boot
+// desta API em produção.
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
-	_, err := pool.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
+	ctx, cancel := context.WithTimeout(ctx, esperaLockMigracao)
+	defer cancel()
+
+	// Uma conexão só, do começo ao fim: o lock é de sessão, então precisa ser
+	// a mesma conexão que o pega, usa e devolve.
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("db: conexão para migrar: %w", err)
+	}
+	defer conn.Release()
+
+	if _, err := conn.Exec(ctx, `SELECT pg_advisory_lock($1)`, chaveLockMigracao); err != nil {
+		return fmt.Errorf("db: lock das migrações: %w", err)
+	}
+	defer func() {
+		// Sem unlock explícito o lock viaja com a conexão de volta para o pool
+		// e tranca o próximo boot. WithoutCancel porque o unlock precisa sair
+		// mesmo quando é o próprio prazo acima que venceu.
+		if _, err := conn.Exec(context.WithoutCancel(ctx),
+			`SELECT pg_advisory_unlock($1)`, chaveLockMigracao); err != nil {
+			slog.Warn("db: unlock das migrações falhou", "erro", err)
+		}
+	}()
+
+	if _, err := conn.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
 		version    text PRIMARY KEY,
 		applied_at timestamptz NOT NULL DEFAULT now()
-	)`)
-	if err != nil {
+	)`); err != nil {
 		return fmt.Errorf("db: tabela de migrações: %w", err)
 	}
 
@@ -61,7 +98,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 
 	for _, nome := range nomes {
 		var existe bool
-		if err := pool.QueryRow(ctx,
+		if err := conn.QueryRow(ctx,
 			`SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = $1)`, nome,
 		).Scan(&existe); err != nil {
 			return err
@@ -73,7 +110,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		if err != nil {
 			return err
 		}
-		tx, err := pool.Begin(ctx)
+		tx, err := conn.Begin(ctx)
 		if err != nil {
 			return err
 		}

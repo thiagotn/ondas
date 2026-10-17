@@ -63,6 +63,15 @@ go run ./cmd/api
 go test ./...
 ```
 
+Os testes de migração precisam de banco de verdade (a corrida de dois pods subindo juntos não
+aparece sem ele) e se **pulam** quando falta `TEST_DATABASE_URL`. O nome do banco tem de terminar
+em `_test`: eles dão `DROP SCHEMA`, e a trava existe para que uma variável apontada por descuido
+para o banco real não apague o acervo.
+
+```bash
+TEST_DATABASE_URL='postgres://postgres:teste@127.0.0.1:55432/ondas_test' go test ./...
+```
+
 Decisões registradas em `docs/adr/0013-ondas-acervo-privado.md` no repo `homelab`: cookie HMAC em
 vez de JWT, argon2id, migrações no start, rate-limit por `CF-Connecting-IP`.
 
