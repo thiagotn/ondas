@@ -282,12 +282,18 @@ test('o acervo aparece só logado, marcado como [meu], e some ao sair', async ({
 });
 
 test('enviar arquivo sobe para o bucket, processa e a faixa entra no acervo', async ({ page }) => {
+  // Clicar na aba em vez de mandar a tecla: a tecla é um atalho do shell do
+  // app, e logo depois do login ela pode chegar antes do shell montar — a
+  // primeira versão deste teste fazia isso e era intermitente (passava aqui,
+  // falhava no CI, que é mais lento). Clique o Playwright espera; tecla não.
+  const aba = (nome: RegExp) => page.getByRole('button', { name: nome });
+
   await page.goto('/login');
   await skipSplash(page);
 
   // Visitante não tem para onde enviar: o acervo é por conta.
   await page.getByRole('button', { name: /continuar como visitante/ }).click();
-  await page.keyboard.press('3');
+  await aba(/~\/biblioteca/).click();
   await expect(page.getByText('enviar', { exact: true })).toBeHidden();
 
   await page.goto('/login');
@@ -295,7 +301,7 @@ test('enviar arquivo sobe para o bucket, processa e a faixa entra no acervo', as
   await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
   await page.getByPlaceholder('••••').fill('senha-forte');
   await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
-  await page.keyboard.press('3');
+  await aba(/~\/biblioteca/).click();
 
   await expect(page.getByText('enviar', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '[+ arquivo]' }).click();
@@ -311,16 +317,16 @@ test('enviar arquivo sobe para o bucket, processa e a faixa entra no acervo', as
 
   // E a faixa entrou no catálogo — que foi relido por causa da ingestão. Os
   // chips de gênero e a contagem da fonte moram na aba `em-alta`, não aqui.
-  await page.keyboard.press('1');
+  await aba(/~\/em-alta/).click();
   await expect(page.getByText(/\+ acervo \(2\)/)).toBeVisible();
   await page.getByRole('button', { name: 'acervo', exact: true }).click();
   await expect(page.getByRole('button', { name: /Noite Fria/ })).toBeVisible();
 
   // Dispensar a linha concluída do painel não mexe na faixa.
-  await page.keyboard.press('3');
+  await aba(/~\/biblioteca/).click();
   await page.getByRole('button', { name: 'dispensar Noite Fria' }).click();
   await expect(page.getByText('pronto', { exact: true })).toBeHidden();
-  await page.keyboard.press('1');
+  await aba(/~\/em-alta/).click();
   await expect(page.getByRole('button', { name: /Noite Fria/ })).toBeVisible();
 });
 
