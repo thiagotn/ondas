@@ -287,6 +287,10 @@
 .panelRow {
   display: flex;
   align-items: center;
+  /* `wrap` para o que não couber descer INTEIRO em vez de ser espremido. É o
+     que a lista de formatos usa; as outras linhas não chegam a quebrar aqui
+     porque o texto delas já quebra por dentro. */
+  flex-wrap: wrap;
   gap: 12px;
   min-height: 48px;
   padding: 4px 12px;
@@ -324,6 +328,25 @@
 
 .panelMuted {
   color: var(--color-neutral-500);
+}
+
+/* A lista de formatos é uma unidade: no celular ela quebrava no meio e deixava
+   um "· m4a" órfão na linha de baixo, separado do que ele acompanha. O
+   `nowrap` proíbe a quebra por dentro e, sem `min-width: 0`, o flex não a
+   espreme abaixo do próprio texto — então ela desce inteira quando não cabe
+   ao lado do botão. */
+.panelFormatos {
+  flex: 1;
+  white-space: nowrap;
+}
+
+/* No estreito ela desce sempre, e alinhada com `[+ arquivo]` — encostada na
+   margem ela ficaria embaixo da coluna do rótulo e pareceria uma linha nova
+   do painel, não a continuação desta. O recuo é a largura do rótulo mais o
+   gap da linha. */
+.panelFormatosSolo {
+  flex-basis: 100%;
+  margin-left: calc(9ch + 12px);
 }
 
 .logout {

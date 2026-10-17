@@ -484,6 +484,32 @@ test('status line mantém os itens na mesma linha de base', async ({ page }) => 
   expect(new Set(topos).size).toBe(1);
 });
 
+test('a lista de formatos do envio não quebra no meio', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
+  await page.getByPlaceholder('••••').fill('senha-forte');
+  await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
+  await page.getByRole('button', { name: /~\/biblioteca/ }).click();
+  await expect(page.getByText('enviar', { exact: true })).toBeVisible();
+
+  // No celular ela quebrava entre "opus" e "m4a", e o separador ficava órfão
+  // no começo da linha de baixo. O Range conta as linhas que o texto ocupa de
+  // verdade — `getClientRects` devolve uma caixa por linha.
+  const medida = await page.locator('[class*="panelFormatos"]').evaluate((el) => {
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    const linha = el.parentElement!.getBoundingClientRect();
+    return {
+      linhas: r.getClientRects().length,
+      direita: Math.round(el.getBoundingClientRect().right),
+      limite: Math.round(linha.right),
+    };
+  });
+  expect(medida.linhas).toBe(1);
+  expect(medida.direita).toBeLessThanOrEqual(medida.limite);
+});
+
 test('rótulos das abas cabem inteiros na barra', async ({ page }) => {
   await page.goto('/login');
   await skipSplash(page);

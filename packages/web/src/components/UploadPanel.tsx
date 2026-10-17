@@ -1,6 +1,7 @@
 import { barraDeProgresso, dlPct } from '@ondas/core';
 import { useRef } from 'react';
 import { useUploads, type ItemEnvio } from '../app/uploads';
+import { useWide } from '../hooks/useWide';
 import s from './shell.module.css';
 import u from './upload.module.css';
 
@@ -17,6 +18,7 @@ export function UploadPanel() {
   const enviar = useUploads((st) => st.enviar);
   const limpar = useUploads((st) => st.limparConcluidos);
   const input = useRef<HTMLInputElement>(null);
+  const wide = useWide();
   const concluidos = itens.some((i) => i.estado === 'pronto' || i.estado === 'erro');
 
   return (
@@ -26,7 +28,11 @@ export function UploadPanel() {
         <button type="button" className={s.link} onClick={() => input.current?.click()}>
           [+ arquivo]
         </button>
-        <span className={`${s.panelValue} ${s.panelMuted}`}>mp3 · flac · opus · m4a</span>
+        <span
+          className={`${s.panelFormatos} ${s.panelMuted} ${wide ? '' : s.panelFormatosSolo}`}
+        >
+          mp3 · flac · opus · m4a
+        </span>
         {concluidos && (
           <button type="button" className={s.link} onClick={limpar}>
             [limpar]
