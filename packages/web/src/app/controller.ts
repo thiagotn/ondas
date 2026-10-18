@@ -1,6 +1,8 @@
 import {
   firstPlayable,
+  fmtMB,
   indexOfTrack,
+  offlineBytes,
   onEnded,
   playability,
   prefetchTarget,
@@ -240,6 +242,29 @@ export async function logout(): Promise<void> {
   // IndexedDB. Sair sem apagar deixaria os metadados das faixas próprias no
   // aparelho à espera do próximo visitante.
   queryClient.removeQueries({ queryKey: catalogKey(true) });
+}
+
+/**
+ * Apaga TODAS as faixas baixadas e zera o índice.
+ *
+ * Existe porque `logout()` não leva a parte local embora: sair da conta apaga
+ * o catálogo do acervo, mas os bytes do áudio continuam no aparelho sem tela
+ * nenhuma que os mostre. Este é o botão que faltava.
+ *
+ * Reconcilia a partir do que sobrou em vez de limpar o índice na mão: se uma
+ * remoção falhar, o índice continua contando aquela faixa — que ainda está lá.
+ *
+ * A faixa que estiver tocando não para: revogar um object URL invalida novos
+ * carregamentos, não o que o `<audio>` já carregou. Um pulo grande depois
+ * disso pode precisar da rede.
+ */
+export async function clearDownloads(): Promise<void> {
+  const antes = offlineBytes(libraryStore.getState());
+  for (const id of await offlineStore.keys()) {
+    await offlineStore.remove(id);
+  }
+  libraryStore.getState().reconcile(await offlineStore.keys());
+  uiStore.getState().flash('downloads apagados — ' + fmtMB(antes) + ' liberados');
 }
 
 export function toggleSimulatedOffline(): void {

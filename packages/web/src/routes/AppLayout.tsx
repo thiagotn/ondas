@@ -4,6 +4,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import * as controller from '../app/controller';
 import { useGuestMode } from '../app/guest';
 import { useSession, useUi } from '../app/stores';
+import { AccountOverlay } from '../components/AccountOverlay';
 import { BottomBar } from '../components/BottomBar';
 import { FullPlayer } from '../components/FullPlayer';
 import { Gate } from '../components/Gate';
@@ -11,6 +12,7 @@ import { TabBar } from '../components/TabBar';
 import s from '../components/shell.module.css';
 import { searchInputRef } from '../hooks/searchInputRef';
 import { useCurrentTrack } from '../hooks/useCurrentTrack';
+import { useAccountOverlay } from '../hooks/useAccountOverlay';
 import { usePlayerOverlay } from '../hooks/usePlayerOverlay';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useCatalog } from '../query/catalog';
@@ -26,6 +28,7 @@ export function AppLayout() {
   const guest = useGuestMode((st) => st.guest);
   const gate = useUi((st) => st.gate);
   const { isPlayerOpen } = usePlayerOverlay();
+  const { isAccountOpen } = useAccountOverlay();
   const { pathname } = useLocation();
 
   // Link de faixa não passa pela tela de login: quem recebeu o link quer
@@ -66,6 +69,8 @@ export function AppLayout() {
       </main>
       <BottomBar track={current} />
       {isPlayerOpen && current && <FullPlayer track={current} />}
+      {/* Depois do player: aberto por cima dele quando os dois estão na URL. */}
+      {isAccountOpen && <AccountOverlay />}
       {gate && <Gate gate={gate} />}
     </div>
   );

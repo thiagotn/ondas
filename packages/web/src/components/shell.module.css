@@ -165,6 +165,24 @@
   color: var(--ansi-2);
 }
 
+/* Parece texto do prompt, funciona como botão. O sublinhado pontilhado é o
+   único sinal — um `[colchete]` aqui brigaria com o `❯` ao lado. */
+.whoBotao {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted var(--color-neutral-700);
+  text-underline-offset: 4px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.whoBotao:hover {
+  text-decoration-color: var(--ansi-2);
+}
+
 .cwd {
   color: var(--ansi-4);
 }

@@ -497,3 +497,50 @@
 .upload input {
   display: none;
 }
+
+/* ── conta / aparelho (`ondas whoami`) ────────────────────────── */
+
+/* `margin-top` compensa o rótulo e o [fechar], que sentam FORA da borda em
+   `top: -10px`/`-14px`: sem ele os dois seriam cortados pelo backdrop. */
+.conta {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  margin-top: 14px;
+  padding: 18px 12px 12px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-lg);
+}
+
+/* A rolagem fica AQUI dentro, e não na caixa: o rótulo e o [fechar] sentam
+   fora da borda (`top: -10px`), e `overflow` na caixa os decepa. */
+.contaCorpo {
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.contaSecao {
+  color: var(--color-neutral-500);
+  font-size: 12px;
+  text-wrap: pretty;
+}
+
+/* Linha própria, sempre: `flex-basis: 100%` força a quebra dentro do
+   `.panelRow`, que já é `wrap`. Dividir a linha com o valor espremia
+   "1 faixa · 0,1 MB" em duas, e no estado de confirmação os dois textos se
+   sobrepunham — `.panelValue` é `flex: 1; min-width: 0` e vence a disputa. */
+.contaLimpar {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.contaConfirma {
+  color: var(--ansi-3);
+}

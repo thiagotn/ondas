@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import * as controller from '../app/controller';
 import { playerStore, uiStore } from '../app/stores';
 import { applyTheme } from '../theme/applyTheme';
+import { useAccountOverlay } from './useAccountOverlay';
 import { usePlayerOverlay } from './usePlayerOverlay';
 import { useTabNavigation } from './useTabNavigation';
 
@@ -15,6 +16,7 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
   const navigate = useNavigate();
   const { goToTab } = useTabNavigation();
   const { openPlayer, closePlayer, isPlayerOpen } = usePlayerOverlay();
+  const { isAccountOpen, closeAccount } = useAccountOverlay();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -43,7 +45,10 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
 
       if (k === 'Escape') {
         if (typing) target?.blur();
-        if (isPlayerOpen) closePlayer();
+        // Um Esc fecha UMA camada, a de cima: com conta aberta sobre o player,
+        // fechar os dois de uma vez tiraria da tela algo que não se pediu.
+        if (isAccountOpen) closeAccount();
+        else if (isPlayerOpen) closePlayer();
         ui.closeGate();
         return;
       }
@@ -91,5 +96,5 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [closePlayer, goToTab, isPlayerOpen, navigate, openPlayer, searchInput]);
+  }, [closeAccount, closePlayer, goToTab, isAccountOpen, isPlayerOpen, navigate, openPlayer, searchInput]);
 }

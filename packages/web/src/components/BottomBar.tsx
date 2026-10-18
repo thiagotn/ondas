@@ -8,6 +8,7 @@ import {
 import { CircleNotch, Pause, Play, SkipBack, SkipForward } from '@phosphor-icons/react';
 import * as controller from '../app/controller';
 import { useLibrary, usePlayer, useSession, useUi } from '../app/stores';
+import { useAccountOverlay } from '../hooks/useAccountOverlay';
 import { useNetwork } from '../hooks/useNetwork';
 import { usePlayerOverlay } from '../hooks/usePlayerOverlay';
 import { useWide } from '../hooks/useWide';
@@ -134,6 +135,7 @@ function StatusLine({ track }: { track: Track | undefined }) {
   const { t, dur, buf } = usePlayer((st) => st);
   const cached = useLibrary((st) => (track ? !!st.cached[track.id] : false));
   const { offline } = useNetwork();
+  const { openAccount } = useAccountOverlay();
 
   const duration = dur || track?.dur || 0;
   const ahead = Math.max(0, (cached ? 1 : buf) * duration - t);
@@ -156,7 +158,20 @@ function StatusLine({ track }: { track: Track | undefined }) {
             ● {offline ? 'offline' : 'online'}
           </span>
         )}
-        <span>{userTag(user)}</span>
+        {/* O próprio nome é a porta da conta: ele já está na tela e já
+            significa "você". Abrir conta daqui evita um ícone novo na barra
+            de cima, e fica na zona do polegar. */}
+        <button
+          type="button"
+          className={s.quem}
+          aria-label="Conta e aparelho"
+          onClick={(e) => {
+            e.stopPropagation();
+            openAccount();
+          }}
+        >
+          {userTag(user)}
+        </button>
         {track && <span>{bufferShortLabel(cached, ahead)}</span>}
         <span className={s.spacer} />
         {wide && (

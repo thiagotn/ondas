@@ -297,7 +297,22 @@ Decisões que valem registrar:
   (daí ele morar no `localStorage`, que é síncrono). Os tokens completos saem de
   `themeCssVars()`; `mixOklab()` resolve os mesmos valores em hex para o
   `theme-color` e para o theme provider nativo.
-- **Full player é uma rota** (`?player=1`), então o botão voltar o fecha.
+- **Full player é uma rota** (`?player=1`), então o botão voltar o fecha. Conta e
+  aparelho são o segundo overlay nesse molde (`?conta=1`); os dois saem do mesmo
+  `useOverlayParam`.
+- **Conta e biblioteca são telas diferentes porque são coisas diferentes.** A
+  conta vive no servidor e te segue para qualquer aparelho; `buffer`, curtidas e
+  downloads vivem no IndexedDB **deste navegador** e não seguem ninguém. Os dois
+  moravam no mesmo painel dentro de `~/biblioteca`, o que insinuava uma sincronia
+  que não existe — e, de quebra, empurrava a primeira faixa para o meio da tela
+  do celular. Agora a biblioteca é só biblioteca, e `ondas whoami` abre pelo seu
+  próprio nome, no prompt ou na status line: ele já está na tela e já significa
+  "você", então não foi preciso inventar ícone nem uma quarta aba.
+- **`[sair]` não apaga o que é do aparelho** — e o painel diz isso com todas as
+  letras. Quem quiser apagar usa `[limpar downloads]`, que pergunta antes e
+  remove os bytes da Cache API, reconciliando o índice com o que sobrou (sem
+  isso, sair deixava o áudio do acervo privado no navegador sem tela nenhuma
+  para mostrá-lo).
 - **Sessão de visitante é efêmera**, como no protótipo: recarregar volta ao login
   (só o login persiste). Tema, curtidas e downloads sobrevivem.
 - **Simulação de queda de rede** (`o` e o clique no `●`) existe apenas no build de

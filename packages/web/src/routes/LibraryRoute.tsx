@@ -1,7 +1,6 @@
 import { emptyText, promptLine, visibleTracks, whoAmI, type LibrarySegment } from '@ondas/core';
 import { useMemo } from 'react';
 import { uiStore, useLibrary, useSession, useUi } from '../app/stores';
-import { LibraryPanel } from '../components/LibraryPanel';
 import { TabScaffold } from '../components/TabScaffold';
 import { UploadPanel } from '../components/UploadPanel';
 import { TrackList } from '../components/TrackList';
@@ -14,7 +13,7 @@ const SEGMENTS: [LibrarySegment, string][] = [
   ['offline', '--offline'],
 ];
 
-/** `~/biblioteca`: conta, buffer, uso de disco e os dois segmentos. */
+/** `~/biblioteca`: envio para o acervo, os dois segmentos e a lista. */
 export function LibraryRoute() {
   const { data, isLoading } = useCatalog();
   const seg = useUi((st) => st.seg);
@@ -41,7 +40,10 @@ export function LibraryRoute() {
 
   return (
     <TabScaffold line={line}>
-      <LibraryPanel />
+      {/* Conta, buffer e ocupação saíram daqui: nenhum deles é biblioteca, e
+          os três juntos empurravam a primeira faixa para o meio da tela do
+          celular. Agora moram em `ondas whoami` (o nome no prompt, ou o do
+          rodapé). Enviar fica: é trabalho de acervo, e acervo é conteúdo. */}
       {/* Enviar arquivo só faz sentido com conta: o acervo é por usuário. */}
       {user && <UploadPanel />}
       <div className={s.segments}>

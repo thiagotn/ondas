@@ -204,3 +204,24 @@
     transform: rotate(360deg);
   }
 }
+
+/* O nome na status line abre conta/aparelho. A linha tem 11px e 28px de
+   altura; o alvo cresce por padding lateral e por `min-height`, que empurra a
+   faixa inteira para 36px — alto demais era o que havia, não o que fica. */
+.quem {
+  min-height: 36px;
+  padding: 0 6px;
+  margin: 0 -6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.quem:hover {
+  color: var(--color-text);
+  background: var(--color-neutral-900);
+}

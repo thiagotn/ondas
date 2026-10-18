@@ -1,36 +1,7 @@
-import { useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useOverlayParam } from './useOverlayParam';
 
-/**
- * O full player é um overlay guardado na query string (`?player=1`), e não um
- * estado solto: assim o botão voltar do aparelho fecha o player em vez de sair
- * da aba.
- */
+/** O full player é o overlay `?player=1`. */
 export function usePlayerOverlay() {
-  const [params, setParams] = useSearchParams();
-  const isPlayerOpen = params.get('player') === '1';
-
-  const openPlayer = useCallback(() => {
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.set('player', '1');
-        return next;
-      },
-      { preventScrollReset: true },
-    );
-  }, [setParams]);
-
-  const closePlayer = useCallback(() => {
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete('player');
-        return next;
-      },
-      { replace: true, preventScrollReset: true },
-    );
-  }, [setParams]);
-
-  return { isPlayerOpen, openPlayer, closePlayer };
+  const { open, show, hide } = useOverlayParam('player');
+  return { isPlayerOpen: open, openPlayer: show, closePlayer: hide };
 }

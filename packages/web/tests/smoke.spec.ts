@@ -200,6 +200,18 @@ async function skipSplash(page: Page) {
   await expect(splash).toBeHidden();
 }
 
+/**
+ * Abre `ondas whoami`. Há duas portas com o mesmo nome acessível — o nome no
+ * prompt e o do rodapé —, e `first()` pega a de cima; `qual: 'rodape'` pega a
+ * outra. As duas abrem o mesmo overlay, e os testes checam as duas.
+ */
+async function abrirConta(page: Page, qual: 'prompt' | 'rodape' = 'prompt') {
+  const portas = page.getByRole('button', { name: 'Conta e aparelho' });
+  await (qual === 'prompt' ? portas.first() : portas.last()).click();
+  await expect(page).toHaveURL(/conta=1/);
+  await expect(page.getByRole('dialog', { name: 'ondas whoami' })).toBeVisible();
+}
+
 test('visitante entra, troca de tema, toca e abre o full player', async ({ page }) => {
   await page.goto('/');
   await skipSplash(page);
@@ -305,7 +317,9 @@ test('faixa [pro] abre o gate de permissão para visitante', async ({ page }) =>
   await expect(gate).toBeHidden();
 });
 
-test('login libera o catálogo e a biblioteca mostra a conta', async ({ page }) => {
+test('login libera o catálogo, e a conta sai da biblioteca para `ondas whoami`', async ({
+  page,
+}) => {
   await page.goto('/login');
   await skipSplash(page);
   await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
@@ -320,9 +334,21 @@ test('login libera o catálogo e a biblioteca mostra a conta', async ({ page }) 
   // Atalho `3` abre a biblioteca.
   await page.keyboard.press('3');
   await expect(page).toHaveURL(/biblioteca/);
-  await expect(page.getByText('catálogo completo + offline')).toBeVisible();
-  await expect(page.getByText('0 faixas · 0.0 MB')).toBeVisible();
   await expect(page.getByText('vazio — pressione [l] ou o coração para curtir.')).toBeVisible();
+  // A biblioteca é só biblioteca: plano e ocupação não moram mais nela.
+  await expect(page.getByText('catálogo completo + offline')).toBeHidden();
+  await expect(page.getByText('0 faixas · 0.0 MB')).toBeHidden();
+
+  // Eles moram atrás do próprio nome — aqui o do prompt, no alto.
+  await abrirConta(page);
+  const conta = page.getByRole('dialog', { name: 'ondas whoami' });
+  await expect(conta.getByText('catálogo completo + offline')).toBeVisible();
+  await expect(conta.getByText('0 faixas · 0.0 MB')).toBeVisible();
+
+  // Esc fecha uma camada e devolve o endereço.
+  await page.keyboard.press('Escape');
+  await expect(conta).toBeHidden();
+  await expect(page).not.toHaveURL(/conta=1/);
 });
 
 test('o acervo aparece só logado, marcado como [meu], e some ao sair', async ({ page }) => {
@@ -361,12 +387,91 @@ test('o acervo aparece só logado, marcado como [meu], e some ao sair', async ({
   await page.getByRole('button', { name: 'tudo', exact: true }).click();
   await expect(linha('Maré Baixa')).toBeVisible();
 
-  // Saindo, o acervo some — e o selo [meu] com ele.
-  await page.keyboard.press('3');
-  await page.getByRole('button', { name: /sair/ }).click();
+  // Saindo, o acervo some — e o selo [meu] com ele. `[sair]` agora vive em
+  // `ondas whoami`, não na biblioteca.
+  await abrirConta(page);
+  await page.getByRole('button', { name: '[sair]' }).click();
+  await expect(page).toHaveURL(/login/);
+
+  // De volta ao app como visitante: é AQUI que a ausência do acervo vale,
+  // não na tela de login, onde lista nenhuma existe.
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+  await expect(linha('Maré Baixa')).toBeVisible();
   await expect(linha('Fita Caseira')).toBeHidden();
   await expect(page.getByText('[meu]')).toBeHidden();
   await expect(page.getByText(/\+ acervo/)).toBeHidden();
+});
+
+test('conta e aparelho: as duas portas, o buffer e limpar downloads', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
+  await page.getByPlaceholder('••••').fill('senha-forte');
+  await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
+  await expect(page.getByRole('button', { name: /^01 Fita Caseira/ })).toBeVisible();
+
+  // ── a porta de baixo: o próprio nome na status line ──────────────
+  await abrirConta(page, 'rodape');
+  const conta = page.getByRole('dialog', { name: 'ondas whoami' });
+
+  // `buffer` é preferência do aparelho, e o botão carrega o próprio estado.
+  // Fica DESLIGADO no resto do teste de propósito: ligado, tocar uma faixa
+  // manda a próxima para o aparelho sozinho, e a contagem abaixo viraria uma
+  // corrida entre o download pedido e o que o buffer trouxe sem pedir.
+  const buffer = conta.getByRole('button', { name: /buffer/ });
+  await expect(buffer).toHaveAttribute('aria-pressed', 'true');
+  await buffer.click();
+  await expect(buffer).toHaveAttribute('aria-pressed', 'false');
+
+  // Sem nada no aparelho não há o que limpar — botão que não faz nada é ruído.
+  await expect(conta.getByText('0 faixas · 0.0 MB')).toBeVisible();
+  await expect(conta.getByRole('button', { name: '[limpar downloads]' })).toBeHidden();
+  await page.keyboard.press('Escape');
+
+  // ── baixa uma faixa, para haver o que limpar ─────────────────────
+  await page.getByRole('button', { name: /^01 Fita Caseira/ }).click();
+  await page.keyboard.press('d');
+  await expect(page.getByText('salva no aparelho')).toBeVisible();
+
+  // Os bytes estão mesmo lá, não só o índice.
+  const noCache = () =>
+    page.evaluate(async () => (await (await caches.open('ondas-offline')).keys()).length);
+  expect(await noCache()).toBe(1);
+
+  // ── e aí sim, em dois toques ─────────────────────────────────────
+  await abrirConta(page);
+  await expect(conta.getByText(/^1 faixa · \d+\.\d MB$/)).toBeVisible();
+  await conta.getByRole('button', { name: '[limpar downloads]' }).click();
+  // O primeiro toque só pergunta: apagar não dá para desfazer.
+  await expect(conta.getByText('apagar 1?')).toBeVisible();
+  await expect(conta.getByText(/^1 faixa ·/)).toBeVisible();
+  await conta.getByRole('button', { name: '[sim]' }).click();
+  await expect(conta.getByText('0 faixas · 0.0 MB')).toBeVisible();
+  // E os bytes foram embora de verdade: zerar só o índice deixaria os
+  // megabytes no aparelho com o painel jurando que não há nada.
+  await expect.poll(noCache).toBe(0);
+  await page.keyboard.press('Escape');
+
+  // O segmento `--offline` concorda com o painel: o índice foi reconciliado
+  // com o cache, não só zerado na mão.
+  await page.keyboard.press('3');
+  await page.getByRole('button', { name: '--offline' }).click();
+  await expect(page.getByText(/vazio — baixe faixas/)).toBeVisible();
+});
+
+test('visitante também tem `ondas whoami`, com [entrar] no lugar de [sair]', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+
+  await abrirConta(page, 'rodape');
+  const conta = page.getByRole('dialog', { name: 'ondas whoami' });
+  await expect(conta.getByText('visitante')).toBeVisible();
+  await expect(conta.getByText('somente faixas grátis')).toBeVisible();
+  // Sem conta não há de onde sair — e o painel vira o caminho para entrar.
+  await expect(conta.getByRole('button', { name: '[sair]' })).toBeHidden();
+  await conta.getByRole('button', { name: '[entrar]' }).click();
+  await expect(page).toHaveURL(/login/);
 });
 
 test('enviar arquivo sobe para o bucket, processa e a faixa entra no acervo', async ({ page }) => {
