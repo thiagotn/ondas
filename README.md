@@ -154,6 +154,26 @@ privado com URL assinada e a trava de SSRF do worker.
 
 ## Arquitetura
 
+[![Diagrama de arquitetura do Ondas](./docs/arquitetura.png)](./docs/arquitetura.html)
+
+O desenho acima é um recorte estático de [`docs/arquitetura.html`](./docs/arquitetura.html) —
+**abra o HTML no navegador**, que é onde ele serve para alguma coisa: dá para percorrer os três
+roteiros (`tocar uma faixa`, `pôr música no acervo`, `as duas fontes do catálogo`), clicar num
+componente para ver só as ligações dele, traçar a rota entre dois pontos e alternar tema. Os
+rótulos das setas e os sublabels só aparecem a partir de 125% de zoom; no recorte acima eles estão
+todos visíveis.
+
+A fonte é [`docs/arquitetura.architecture.json`](./docs/arquitetura.architecture.json) — mexer no
+desenho é mexer nele, nunca no HTML, que é gerado pela skill `archify`:
+
+```bash
+node ~/.claude/skills/archify/bin/archify.mjs deliver architecture \
+  docs/arquitetura.architecture.json docs/arquitetura.html --quality showcase
+```
+
+O `arquitetura.png` é o Share Card do próprio HTML (`Export → Share Card`), regerado à mão quando
+o diagrama muda — ele existe só porque o GitHub não renderiza o HTML.
+
 **`core` não enxerga o DOM.** O `tsconfig` dele exclui a lib DOM de propósito:
 `document`, `window` e `localStorage` são erro de compilação ali. Tudo que é
 plataforma entra por interfaces (`src/ports/`) que a web implementa em
@@ -210,9 +230,10 @@ Decisões que valem registrar:
 
 ## Deploy
 
-A imagem é um **nginx servindo o estático** (`Dockerfile` na raiz, multi-stage, non-root em
-`:8080`, `/healthz` para as probes). Não há backend: metadados vêm da API do Audius direto do
-browser e as faixas baixadas ficam na Cache API do aparelho.
+A imagem da PWA é um **nginx servindo o estático** (`Dockerfile` na raiz, multi-stage, non-root em
+`:8080`, `/healthz` para as probes) e não fala com backend nenhum: os metadados do Audius vêm
+direto do browser e as faixas baixadas ficam na Cache API do aparelho. O que é privado passa pelas
+outras duas imagens, `ondas-api` e `ondas-worker` (acima).
 
 ```bash
 docker build -t ondas:local .

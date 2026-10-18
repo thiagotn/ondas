@@ -1,0 +1,392 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Ondas — arquitetura",
+    "subtitle": "PWA estática, API Go e acervo privado no R2, servidos do k3s do homelab",
+    "output": "docs/arquitetura.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1420,
+      850
+    ],
+    "views": [
+      {
+        "id": "tocar",
+        "label": "Tocar uma faixa",
+        "focus": [
+          "navegador",
+          "cloudflare",
+          "traefik",
+          "api",
+          "postgres",
+          "r2"
+        ],
+        "note": "O catálogo vem pelo túnel; os bytes do áudio, não."
+      },
+      {
+        "id": "ingestao",
+        "label": "Pôr música no acervo",
+        "focus": [
+          "hermes",
+          "cloudflare",
+          "api",
+          "postgres",
+          "worker",
+          "r2"
+        ],
+        "note": "O bot do Telegram enfileira pela API e grava direto no bucket."
+      },
+      {
+        "id": "duas-fontes",
+        "label": "As duas fontes do catálogo",
+        "focus": [
+          "navegador",
+          "audius",
+          "api",
+          "r2"
+        ],
+        "note": "Audius público e acervo privado são buscados em paralelo e falham em separado."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "audius",
+      "type": "external",
+      "label": "Audius API",
+      "sublabel": "catálogo público",
+      "pos": [
+        70,
+        92
+      ],
+      "size": [
+        138,
+        62
+      ]
+    },
+    {
+      "id": "navegador",
+      "type": "frontend",
+      "label": "Navegador",
+      "sublabel": "PWA instalada",
+      "pos": [
+        70,
+        300
+      ],
+      "size": [
+        138,
+        62
+      ],
+      "tag": "service worker"
+    },
+    {
+      "id": "hermes",
+      "type": "external",
+      "label": "Hermes no nó",
+      "sublabel": "Telegram + scdl",
+      "pos": [
+        70,
+        560
+      ],
+      "size": [
+        138,
+        62
+      ],
+      "tag": "systemd, fora do k3s"
+    },
+    {
+      "id": "cloudflare",
+      "type": "cloud",
+      "label": "Cloudflare",
+      "sublabel": "DNS + Tunnel",
+      "pos": [
+        272,
+        300
+      ],
+      "size": [
+        138,
+        62
+      ]
+    },
+    {
+      "id": "traefik",
+      "type": "security",
+      "label": "Traefik",
+      "sublabel": "ingress + TLS",
+      "pos": [
+        474,
+        300
+      ],
+      "size": [
+        138,
+        62
+      ],
+      "tag": "music.thiagotn.com"
+    },
+    {
+      "id": "pwa",
+      "type": "frontend",
+      "label": "ondas",
+      "sublabel": "nginx :8080 · estático",
+      "pos": [
+        686,
+        170
+      ],
+      "size": [
+        138,
+        62
+      ],
+      "tag": "packages/web"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "ondas-api",
+      "sublabel": "Go · sessão e acervo",
+      "pos": [
+        686,
+        330
+      ],
+      "size": [
+        138,
+        62
+      ],
+      "tag": "api/cmd/api"
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "ondas-worker",
+      "sublabel": "Go + ffmpeg",
+      "pos": [
+        686,
+        490
+      ],
+      "size": [
+        138,
+        62
+      ],
+      "tag": "api/cmd/worker"
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "Postgres",
+      "sublabel": "contas, faixas, fila",
+      "pos": [
+        930,
+        410
+      ],
+      "size": [
+        138,
+        62
+      ],
+      "tag": "ns postgres, 1 banco por app"
+    },
+    {
+      "id": "r2",
+      "type": "cloud",
+      "label": "R2 ondas-acervo",
+      "sublabel": "bucket privado",
+      "pos": [
+        1150,
+        620
+      ],
+      "size": [
+        138,
+        62
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "k3s do homelab",
+      "wraps": [
+        "pwa",
+        "api",
+        "worker",
+        "postgres"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "catalogo-publico",
+      "from": "navegador",
+      "to": "audius",
+      "label": "catálogo público",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "https",
+      "from": "navegador",
+      "to": "cloudflare",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ingest-token",
+      "from": "hermes",
+      "to": "cloudflare",
+      "label": "X-Ondas-Token",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "via": [
+        [
+          139,
+          461
+        ],
+        [
+          341,
+          461
+        ]
+      ]
+    },
+    {
+      "id": "tunnel",
+      "from": "cloudflare",
+      "to": "traefik",
+      "label": "Tunnel",
+      "variant": "emphasis"
+    },
+    {
+      "id": "rota-raiz",
+      "from": "traefik",
+      "to": "pwa",
+      "label": "/",
+      "variant": "emphasis",
+      "route": "orthogonal-h",
+      "labelDy": -14
+    },
+    {
+      "id": "rota-api",
+      "from": "traefik",
+      "to": "api",
+      "label": "/api",
+      "variant": "emphasis",
+      "route": "orthogonal-h",
+      "labelDy": 18
+    },
+    {
+      "id": "api-sql",
+      "from": "api",
+      "to": "postgres",
+      "label": "SQL · enfileira",
+      "route": "orthogonal-h"
+    },
+    {
+      "id": "worker-fila",
+      "from": "worker",
+      "to": "postgres",
+      "label": "puxa a fila",
+      "route": "orthogonal-h"
+    },
+    {
+      "id": "worker-r2",
+      "from": "worker",
+      "to": "r2",
+      "label": "grava áudio + capa",
+      "fromSide": "right",
+      "toSide": "top",
+      "via": [
+        [
+          1219,
+          521
+        ]
+      ]
+    },
+    {
+      "id": "put-assinado",
+      "from": "hermes",
+      "to": "r2",
+      "label": "PUT assinado",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "bottom",
+      "via": [
+        [
+          240,
+          591
+        ],
+        [
+          240,
+          700
+        ],
+        [
+          1219,
+          700
+        ]
+      ],
+      "labelAt": [
+        700,
+        688
+      ]
+    },
+    {
+      "id": "bytes-diretos",
+      "from": "r2",
+      "to": "navegador",
+      "label": "áudio + capa · URL assinada",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          1340,
+          651
+        ],
+        [
+          1340,
+          780
+        ],
+        [
+          24,
+          780
+        ],
+        [
+          24,
+          331
+        ]
+      ],
+      "labelAt": [
+        660,
+        768
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "O monorepo",
+      "items": [
+        "packages/core — TS sem DOM: tipos, fila, temas, stores",
+        "packages/web — PWA React 18 + Vite, vira a imagem nginx",
+        "api/cmd/api — sessão por cookie HMAC, rotas do acervo",
+        "api/cmd/worker — ffprobe, capa e upload no R2"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Os bytes passam por fora",
+      "items": [
+        "/audio responde 302 para URL assinada do R2, válida 1h",
+        "O envio é PUT assinado: o arquivo não cruza o túnel",
+        "Pelo homelab só trafegam JSON e o app estático"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Entrega",
+      "items": [
+        "push na main → Actions: typecheck, testes de core, e2e",
+        "três imagens em ghcr.io/thiagotn/ondas{,-api,-worker}",
+        "o CI escreve a tag no repo homelab; o Argo CD reconcilia"
+      ]
+    }
+  ]
+}
