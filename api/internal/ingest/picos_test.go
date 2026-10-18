@@ -95,24 +95,7 @@ func TestPicosFalhaEmArquivoQueNaoEAudio(t *testing.T) {
 	require.Error(t, err, "o worker trata isso como forma de onda ausente, não como ingestão perdida")
 }
 
-// O alfabeto vive em dois lugares — aqui e no core, que decodifica. Se um dos
-// dois mudar sozinho, a forma de onda sai embaralhada e nada falha em voz
-// alta. Este teste é o alarme.
-func TestPicosAlfabetoBateComOCore(t *testing.T) {
-	bruto, err := os.ReadFile("../../../packages/core/src/waveform.ts")
-	require.NoError(t, err, "o core é a outra ponta desta codificação")
-
-	linha := "const ALFABETO = '" + alfabeto + "';"
-	// `require.True` e não `require.Contains`: a falha aqui imprimiria o
-	// arquivo inteiro do core no log, e o que interessa é uma linha.
-	require.True(t, strings.Contains(string(bruto), linha),
-		"o alfabeto do core não é o deste pacote; esperado %s", linha)
-}
-
-func TestPicosResolucaoBateComOCore(t *testing.T) {
-	bruto, err := os.ReadFile("../../../packages/core/src/waveform.ts")
-	require.NoError(t, err)
-	require.True(t, strings.Contains(string(bruto), "export const PICOS_POR_FAIXA = 200;"),
-		"o core guarda outra resolução")
-	require.Equal(t, 200, PicosPorFaixa)
-}
+// A trava que compara este alfabeto com o do core vive do lado de lá
+// (`packages/core/src/__tests__/waveform.test.ts`): a imagem da API é
+// construída só com `api/` no contexto, então um teste daqui que lesse o
+// arquivo do core falharia dentro do Docker — e foi o que aconteceu.

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   ALTURA,
@@ -156,5 +158,36 @@ describe('bufferBar', () => {
   it('satura fora de 0..1', () => {
     expect(bufferBar(2, 2).a).toHaveLength(24);
     expect(bufferBar(-1, -1).c).toHaveLength(24);
+  });
+});
+
+/**
+ * A codificação dos picos tem duas pontas: este arquivo e
+ * `api/internal/ingest/picos.go`, que escreve. Se uma mudar sozinha, a forma
+ * de onda sai embaralhada e nada falha em voz alta.
+ *
+ * A trava mora aqui, e não do lado Go, porque a imagem da API é construída só
+ * com `api/` no contexto do Docker: um teste Go que lesse este arquivo
+ * quebraria a build por não achá-lo. O core, ao contrário, só é testado com o
+ * monorepo inteiro à mão.
+ */
+describe('as duas pontas da codificação', () => {
+  const picosGo = readFileSync(
+    fileURLToPath(new URL('../../../../api/internal/ingest/picos.go', import.meta.url)),
+    'utf8',
+  );
+
+  it('o worker escreve com o mesmo alfabeto que o app lê', () => {
+    const noGo = /const alfabeto = "([^"]+)"/.exec(picosGo)?.[1];
+    const aqui = /const ALFABETO = '([^']+)'/.exec(
+      readFileSync(fileURLToPath(new URL('../waveform.ts', import.meta.url)), 'utf8'),
+    )?.[1];
+    expect(noGo).toBeTruthy();
+    expect(aqui).toBe(noGo);
+  });
+
+  it('e mede a mesma quantidade de trechos', () => {
+    const noGo = /const PicosPorFaixa = (\d+)/.exec(picosGo)?.[1];
+    expect(Number(noGo)).toBe(PICOS_POR_FAIXA);
   });
 });
