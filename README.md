@@ -222,6 +222,13 @@ três refletidos no player cheio. Quantas barras cabem é medido na caixa com `R
 cada 3px. E a barra virou `<button>`: dá para posicionar a faixa com as setas, `Home` e `End` —
 antes era um `<span tabindex="-1">` que só o mouse alcançava.
 
+Posicionar é um arrasto, não um clique: a barra captura o ponteiro e o desenho acompanha o dedo,
+mas **a faixa só anda ao soltar**. Procurar a cada movimento faria o áudio engasgar — cada pulo
+numa faixa que vem pela rede é um pedido novo de intervalo de bytes. No toque o CSS vale tanto
+quanto o código: `touch-action: pan-y` deixa o gesto vertical rolar a página e reserva o
+horizontal para a barra, e `-webkit-tap-highlight-color: transparent` tira o retângulo cinza que o
+Chrome no Android pinta sobre a caixa inteira do botão ao tocar.
+
 ## Arquitetura
 
 [![Diagrama de arquitetura do Ondas](./docs/arquitetura.png)](./docs/arquitetura.html)

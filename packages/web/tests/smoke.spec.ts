@@ -677,6 +677,52 @@ test('a forma de onda desenha o áudio quando ele é conhecido, e barra lisa qua
   await page.keyboard.press(' ');
   await expect(barra).toHaveAttribute('aria-valuenow', '2');
 
+  // ── arrastar: o ponto é escolhido com o botão apertado, e a faixa só
+  //    anda ao soltar ────────────────────────────────────────────────
+  // O espaço acima voltou a tocar; pausar de novo para que o tempo exibido
+  // só mude por causa do arrasto.
+  await page.keyboard.press(' ');
+  await expect(page.getByRole('button', { name: 'Tocar' }).first()).toBeVisible();
+  await page.keyboard.press('Home');
+  await expect(page.locator('[class*="timeNow"]')).toHaveText('0:00');
+
+  // A do player cheio, e não `barra`: aquela é a do rodapé, que está por
+  // baixo do overlay. O teclado alcança um elemento coberto; o mouse não.
+  const grande = page.locator('[class*="waveBlock"] [role="slider"]');
+  const caixa = (await grande.boundingBox())!;
+  const emX = (f: number) => caixa.x + caixa.width * f;
+  const meio = caixa.y + caixa.height / 2;
+  const valor = async () => Number(await grande.getAttribute('aria-valuenow'));
+
+  await page.mouse.move(emX(0.2), meio);
+  await page.mouse.down();
+  await page.mouse.move(emX(0.7), meio, { steps: 12 });
+
+  // Ainda apertado: a barra já mostra o destino (sem isto não há arrasto,
+  // só clique)…
+  await expect.poll(valor).toBeGreaterThan(65);
+  expect(await valor()).toBeLessThan(75);
+  // …e o áudio não saiu do lugar. Procurar a cada movimento é o que faz uma
+  // faixa que vem pela rede engasgar a cada pixel arrastado.
+  await expect(page.locator('[class*="timeNow"]')).toHaveText('0:00');
+
+  // O realce de toque do Chrome no Android pinta a caixa INTEIRA do botão —
+  // sobre a forma de onda isso é um retângulo cinza cobrindo o desenho todo.
+  // E sem `pan-y` o navegador leva o arrasto horizontal como rolagem e
+  // cancela o gesto no meio. São duas linhas de CSS que somem sem alarde.
+  expect(
+    await grande.evaluate((el) => {
+      const c = getComputedStyle(el);
+      return [c.getPropertyValue('-webkit-tap-highlight-color'), c.touchAction];
+    }),
+  ).toEqual(['rgba(0, 0, 0, 0)', 'pan-y']);
+
+  await page.mouse.up();
+  // Soltou: agora sim. A faixa tem 3:34, então 70% caem nos 2 e pouco — bem
+  // longe tanto do 0:00 de antes quanto do 0:42 de onde o botão foi apertado.
+  await expect(page.locator('[class*="timeNow"]')).toHaveText(/^2:\d\d$/);
+  expect(await valor()).toBeGreaterThan(65);
+
   // ── acervo: o worker mediu, então a barra tem relevo ────────────
   await page.goto('/login');
   await skipSplash(page);
