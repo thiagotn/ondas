@@ -297,6 +297,14 @@ Decisões que valem registrar:
   (daí ele morar no `localStorage`, que é síncrono). Os tokens completos saem de
   `themeCssVars()`; `mixOklab()` resolve os mesmos valores em hex para o
   `theme-color` e para o theme provider nativo.
+- **O player cheio cabe na tela no celular**, sem rolagem — rolar para alcançar
+  o botão de tocar é perder o player. A conta não dá para fixar em pixels (o
+  título tem de uma a três linhas, o bloco de buffer tem ou não o botão de
+  baixar), então o painel vira um teto de altura e **a capa fica com o que
+  sobrar**: um botão menor não serve para nada, uma capa menor serve. É o único
+  `@media` do projeto, no mesmo ponto de corte do `useWide`; acima dele nada
+  muda. Abaixo de ~570px de altura a capa bate no piso de 120px e a tela volta a
+  rolar, que é o comportamento honesto.
 - **Full player é uma rota** (`?player=1`), então o botão voltar o fecha. Conta e
   aparelho são o segundo overlay nesse molde (`?conta=1`); os dois saem do mesmo
   `useOverlayParam`.

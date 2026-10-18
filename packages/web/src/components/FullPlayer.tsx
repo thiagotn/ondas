@@ -65,14 +65,19 @@ export function FullPlayer({ track }: { track: Track }) {
         </button>
 
         <div className={s.body}>
-          <div className={s.cover}>
-            {capa.length ? (
-              <TrackArt sources={capa} />
-            ) : (
-              <div className={s.coverLogo}>
-                <CassetteLogo playing={playing} progress={played} label />
-              </div>
-            )}
+          {/* A caixa só existe no estreito (`display: contents` no largo): é
+              ela que recebe a altura que sobra, para a capa saber de quanto
+              pode encolher. Ver o `@media` em overlay.module.css. */}
+          <div className={s.coverBox}>
+            <div className={s.cover}>
+              {capa.length ? (
+                <TrackArt sources={capa} />
+              ) : (
+                <div className={s.coverLogo}>
+                  <CassetteLogo playing={playing} progress={played} label />
+                </div>
+              )}
+            </div>
           </div>
 
           <div className={s.info}>

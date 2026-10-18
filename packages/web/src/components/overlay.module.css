@@ -81,6 +81,12 @@
   gap: 24px 36px;
 }
 
+/* No largo a caixa não existe para o layout: a capa continua sendo filha
+   direta de `.body`, como sempre foi. */
+.coverBox {
+  display: contents;
+}
+
 .cover {
   flex: 1 1 260px;
   max-width: 400px;
@@ -279,6 +285,72 @@
 
 .dlButton:hover {
   color: var(--color-accent-100);
+}
+
+/* ── o player cabe na tela ────────────────────────────────────────
+   Primeiro e único `@media` do projeto, no mesmo ponto de corte do
+   `useWide` (`hooks/useWide.ts`). Acima dele nada muda.
+
+   Abaixo, capa e dados empilham e a soma passava da altura do celular: era
+   preciso rolar para ver os botões de tocar, que é perder o player. A conta
+   não dá para fixar em pixels — o título tem uma a três linhas, e o bloco de
+   buffer tem ou não o botão de baixar —, então quem se ajusta é a capa, que
+   fica com o que sobrar. Um botão menor não serve para nada; uma capa
+   menor serve. */
+@media (max-width: 859px) {
+  .panel {
+    /* `height` e não `min-height`: aqui o painel é um TETO, e é desse teto
+       que sai o "quanto sobra" da capa. */
+    height: calc(100% - 8px);
+    min-height: 0;
+    padding: 20px 12px 12px;
+    gap: 12px;
+  }
+
+  .body {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 12px;
+    /* Sem isto um filho de flex não encolhe abaixo do tamanho natural. */
+    min-height: 0;
+  }
+
+  .coverBox {
+    flex: 1 1 auto;
+    /* Abaixo disto a capa vira enfeite ilegível: aí é melhor voltar a rolar
+       (o `.fullscreen` continua com `overflow-y: auto`) do que mentir que
+       coube. */
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cover {
+    /* `flex: 0 0 auto` desarma o `flex: 1 1 260px` da regra base: dentro da
+       caixa ele faria a capa crescer até a largura toda e virar retângulo. */
+    flex: 0 0 auto;
+    height: 100%;
+    width: auto;
+    /* Numa tela alta sobra mais altura do que largura, e aí a capa esticaria
+       em retângulo — `object-fit: cover` cortaria a arte de cima e de baixo.
+       O teto é a largura útil: 50px são as duas bordas e os dois pares de
+       padding logo acima (12+12 da tela, 12+12 do painel, 1+1 da borda). Com
+       a altura limitada, o `aspect-ratio` devolve a largura e ela fica
+       quadrada; a folga que sobra vira respiro em volta. */
+    max-height: calc(100vw - 50px);
+    max-width: 100%;
+  }
+
+  .info {
+    flex: 0 0 auto;
+    gap: 12px;
+  }
+
+  .wave {
+    height: 72px;
+  }
 }
 
 /* ── gate ─────────────────────────────────────────────────────── */

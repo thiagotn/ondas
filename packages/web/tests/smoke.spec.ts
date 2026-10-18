@@ -523,6 +523,51 @@ test('enviar arquivo sobe para o bucket, processa e a faixa entra no acervo', as
   await expect(page.getByRole('button', { name: /Noite Fria/ })).toBeVisible();
 });
 
+/** `{ rola, capa }` do player cheio: se precisa rolar, e quanto mede a capa. */
+async function medirPlayer(page: Page) {
+  return page.evaluate(() => {
+    const tela = document.querySelector('[class*="fullscreen"]') as HTMLElement;
+    const capa = document.querySelector(
+      '[class*="cover"]:not([class*="coverBox"]):not([class*="coverLogo"])',
+    ) as HTMLElement;
+    const r = capa.getBoundingClientRect();
+    return {
+      // 1px de folga: zoom de dispositivo deixa sobras fracionárias.
+      rola: tela.scrollHeight > tela.clientHeight + 1,
+      largura: Math.round(r.width),
+      altura: Math.round(r.height),
+    };
+  });
+}
+
+test('o player cabe na tela sem rolar, e a capa continua quadrada', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
+  await page.getByPlaceholder('••••').fill('senha-forte');
+  await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
+  await page.getByRole('button', { name: /^01 Fita Caseira/ }).click();
+  await page.getByRole('button', { name: 'Abrir player' }).click();
+  await expect(page.getByRole('heading', { name: 'Fita Caseira' })).toBeVisible();
+
+  // Rolar para ver os botões de tocar é perder o player. Quem se ajusta é a
+  // capa, que fica com a altura que sobrar — e tem de continuar quadrada,
+  // senão `object-fit: cover` corta a arte.
+  const telas = [
+    { width: 360, height: 640 }, // o aperto: quase não sobra altura
+    { width: 414, height: 896 }, // sobra MAIS altura do que largura
+    { width: 393, height: 727 },
+  ];
+  for (const t of telas) {
+    await page.setViewportSize(t);
+    const onde = `${t.width}x${t.height}`;
+    await expect.poll(async () => (await medirPlayer(page)).rola, { message: onde }).toBe(false);
+    const m = await medirPlayer(page);
+    expect(Math.abs(m.largura - m.altura), onde).toBeLessThanOrEqual(1);
+    expect(m.altura, onde).toBeGreaterThan(120);
+  }
+});
+
 test('busca filtra por artista e mostra a mensagem de grep vazio', async ({ page }) => {
   await page.goto('/login');
   await skipSplash(page);
