@@ -61,8 +61,15 @@ func pedirOG(t *testing.T, h http.Handler, seg string) *httptest.ResponseRecorde
 func TestOGDeFaixaPublica(t *testing.T) {
 	cliente, hits := audiusFalso(t, map[string]any{
 		"id": "J72oWO6", "title": "Long Drive", "genre": "Electronic", "duration": 150,
-		"user":    map[string]any{"name": "Tohaj"},
-		"artwork": map[string]any{"1000x1000": "https://cdn.exemplo/capa.jpg"},
+		"user": map[string]any{"name": "Tohaj"},
+		// `mirrors` é array, e está aqui de propósito: com o decode no
+		// formato errado ele derruba a resposta INTEIRA, e a faixa vira
+		// cartão genérico. Foi assim em produção antes deste caso existir.
+		"artwork": map[string]any{
+			"1000x1000": "https://cdn.exemplo/capa.jpg",
+			"150x150":   "https://cdn.exemplo/p.jpg",
+			"mirrors":   []string{"https://espelho.exemplo"},
+		},
 	})
 	w := pedirOG(t, servidorOG(t, cliente), "tohaj-long-drive-J72oWO6")
 

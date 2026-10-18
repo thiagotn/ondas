@@ -56,7 +56,16 @@ type resposta struct {
 		IsAvailable  *bool                 `json:"is_available"`
 		Permalink    string                `json:"permalink"`
 		User         struct{ Name string } `json:"user"`
-		Artwork      map[string]string     `json:"artwork"`
+		// Campos nomeados, e não um mapa de strings: `artwork` também traz
+		// `mirrors`, que é um ARRAY. Com `map[string]string` o decode INTEIRO
+		// falha nele e a faixa vira cartão genérico — foi o que aconteceu no
+		// primeiro deploy disto. O TypeScript ignorava calado porque não
+		// valida em tempo de execução.
+		Artwork struct {
+			P150  string `json:"150x150"`
+			P480  string `json:"480x480"`
+			P1000 string `json:"1000x1000"`
+		} `json:"artwork"`
 	} `json:"data"`
 }
 
@@ -140,7 +149,7 @@ func (c *Client) Faixa(ctx context.Context, id string) (*Faixa, error) {
 		Artista:   d.User.Name,
 		Genero:    d.Genre,
 		Duracao:   d.Duration,
-		Capa:      primeira(d.Artwork, "1000x1000", "480x480", "150x150"),
+		Capa:      primeira(d.Artwork.P1000, d.Artwork.P480, d.Artwork.P150),
 		Permalink: d.Permalink,
 	}
 	c.guardar(id, f)
@@ -220,9 +229,9 @@ func (c *Client) pegarJSON(ctx context.Context, alvo string, destino any) error 
 	return json.NewDecoder(res.Body).Decode(destino)
 }
 
-func primeira(m map[string]string, chaves ...string) string {
-	for _, k := range chaves {
-		if v := m[k]; v != "" {
+func primeira(valores ...string) string {
+	for _, v := range valores {
+		if v != "" {
 			return v
 		}
 	}

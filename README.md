@@ -193,6 +193,13 @@ segue sem saber o nome de nenhum serviço do cluster.
 
 Para faixa do acervo a prévia é genérica e **idêntica para qualquer id**, sem tocar no banco.
 
+O cliente Go do Audius tem um teste contra a API de verdade, fora do `go test ./...` porque CI não
+deve depender de terceiro — rode antes de mexer no formato da resposta:
+
+```bash
+cd api && ONDAS_AUDIUS_AO_VIVO=1 go test ./internal/audius/ -run TestAoVivo -v
+```
+
 ### A forma de onda
 
 A barra de progresso desenha o áudio de verdade, e só quando ele é conhecido.
