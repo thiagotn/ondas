@@ -15,14 +15,3 @@ export function useWide(): boolean {
   }, []);
   return wide;
 }
-
-/** Largura da viewport, para calcular a quantidade de barras da waveform. */
-export function useViewportWidth(): number {
-  const [w, setW] = useState(() => window.innerWidth);
-  useEffect(() => {
-    const onResize = () => setW(window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-  return w;
-}

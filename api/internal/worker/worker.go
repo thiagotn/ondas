@@ -184,6 +184,14 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 
 	artKey, thumbKey := w.capas(ctx, dir, bruto, job.UserID, trackID, midia, log)
 
+	// Best-effort, como as capas: faixa sem forma de onda desenha barra lisa,
+	// e isso não é motivo para reprovar uma ingestão que já subiu o áudio.
+	picos, err := ingest.Picos(ctx, bruto, midia.DuracaoS)
+	if err != nil {
+		log.Warn("forma de onda não medida", "erro", err)
+		picos = ""
+	}
+
 	nova := acervo.Nova{
 		ID:     trackID,
 		UserID: job.UserID,
@@ -199,6 +207,7 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 		SizeBytes:   tamanho,
 		ArtKey:      artKey,
 		ArtThumbKey: thumbKey,
+		Peaks:       picos,
 	}
 	track, err := w.tracks.Criar(ctx, nova)
 	if err != nil {

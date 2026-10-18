@@ -25,6 +25,20 @@ interface Resposta {
 }
 
 /**
+ * Teto do tamanho da forma de onda aceita.
+ *
+ * A API manda 200 caracteres, mas isto aqui lê JSON que atravessou rede e
+ * cache: sem teto, um campo absurdo viraria um array enorme a cada render da
+ * barra. Folga de 4x em vez de exigir o número exato, para um dia aumentar a
+ * resolução no servidor sem que a PWA velha pare de desenhar.
+ */
+const MAX_PICOS = 800;
+
+function picosValidos(v: unknown): boolean {
+  return typeof v === 'string' && v.length > 0 && v.length <= MAX_PICOS;
+}
+
+/**
  * Faixa válida o suficiente para entrar na lista.
  *
  * A API é nossa, mas a resposta é JSON que atravessa a rede e o cache do
@@ -44,6 +58,7 @@ function valida(bruta: unknown): Track | null {
     dur: typeof t['dur'] === 'number' && Number.isFinite(t['dur']) ? t['dur'] : 0,
     art: typeof t['art'] === 'string' ? t['art'] : '',
     ...(typeof t['artThumb'] === 'string' && t['artThumb'] ? { artThumb: t['artThumb'] } : {}),
+    ...(picosValidos(t['peaks']) ? { peaks: t['peaks'] as string } : {}),
     stream: t['stream'],
     // A API manda `premium: false` explícito; reforçamos aqui porque
     // `undefined` faria o heurístico do protótipo marcar música própria como

@@ -26,7 +26,10 @@ type Track struct {
 	// Vazios quando o arquivo não trazia capa embutida.
 	ArtKey      string
 	ArtThumbKey string
-	CreatedAt   time.Time
+	// Forma de onda medida na ingestão. Vazia nas faixas anteriores a ela e
+	// nas que o ffmpeg não conseguiu medir.
+	Peaks     string
+	CreatedAt time.Time
 }
 
 type Tracks struct{ pool *pgxpool.Pool }
@@ -34,12 +37,14 @@ type Tracks struct{ pool *pgxpool.Pool }
 func NewTracks(pool *pgxpool.Pool) *Tracks { return &Tracks{pool: pool} }
 
 const colunas = `id, user_id, title, artist, genre, duration_s, audio_key, audio_type,
-	size_bytes, coalesce(art_key, ''), coalesce(art_thumb_key, ''), created_at`
+	size_bytes, coalesce(art_key, ''), coalesce(art_thumb_key, ''), coalesce(peaks, ''),
+	created_at`
 
 func scan(row pgx.Row) (*Track, error) {
 	var t Track
 	err := row.Scan(&t.ID, &t.UserID, &t.Title, &t.Artist, &t.Genre, &t.DurS,
-		&t.AudioKey, &t.AudioType, &t.SizeBytes, &t.ArtKey, &t.ArtThumbKey, &t.CreatedAt)
+		&t.AudioKey, &t.AudioType, &t.SizeBytes, &t.ArtKey, &t.ArtThumbKey, &t.Peaks,
+		&t.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNaoEncontrada
 	}
@@ -88,25 +93,29 @@ type Nova struct {
 	SizeBytes   int64
 	ArtKey      string
 	ArtThumbKey string
+	Peaks       string
 }
 
 func (r *Tracks) Criar(ctx context.Context, n Nova) (*Track, error) {
 	// Strings vazias viram NULL: a coluna de capa é opcional e `''` como key
 	// seria um caminho inválido esperando para ser usado.
-	var art, thumb *string
+	var art, thumb, picos *string
 	if n.ArtKey != "" {
 		art = &n.ArtKey
 	}
 	if n.ArtThumbKey != "" {
 		thumb = &n.ArtThumbKey
 	}
+	if n.Peaks != "" {
+		picos = &n.Peaks
+	}
 	return scan(r.pool.QueryRow(ctx, `
 		INSERT INTO tracks (id, user_id, title, artist, genre, duration_s,
-		                    audio_key, audio_type, size_bytes, art_key, art_thumb_key)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		                    audio_key, audio_type, size_bytes, art_key, art_thumb_key, peaks)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING `+colunas,
 		n.ID, n.UserID, n.Title, n.Artist, n.Genre, n.DurS,
-		n.AudioKey, n.AudioType, n.SizeBytes, art, thumb))
+		n.AudioKey, n.AudioType, n.SizeBytes, art, thumb, picos))
 }
 
 // Remover apaga a linha e devolve o que foi apagado, para que quem chamou

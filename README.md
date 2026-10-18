@@ -53,7 +53,7 @@ a fase 3 da ADR 0013.)
 | `POST /api/auth/logout` | limpa o cookie |
 | `GET /api/auth/me` | sessão atual; 401 quando não há |
 | `GET /api/healthz` / `readyz` | probes — `readyz` confere o banco, `healthz` não |
-| `GET /api/acervo` | faixas do dono, no formato do `Track` do core |
+| `GET /api/acervo` | faixas do dono, no formato do `Track` do core — inclui `peaks`, a forma de onda medida na ingestão |
 | `GET /api/acervo/{id}/audio` | **302** para URL assinada do R2 |
 | `GET /api/acervo/{id}/art` | idem para a capa (`?p=thumb` para a de 150) |
 | `DELETE /api/acervo/{id}` | apaga a faixa e os objetos |
@@ -151,6 +151,28 @@ ficam no aparelho esperando o próximo visitante.
 Decisões registradas em `docs/adr/0013-ondas-acervo-privado.md` no repo `homelab`: cookie HMAC em
 vez de JWT, argon2id, migrações sob advisory lock, rate-limit por `CF-Connecting-IP`, bucket R2
 privado com URL assinada e a trava de SSRF do worker.
+
+### A forma de onda
+
+A barra de progresso desenha o áudio de verdade, e só quando ele é conhecido.
+
+Na ingestão o worker passa o ffmpeg uma segunda vez sobre o arquivo e mede o **RMS de 200
+trechos** (`api/internal/ingest/picos.go`) — menos de 0,1s por faixa, decodificando a 4 kHz mono em
+fluxo para não segurar o PCM inteiro na memória. O resultado vira 200 caracteres de 6 bits, uma
+coluna `text` na faixa, e sai no catálogo como `peaks`. O alfabeto é o mesmo nos dois lados
+(`packages/core/src/waveform.ts`), com um teste em cada ponta para o dia em que alguém mexer em um
+só.
+
+Faixa **sem** picos medidos desenha barra lisa, de propósito: o catálogo público do Audius não
+publica forma de onda (`track_segments` vem vazio), e o app nunca baixa o arquivo inteiro para
+medir. Assim o relevo passa a significar uma coisa só — *o Ondas conhece este áudio*. A versão
+anterior desenhava para todas uma onda derivada do hash do id: bonita, convincente e sem nenhuma
+relação com o som.
+
+O desenho são três `<path>` SVG (tocado / em buffer / resto), um traço vertical por barra, mais os
+três refletidos no player cheio. Quantas barras cabem é medido na caixa com `ResizeObserver`, uma a
+cada 3px. E a barra virou `<button>`: dá para posicionar a faixa com as setas, `Home` e `End` —
+antes era um `<span tabindex="-1">` que só o mouse alcançava.
 
 ## Arquitetura
 

@@ -1,0 +1,11 @@
+-- Forma de onda da faixa: 200 trechos, um caractere cada (ver
+-- `api/internal/ingest/picos.go`).
+--
+-- Fica aqui, e não num objeto no R2, porque são 200 bytes e a listagem do
+-- acervo já é uma consulta só — buscar a forma de onda à parte seria uma
+-- viagem de rede por faixa para desenhar a primeira tela.
+--
+-- Nulo é o estado normal de quem foi ingerido antes disto, e de quem o ffmpeg
+-- não conseguiu medir: a PWA desenha barra lisa e não há migração de dados a
+-- fazer.
+ALTER TABLE tracks ADD COLUMN IF NOT EXISTS peaks text;

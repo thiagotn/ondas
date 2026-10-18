@@ -2,6 +2,7 @@ package acervo_test
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/thiagotn/ondas/api/internal/acervo"
 	"github.com/thiagotn/ondas/api/internal/dbtest"
+	"github.com/thiagotn/ondas/api/internal/ingest"
 )
 
 func nova(userID, titulo string) acervo.Nova {
@@ -85,6 +87,35 @@ func TestCapaAusenteViraVazioENaoNulo(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, n.ArtKey, comCapa.ArtKey)
 	require.Equal(t, n.ArtThumbKey, comCapa.ArtThumbKey)
+}
+
+func TestFormaDeOndaVaiEVoltaInteira(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	tracks := acervo.NewTracks(pool)
+	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
+
+	// Faixa ingerida antes desta coluna existir: a leitura precisa dar string
+	// vazia, não estourar no NULL, senão o acervo inteiro para de listar.
+	semPicos, err := tracks.Criar(ctx, nova(eu, "sem-picos"))
+	require.NoError(t, err)
+	require.Empty(t, semPicos.Peaks)
+
+	n := nova(eu, "com-picos")
+	n.Peaks = strings.Repeat("Z", ingest.PicosPorFaixa)
+	comPicos, err := tracks.Criar(ctx, n)
+	require.NoError(t, err)
+	require.Equal(t, n.Peaks, comPicos.Peaks)
+
+	// E sobrevive à listagem, que é por onde a PWA recebe.
+	lista, err := tracks.Listar(ctx, eu)
+	require.NoError(t, err)
+	porID := map[string]acervo.Track{}
+	for _, t := range lista {
+		porID[t.ID] = t
+	}
+	require.Equal(t, n.Peaks, porID[comPicos.ID].Peaks)
+	require.Empty(t, porID[semPicos.ID].Peaks)
 }
 
 func TestListagemVemDaMaisNovaParaAMaisVelha(t *testing.T) {

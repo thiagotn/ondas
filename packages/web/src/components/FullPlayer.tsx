@@ -1,7 +1,6 @@
 import {
   artworkHosts,
   artworkSources,
-  barCount,
   bufferBar,
   bufferSourceLabel,
   fmtTime,
@@ -20,7 +19,7 @@ import { useMemo } from 'react';
 import * as controller from '../app/controller';
 import { playerStore, useLibrary, usePlayer, useSession } from '../app/stores';
 import { usePlayerOverlay } from '../hooks/usePlayerOverlay';
-import { useViewportWidth, useWide } from '../hooks/useWide';
+import { useWide } from '../hooks/useWide';
 import { useCatalog } from '../query/catalog';
 import { PlayIcon } from './BottomBar';
 import { CassetteLogo } from './CassetteLogo';
@@ -31,9 +30,8 @@ import { Waveform } from './Waveform';
 /** Overlay de tela cheia da faixa atual. Fechado pelo Esc e pelo botão voltar. */
 export function FullPlayer({ track }: { track: Track }) {
   const wide = useWide();
-  const viewportWidth = useViewportWidth();
   const { closePlayer } = usePlayerOverlay();
-  const { t, dur, buf, playing, waiting, shuffle, repeat, curId } = usePlayer((st) => st);
+  const { t, dur, buf, playing, waiting, shuffle, repeat } = usePlayer((st) => st);
   const user = useSession((st) => st.user);
   const cached = useLibrary((st) => !!st.cached[track.id]);
   const liked = useLibrary((st) => !!st.liked[track.id]);
@@ -85,15 +83,16 @@ export function FullPlayer({ track }: { track: Track }) {
 
             <div className={s.waveBlock}>
               <Waveform
-                trackId={curId}
-                bars={barCount(viewportWidth, wide)}
+                peaks={track.peaks}
                 played={played}
                 buf={bufFraction}
+                dur={duration}
+                mirror
                 onSeek={controller.seekFraction}
                 className={s.wave}
               />
               <div className={s.times}>
-                <span>{fmtTime(t)}</span>
+                <span className={s.timeNow}>{fmtTime(t)}</span>
                 <span>{fmtTime(duration)}</span>
               </div>
             </div>

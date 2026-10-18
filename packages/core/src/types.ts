@@ -28,6 +28,13 @@ export interface Track {
    * é o catálogo público (nenhum código antigo precisou mudar por causa disto).
    */
   source?: 'audius' | 'acervo';
+  /**
+   * Forma de onda medida no áudio, um caractere por trecho (ver
+   * `waveform.ts`). Só as faixas do acervo têm: do catálogo público o app
+   * nunca baixa o arquivo inteiro, então não há o que medir. Ausente = barra
+   * lisa.
+   */
+  peaks?: string;
 }
 
 export interface User {
@@ -88,8 +95,3 @@ export interface Catalog {
   acervo?: number;
 }
 
-/** Barra da waveform: caractere de bloco + a cor (CSS var) que lhe cabe. */
-export interface WaveBar {
-  ch: string;
-  color: string;
-}

@@ -31,6 +31,9 @@ type trackJSON struct {
 	Art      string `json:"art"`
 	ArtThumb string `json:"artThumb,omitempty"`
 	Stream   string `json:"stream"`
+	// Forma de onda medida na ingestão. Omitida quando não há: a PWA então
+	// desenha barra lisa, que é o certo — ela não conhece esse áudio.
+	Peaks string `json:"peaks,omitempty"`
 	// Explícito, e não por omissão: `undefined` faria a PWA cair no heurístico
 	// `index % 3 === 2` do protótipo e marcar música sua como [pro].
 	Premium bool `json:"premium"`
@@ -48,6 +51,7 @@ func paraJSON(t acervo.Track) trackJSON {
 		Genre:   t.Genre,
 		Dur:     t.DurS,
 		Stream:  "/api/acervo/" + t.ID + "/audio",
+		Peaks:   t.Peaks,
 		Premium: false,
 	}
 	if t.ArtKey != "" {

@@ -97,13 +97,12 @@
   overflow: hidden;
 }
 
+/* Sem reflexo aqui: 20px de altura é o que a linha do rodapé dá, e dividir
+   isso em duas formas não deixaria nenhuma das duas legível. */
 .wave {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  letter-spacing: 0;
-  cursor: pointer;
+  height: 20px;
 }
 
 .controls {

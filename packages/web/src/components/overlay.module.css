@@ -147,14 +147,11 @@
   gap: 4px;
 }
 
+/* 96px dão ~70px de desenho e ~21px de reflexo, na proporção que o `wavePaths`
+   monta. O <svg> estica para esta altura; quem decide a grossura das barras é
+   o eixo horizontal, que não muda de escala. */
 .wave {
-  font-size: 22px;
-  line-height: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  letter-spacing: 0;
-  cursor: pointer;
-  display: block;
+  height: 96px;
 }
 
 .times {
@@ -163,6 +160,12 @@
   font-size: 12px;
   color: var(--color-neutral-500);
   font-variant-numeric: tabular-nums;
+}
+
+/* O tempo corrente acompanha a cor da parte tocada: são a mesma informação
+   dita de dois jeitos. */
+.timeNow {
+  color: var(--color-accent);
 }
 
 .keycaps {

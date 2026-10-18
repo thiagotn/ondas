@@ -20,6 +20,7 @@ import (
 	"github.com/thiagotn/ondas/api/internal/auth"
 	"github.com/thiagotn/ondas/api/internal/config"
 	"github.com/thiagotn/ondas/api/internal/dbtest"
+	"github.com/thiagotn/ondas/api/internal/ingest"
 	"github.com/thiagotn/ondas/api/internal/storage"
 )
 
@@ -120,6 +121,35 @@ func TestAcervoSoMostraAsFaixasDoDono(t *testing.T) {
 	// Sem capa, nada de URL de capa.
 	require.Equal(t, "", corpo.Tracks[0]["art"])
 	require.NotContains(t, corpo.Tracks[0], "artThumb")
+	// Sem forma de onda medida, o campo não vai: é assim que a PWA sabe que
+	// deve desenhar barra lisa em vez de inventar relevo.
+	require.NotContains(t, corpo.Tracks[0], "peaks")
+}
+
+func TestFormaDeOndaSaiNoCatalogo(t *testing.T) {
+	r, pool, cfg := montar(t, true)
+	ctx := context.Background()
+	tracks := acervo.NewTracks(pool)
+
+	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
+	picos := strings.Repeat("Qa", ingest.PicosPorFaixa/2)
+	_, err := tracks.Criar(ctx, acervo.Nova{
+		ID: "33333333-3333-4333-8333-333333333333", UserID: eu,
+		Title: "com forma", Artist: "a", Genre: "acervo", DurS: 10,
+		AudioKey: "u/eu/a/3.mp3", AudioType: "audio/mpeg", SizeBytes: 1,
+		Peaks: picos,
+	})
+	require.NoError(t, err)
+
+	req := comCookie(t, cfg, httptest.NewRequest(http.MethodGet, "/api/acervo", nil), eu)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var corpo struct{ Tracks []map[string]any }
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &corpo))
+	require.Len(t, corpo.Tracks, 1)
+	require.Equal(t, picos, corpo.Tracks[0]["peaks"])
 }
 
 func TestAudioRedirecionaParaURLAssinada(t *testing.T) {

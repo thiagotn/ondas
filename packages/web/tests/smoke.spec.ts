@@ -10,6 +10,41 @@ async function blockAudius(page: Page) {
   await page.route('**/*.audius.co/**', (route) => route.abort());
 }
 
+/**
+ * Forma de onda de mentira com relevo conhecido: metade no teto, metade em
+ * silêncio. `_` é o último caractere do alfabeto de picos (valor cheio) e `A`
+ * é o primeiro (zero) — ver `packages/core/src/waveform.ts`.
+ */
+const PICOS_METADE = '_'.repeat(100) + 'A'.repeat(100);
+
+/**
+ * WAV de silêncio, montado na hora.
+ *
+ * Existe porque o `/audio` do acervo precisa devolver áudio TOCÁVEL: sem isso
+ * o elemento dispara `error`, o controller pula para a próxima faixa (é o
+ * comportamento certo dele) e o teste nunca chega a ver a faixa do acervo no
+ * player.
+ */
+function wavDeSilencio(segundos: number): Buffer {
+  const taxa = 8000;
+  const amostras = taxa * segundos;
+  const dados = Buffer.alloc(amostras * 2);
+  const cabecalho = Buffer.alloc(44);
+  cabecalho.write('RIFF', 0);
+  cabecalho.writeUInt32LE(36 + dados.length, 4);
+  cabecalho.write('WAVEfmt ', 8);
+  cabecalho.writeUInt32LE(16, 16); // tamanho do bloco fmt
+  cabecalho.writeUInt16LE(1, 20); // PCM
+  cabecalho.writeUInt16LE(1, 22); // mono
+  cabecalho.writeUInt32LE(taxa, 24);
+  cabecalho.writeUInt32LE(taxa * 2, 28); // bytes por segundo
+  cabecalho.writeUInt16LE(2, 32); // alinhamento
+  cabecalho.writeUInt16LE(16, 34); // bits por amostra
+  cabecalho.write('data', 36);
+  cabecalho.writeUInt32LE(dados.length, 40);
+  return Buffer.concat([cabecalho, dados]);
+}
+
 /** Faixas do acervo que a API falsa devolve para quem está logado. */
 const ACERVO = [
   {
@@ -20,6 +55,7 @@ const ACERVO = [
     dur: 184,
     art: '',
     stream: '/api/acervo/11111111-1111-4111-8111-111111111111/audio',
+    peaks: PICOS_METADE,
     premium: false,
   },
 ];
@@ -72,6 +108,15 @@ async function stubApi(page: Page) {
       : route.fulfill({ status: 401, json: { error: 'sessão expirada' } }),
   );
 
+  // O `/audio` da API real devolve um 302 para a URL assinada do R2; aqui os
+  // bytes vêm direto, porque o que o teste exercita é a PWA tocando a faixa,
+  // não a assinatura (essa é coberta pelos testes Go).
+  await page.route('**/api/acervo/*/audio', async (route) =>
+    logado
+      ? route.fulfill({ status: 200, contentType: 'audio/wav', body: wavDeSilencio(4) })
+      : route.fulfill({ status: 401, json: { error: 'sessão expirada' } }),
+  );
+
   // --- envio de arquivo (fase 4) ---
 
   // 1) a vaga: a API devolve um PUT assinado. Aqui ele aponta para um bucket
@@ -118,6 +163,9 @@ async function stubApi(page: Page) {
       dur: 7,
       art: '',
       stream: '/api/acervo/22222222-2222-4222-8222-222222222222/audio',
+      // O worker mede a forma de onda na ingestão, então faixa recém-chegada
+      // vem com ela — é o que o stub imita.
+      peaks: PICOS_METADE,
       premium: false,
     });
     return route.fulfill({ status: 202, json: { id: 'job-1', status: 'pending', url: 'upload:envio-1' } });
@@ -562,4 +610,90 @@ test('as abas: rótulo inteiro no largo, só ícone no estreito', async ({ page 
     return Math.round(tema.left - ultima.right);
   });
   expect(vao).toBe(0);
+});
+
+/**
+ * Alturas das barras da forma de onda, da esquerda para a direita.
+ *
+ * O desenho é feito de três `<path>` — tocado, em buffer e resto — então as
+ * barras só ficam em ordem depois de reunir os três e ordenar por x. O `:scope
+ * > path` deixa o reflexo de fora: ele vive num `<g>`.
+ */
+async function alturasDaOnda(page: Page, dentroDe: string): Promise<number[]> {
+  return page.evaluate((seletor) => {
+    const svg = document.querySelector(`${seletor} [role="slider"] svg`);
+    if (!svg) throw new Error(`nenhuma forma de onda em ${seletor}`);
+    const pares: [number, number][] = [];
+    for (const p of svg.querySelectorAll(':scope > path')) {
+      for (const m of (p.getAttribute('d') ?? '').matchAll(/M([\d.]+),([\d.]+)V([\d.]+)/g)) {
+        pares.push([Number(m[1]), Number(m[2]) - Number(m[3])]);
+      }
+    }
+    return pares.sort((a, b) => a[0] - b[0]).map(([, altura]) => altura);
+  }, dentroDe);
+}
+
+test('a forma de onda desenha o áudio quando ele é conhecido, e barra lisa quando não', async ({
+  page,
+}) => {
+  await page.goto('/login');
+  await skipSplash(page);
+
+  // ── catálogo público: ninguém mediu esse áudio ──────────────────
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+  await page.getByRole('button', { name: /Maré Baixa/ }).click();
+  await page.getByRole('button', { name: 'Abrir player' }).click();
+  await expect(page.getByRole('heading', { name: 'Maré Baixa' })).toBeVisible();
+
+  const lisa = await alturasDaOnda(page, '[class*="waveBlock"]');
+  expect(lisa.length).toBeGreaterThan(40);
+  // Lisa de verdade: uma altura só. Se um dia voltar a inventar relevo para
+  // faixa sem picos, este conjunto deixa de ter um elemento.
+  expect(new Set(lisa.map((h) => h.toFixed(1))).size).toBe(1);
+
+  // ── e o teclado alcança a barra, que antes era um span sem foco ──
+  const barra = page.getByRole('slider', { name: 'Posição da faixa' }).first();
+  await barra.focus();
+  await expect(barra).toHaveAttribute('aria-valuenow', '0');
+  // Uma tecla só: duas seguidas leem a mesma posição antes do re-render e o
+  // teste viraria uma corrida.
+  await page.keyboard.press('ArrowRight');
+  await expect(barra).toHaveAttribute('aria-valuenow', '2');
+  await page.keyboard.press('Home');
+  await expect(barra).toHaveAttribute('aria-valuenow', '0');
+  await page.keyboard.press('End');
+  await expect(barra).toHaveAttribute('aria-valuenow', '100');
+
+  // ── acervo: o worker mediu, então a barra tem relevo ────────────
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
+  await page.getByPlaceholder('••••').fill('senha-forte');
+  await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
+
+  await page.getByRole('button', { name: /^01 Fita Caseira/ }).click();
+  await page.getByRole('button', { name: 'Abrir player' }).click();
+  await expect(page.getByRole('heading', { name: 'Fita Caseira' })).toBeVisible();
+
+  // A fixture é metade no teto, metade em silêncio: a barra mais baixa da
+  // primeira metade tem de superar com folga a mais alta da segunda. As
+  // barras da fronteira ficam de fora — elas resumem um trecho que tem os
+  // dois volumes.
+  const metadeAMetade = (alturas: number[]) => {
+    const meio = Math.floor(alturas.length / 2);
+    return {
+      menorNoComeco: Math.min(...alturas.slice(0, meio - 1)),
+      maiorNoFim: Math.max(...alturas.slice(meio + 1)),
+    };
+  };
+
+  const real = await alturasDaOnda(page, '[class*="waveBlock"]');
+  const cheio = metadeAMetade(real);
+  expect(cheio.menorNoComeco).toBeGreaterThan(cheio.maiorNoFim * 10);
+
+  // O rodapé desenha a MESMA faixa, não um enfeite à parte.
+  const rodape = await alturasDaOnda(page, '[class*="progress"]');
+  expect(rodape.length).toBeGreaterThan(20);
+  const pequeno = metadeAMetade(rodape);
+  expect(pequeno.menorNoComeco).toBeGreaterThan(pequeno.maiorNoFim * 10);
 });

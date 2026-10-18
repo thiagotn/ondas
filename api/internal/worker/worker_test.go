@@ -295,6 +295,8 @@ func TestIngestaoCompletaGravaFaixaESobeObjetos(t *testing.T) {
 	require.InDelta(t, 2, f.DurS, 1)
 	require.Equal(t, "audio/mpeg", f.AudioType)
 	require.Positive(t, f.SizeBytes)
+	// E com a forma de onda medida: é ela que a barra de progresso desenha.
+	require.Len(t, f.Peaks, ingest.PicosPorFaixa)
 
 	// Áudio e as duas capas subiram, com o dono na frente da key (ADR 0011).
 	chaves := s3.chaves()

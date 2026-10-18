@@ -1,0 +1,82 @@
+/* Forma de onda. A altura vem de quem usa — aqui só o que vale nos dois
+   tamanhos. */
+.wave {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  /* `line-height` sobra do botão: sem isto o <svg> inline ganha uns pixels
+     embaixo e a barra desalinha do tempo ao lado. */
+  line-height: 0;
+}
+
+.wave:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* `none`: o desenho estica na vertical até a altura que a caixa der, e as
+   barras continuam verticais — é o eixo horizontal que define a grossura
+   delas, e esse não muda de escala. */
+.svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.svg path {
+  stroke-width: 2;
+  stroke-linecap: butt;
+  fill: none;
+}
+
+.tocado {
+  stroke: var(--color-accent);
+}
+
+/* O que já desceu mas ainda não tocou. Entre o accent e o apagado, para a
+   barra dizer de relance quanto dá para adiantar sem esperar rede. */
+.buffer {
+  stroke: var(--color-neutral-500);
+}
+
+.resto {
+  stroke: var(--color-neutral-800);
+}
+
+/* O reflexo é o que dá peso à faixa; forte demais vira segunda forma de onda e
+   o olho não sabe qual das duas ler. */
+.eco {
+  opacity: 0.32;
+}
+
+.cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-accent);
+  pointer-events: none;
+}
+
+.cursorTempo {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-size: 11px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

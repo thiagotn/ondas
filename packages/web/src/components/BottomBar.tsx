@@ -1,7 +1,6 @@
 import {
   bufferShortLabel,
   fmtTime,
-  miniBarCount,
   playerMode,
   userTag,
   type Track,
@@ -48,7 +47,7 @@ export function BottomBar({ track }: { track: Track | undefined }) {
 function PlayerRow({ track }: { track: Track }) {
   const wide = useWide();
   const { openPlayer } = usePlayerOverlay();
-  const { t, dur, buf, playing, waiting, curId } = usePlayer((st) => st);
+  const { t, dur, buf, playing, waiting } = usePlayer((st) => st);
   const cached = useLibrary((st) => !!st.cached[track.id]);
 
   const duration = dur || track.dur || 0;
@@ -78,14 +77,16 @@ function PlayerRow({ track }: { track: Track }) {
         <span className={s.progress}>
           {fmtTime(t)}
           <Waveform
-            trackId={curId}
-            bars={miniBarCount(wide)}
+            peaks={track.peaks}
             played={played}
             buf={bufFraction}
             onSeek={controller.seekFraction}
             className={s.wave}
           />
-          {fmtTime(duration)}
+          {/* No estreito a linha inteira tem ~120px e os dois tempos comiam
+              metade dela. A duração sai: ela está no player cheio, e o que
+              importa aqui é onde a faixa está. */}
+          {wide && fmtTime(duration)}
         </span>
       </span>
       <span className={s.controls}>
