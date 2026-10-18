@@ -76,6 +76,11 @@ export function Waveform({
       className={className ? `${s.wave} ${className}` : s.wave}
       onClick={(e) => {
         e.stopPropagation();
+        // Enter e Espaço num <button> disparam clique SEM ponteiro, e aí
+        // `clientX` é 0 — a faixa saltaria para o começo. `detail === 0` é
+        // como o navegador diz que o clique não veio de um dedo nem do
+        // mouse; teclado já é tratado no onKeyDown.
+        if (e.detail === 0) return;
         onSeek(fracaoDoEvento(e));
       }}
       onMouseMove={(e) => setHover(fracaoDoEvento(e))}

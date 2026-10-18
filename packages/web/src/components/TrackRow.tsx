@@ -1,4 +1,4 @@
-import { CheckCircle, DownloadSimple, Heart } from '@phosphor-icons/react';
+import { CheckCircle, DownloadSimple, Heart, ShareNetwork } from '@phosphor-icons/react';
 import type { RowModel } from '../hooks/useTrackRows';
 import s from './row.module.css';
 import { TrackArt } from './TrackArt';
@@ -7,13 +7,28 @@ export interface TrackRowProps {
   row: RowModel;
   /** Thumbnail só aparece no wide. */
   showArt: boolean;
+  /**
+   * Compartilhar também só no wide: no estreito três alvos de 44px comem o
+   * título da faixa, e lá o caminho é o player cheio, que tem a folha de
+   * compartilhamento do sistema.
+   */
+  showShare: boolean;
   onPlay(index: number): void;
   onLike(id: string): void;
   onDownload(row: RowModel): void;
+  onShare(row: RowModel): void;
 }
 
 /** `[01] [capa] titulo / artista #genero m:ss  [pro] [off] [ 42%]  ♥  ↓` */
-export function TrackRow({ row, showArt, onPlay, onLike, onDownload }: TrackRowProps) {
+export function TrackRow({
+  row,
+  showArt,
+  showShare,
+  onPlay,
+  onLike,
+  onDownload,
+  onShare,
+}: TrackRowProps) {
   const { track } = row;
   const className = [
     s.row,
@@ -79,6 +94,17 @@ export function TrackRow({ row, showArt, onPlay, onLike, onDownload }: TrackRowP
           <DownloadSimple size={17} />
         )}
       </button>
+
+      {showShare && (
+        <button
+          type="button"
+          aria-label="Compartilhar"
+          className={s.action}
+          onClick={() => onShare(row)}
+        >
+          <ShareNetwork size={17} />
+        </button>
+      )}
     </div>
   );
 }

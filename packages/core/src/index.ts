@@ -1,5 +1,6 @@
 export * from './types.js';
 export * from './format.js';
+export * from './share.js';
 export * from './themes.js';
 export * from './access.js';
 export * from './queue.js';

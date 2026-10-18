@@ -64,6 +64,7 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
         ArrowRight: () => controller.seekBy(10),
         ArrowLeft: () => controller.seekBy(-10),
         l: () => controller.likeCurrent(),
+        c: () => controller.shareCurrent(),
         d: () => controller.downloadCurrent(),
         s: () => playerStore.getState().toggleShuffle(),
         r: () => playerStore.getState().toggleRepeat(),

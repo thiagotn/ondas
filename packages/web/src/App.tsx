@@ -12,6 +12,7 @@ import { HomeRoute } from './routes/HomeRoute';
 import { LibraryRoute } from './routes/LibraryRoute';
 import { LoginRoute } from './routes/LoginRoute';
 import { SearchRoute } from './routes/SearchRoute';
+import { TrackRoute } from './routes/TrackRoute';
 import { applyTheme } from './theme/applyTheme';
 
 export function App() {
@@ -43,6 +44,9 @@ export function App() {
           <Route path="/" element={<HomeRoute />} />
           <Route path="/buscar" element={<SearchRoute />} />
           <Route path="/biblioteca" element={<LibraryRoute />} />
+        {/* Link de faixa. Fica DENTRO do layout porque quem chega por ele
+            precisa do app inteiro: abas, rodapé e o player cheio. */}
+        <Route path="/t/:link" element={<TrackRoute />} />
           <Route path="*" element={<HomeRoute />} />
         </Route>
       </Routes>

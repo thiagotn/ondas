@@ -53,6 +53,7 @@ a fase 3 da ADR 0013.)
 | `POST /api/auth/logout` | limpa o cookie |
 | `GET /api/auth/me` | sessão atual; 401 quando não há |
 | `GET /api/healthz` / `readyz` | probes — `readyz` confere o banco, `healthz` não |
+| `GET /api/og/t/{seg}` | **pública**: meta tags da prévia de link (ver *Link de faixa*) |
 | `GET /api/acervo` | faixas do dono, no formato do `Track` do core — inclui `peaks`, a forma de onda medida na ingestão |
 | `GET /api/acervo/{id}/audio` | **302** para URL assinada do R2 |
 | `GET /api/acervo/{id}/art` | idem para a capa (`?p=thumb` para a de 150) |
@@ -151,6 +152,46 @@ ficam no aparelho esperando o próximo visitante.
 Decisões registradas em `docs/adr/0013-ondas-acervo-privado.md` no repo `homelab`: cookie HMAC em
 vez de JWT, argon2id, migrações sob advisory lock, rate-limit por `CF-Connecting-IP`, bucket R2
 privado com URL assinada e a trava de SSRF do worker.
+
+### Link de faixa
+
+Toda música tem um endereço próprio, para mandar para alguém:
+
+```
+music.thiagotn.com/t/tohaj-long-drive-J72oWO6
+```
+
+**O texto é decoração; o id é a verdade.** A leitura é uma regra só — *o token é o que vem depois
+do último hífen, e o token nunca tem hífen*. Isso funciona porque o id do Audius é um hashid
+alfanumérico (conferido nas 100 faixas do trending: `[A-Za-z0-9]{6,7}`), então trocar o título de
+uma faixa não quebra link antigo. O codec vive em `packages/core/src/share.ts`.
+
+Abrir o link **não passa pela tela de login**: quem recebeu quer ouvir a música, não escolher um
+modo de sessão, então `/t/...` liga o modo visitante sozinho e abre o player cheio. Autoplay
+continua sendo decisão do navegador — o link carrega a faixa; se o navegador barrar, ela fica
+pausada com o botão pronto.
+
+Faixa que não está nas 24 do trending é resolvida pelo id (`GET /v1/tracks/{id}` do Audius) e
+entra numa lista de **avulsas**, concatenada no fim do catálogo. Ela fica fora do react-query de
+propósito: no cache da query, o próximo refetch do trending a derrubaria no meio da escuta.
+
+**Faixa do acervo é privada, e a URL também.** Ela vira `/t/_<uuid sem hífen>` — sem slug, porque
+o slug sai de título e artista e estaria contando o que é a faixa para quem só recebeu o link. Sem
+sessão, a rota para num aviso sem consultar nada: um 404 diferenciado já diria a um estranho que
+aquele uuid existe.
+
+#### A prévia no WhatsApp
+
+A PWA é estática, então o robô que desembrulha o link receberia um HTML sem nada da faixa. O
+`nginx.conf` tem um `map` de User-Agent que manda **só robôs conhecidos** para `/api/og/t/<seg>`,
+onde o Go responde as meta tags; gente continua recebendo o `index.html`.
+
+É um **302, não um `proxy_pass`**: o nginx resolve upstream literal no start, então apontar para
+`ondas-api` derrubaria o pod da PWA em CrashLoop sempre que o DNS da API falhasse — e hoje a API
+fora do ar degrada só o acervo. O redirect reentra pelo Ingress, que já roteia `/api`, e a imagem
+segue sem saber o nome de nenhum serviço do cluster.
+
+Para faixa do acervo a prévia é genérica e **idêntica para qualquer id**, sem tocar no banco.
 
 ### A forma de onda
 

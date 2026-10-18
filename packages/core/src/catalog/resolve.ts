@@ -89,3 +89,25 @@ async function resolvePublico(deps: LoadCatalogDeps, options?: TrendingOptions):
     return { tracks: demoTracks(), source: 'catálogo demo — api inacessível' };
   }
 }
+
+/** Teto de faixas avulsas numa sessão: abrir muitos links não faz a lista crescer sem fim. */
+export const MAX_AVULSAS = 20;
+
+/**
+ * Junta ao catálogo as faixas abertas por link que não estão na lista.
+ *
+ * Elas entram NO FIM, nunca na frente, por dois motivos: a frente é o lugar do
+ * acervo (contrato acima, e `catalog.acervo` conta quantas são), e prepender
+ * reembaralharia os índices de todo mundo — o que muda quem é `[pro]` no
+ * catálogo demo e remonta a lista inteira na tela.
+ */
+export function comFaixasAvulsas(
+  catalog: Catalog | undefined,
+  avulsas: readonly Track[],
+): Catalog | undefined {
+  if (!catalog || !avulsas.length) return catalog;
+  const jaTem = new Set(catalog.tracks.map((t) => t.id));
+  const novas = avulsas.filter((t) => !jaTem.has(t.id)).slice(0, MAX_AVULSAS);
+  if (!novas.length) return catalog;
+  return { ...catalog, tracks: [...catalog.tracks, ...novas] };
+}

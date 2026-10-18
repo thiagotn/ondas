@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/thiagotn/ondas/api/internal/acervo"
+	"github.com/thiagotn/ondas/api/internal/audius"
 	"github.com/thiagotn/ondas/api/internal/auth"
 	"github.com/thiagotn/ondas/api/internal/config"
 	"github.com/thiagotn/ondas/api/internal/storage"
@@ -25,6 +26,10 @@ type Server struct {
 	limiter  *auth.Limiter
 	tracks   *acervo.Tracks
 	jobs     *acervo.Jobs
+	// Prévia de link: cliente do Audius com cache, e um freio próprio — é a
+	// única rota pública que faz chamada para fora.
+	audius    *audius.Client
+	ogLimiter *auth.Limiter
 	// nil quando não há credencial de R2: o acervo responde 503 e o login
 	// segue funcionando.
 	r2 *storage.R2
@@ -32,13 +37,15 @@ type Server struct {
 
 func New(cfg *config.Config, pool *pgxpool.Pool) *Server {
 	s := &Server{
-		cfg:      cfg,
-		pool:     pool,
-		users:    auth.NewUsers(pool),
-		sessions: auth.NewSessions(cfg.SessionSecret, time.Duration(cfg.SessionMaxAgeS)*time.Second),
-		limiter:  auth.NewLimiter(cfg.LoginAttempts, time.Duration(cfg.LoginWindowS)*time.Second),
-		tracks:   acervo.NewTracks(pool),
-		jobs:     acervo.NewJobs(pool),
+		cfg:       cfg,
+		pool:      pool,
+		users:     auth.NewUsers(pool),
+		sessions:  auth.NewSessions(cfg.SessionSecret, time.Duration(cfg.SessionMaxAgeS)*time.Second),
+		limiter:   auth.NewLimiter(cfg.LoginAttempts, time.Duration(cfg.LoginWindowS)*time.Second),
+		tracks:    acervo.NewTracks(pool),
+		jobs:      acervo.NewJobs(pool),
+		audius:    audius.New(audius.Opcoes{}),
+		ogLimiter: auth.NewLimiter(60, time.Minute),
 	}
 	if !cfg.AcervoConfigurado() {
 		slog.Warn("acervo desligado: sem credencial de R2 (R2_ACCOUNT_ID/KEY/SECRET)")
@@ -67,6 +74,11 @@ func (s *Server) Router() http.Handler {
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/healthz", s.healthz)
 		r.Get("/readyz", s.readyz)
+
+		// Prévia de link, pública de propósito: quem chama é o robô do
+		// WhatsApp/Telegram, que não tem cookie. Fica FORA dos grupos do
+		// acervo — e para faixa do acervo ela não diz nada (ver og.go).
+		r.Get("/og/t/{seg}", s.ogFaixa)
 
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/signup", s.signup)

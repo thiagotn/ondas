@@ -262,7 +262,7 @@ test('o player esconde os atalhos no estreito e mantém as ações numa linha', 
   const largo = page.viewportSize()!.width >= 860;
 
   const letras = page.locator('[class*="keycapKey"]');
-  await expect(letras).toHaveCount(largo ? 7 : 0);
+  await expect(letras).toHaveCount(largo ? 8 : 0);
 
   const painel = page.locator('[class*="overlay_panel"], [class*="panel"]').first();
   const texto = (await painel.innerText()).replace(/\s+/g, ' ');
@@ -272,14 +272,14 @@ test('o player esconde os atalhos no estreito e mantém as ações numa linha', 
     expect(texto).not.toMatch(/\[(esc|d)\]/);
   }
 
-  // As sete ações numa fileira só — e dentro da caixa, sem transbordar.
+  // As oito ações numa fileira só — e dentro da caixa, sem transbordar.
   const caixas = await page.locator('[class*="keycaps"] > button').evaluateAll((els) =>
     els.map((el) => {
       const r = el.getBoundingClientRect();
       return { topo: Math.round(r.top), direita: Math.round(r.right) };
     }),
   );
-  expect(caixas).toHaveLength(7);
+  expect(caixas).toHaveLength(8);
   expect(new Set(caixas.map((c) => c.topo)).size).toBe(1);
 
   const limite = await page
@@ -652,6 +652,12 @@ test('a forma de onda desenha o áudio quando ele é conhecido, e barra lisa qua
   expect(new Set(lisa.map((h) => h.toFixed(1))).size).toBe(1);
 
   // ── e o teclado alcança a barra, que antes era um span sem foco ──
+  // Pausado: com a faixa correndo, mandar o cursor para o fim dispara o fim
+  // da faixa e o player pula para a próxima no meio das asserções. Pelo
+  // atalho, e não pelo botão: o overlay cobre o do rodapé.
+  await page.keyboard.press(' ');
+  await expect(page.getByRole('button', { name: 'Tocar' }).first()).toBeVisible();
+
   const barra = page.getByRole('slider', { name: 'Posição da faixa' }).first();
   await barra.focus();
   await expect(barra).toHaveAttribute('aria-valuenow', '0');
@@ -663,6 +669,13 @@ test('a forma de onda desenha o áudio quando ele é conhecido, e barra lisa qua
   await expect(barra).toHaveAttribute('aria-valuenow', '0');
   await page.keyboard.press('End');
   await expect(barra).toHaveAttribute('aria-valuenow', '100');
+
+  // Espaço com o foco na barra toca/pausa — não salta a faixa para o começo.
+  // A barra é um <button>, e clique de teclado chega sem coordenada.
+  await page.keyboard.press('Home');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press(' ');
+  await expect(barra).toHaveAttribute('aria-valuenow', '2');
 
   // ── acervo: o worker mediu, então a barra tem relevo ────────────
   await page.goto('/login');
@@ -696,4 +709,101 @@ test('a forma de onda desenha o áudio quando ele é conhecido, e barra lisa qua
   expect(rodape.length).toBeGreaterThan(20);
   const pequeno = metadeAMetade(rodape);
   expect(pequeno.menorNoComeco).toBeGreaterThan(pequeno.maiorNoFim * 10);
+});
+
+/** Link de faixa do catálogo demo: os ids demo são alfanuméricos, logo parseáveis. */
+const LINK_DEMO = '/t/lia-sombra-mare-baixa-demo0';
+
+test('link de faixa abre a música sem passar pelo login', async ({ page }) => {
+  await page.goto(LINK_DEMO);
+  await skipSplash(page);
+
+  // O ponto do deeplink: quem recebeu o link não vê tela de login.
+  await expect(page.getByText('ondas — login')).toBeHidden();
+  await expect(page.getByText(/sessão de visitante/)).toBeVisible();
+
+  // O player cheio abre já na faixa certa, e fica na URL.
+  await expect(page).toHaveURL(/player=1/);
+  await expect(page.getByRole('heading', { name: 'Maré Baixa' })).toBeVisible();
+  await expect(page.getByText('Maré Baixa — Lia Sombra')).toBeVisible();
+  // Nada de afirmar PLAY/PAUSE: a política de autoplay do Chromium decide
+  // isso, e o link promete carregar a faixa, não tocá-la sozinha.
+
+  // Fechando o player, quem chegou pelo link já está no app — sem tela morta.
+  await page.getByRole('button', { name: /fechar/ }).click();
+  await expect(page.getByText('Concreto Molhado')).toBeVisible();
+});
+
+test('link quebrado e link de faixa privada não contam nada', async ({ page }) => {
+  await page.goto('/t/nada-ZZZZZZZZ');
+  await skipSplash(page);
+  await expect(page.getByText(/faixa não encontrada/)).toBeVisible();
+
+  // Faixa do acervo sem sessão: para no aviso e NÃO diz o que a faixa é. O
+  // id abaixo é o da `Fita Caseira` do stub, em hex sem hífen.
+  await page.goto('/t/_11111111111141118111111111111111');
+  await skipSplash(page);
+  await expect(page.getByText(/faixa privada/)).toBeVisible();
+  const html = await page.content();
+  expect(html).not.toContain('Fita Caseira');
+  expect(html).not.toContain('Eu Mesmo');
+});
+
+test('a mesma faixa privada abre para quem tem a conta', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
+  await page.getByPlaceholder('••••').fill('senha-forte');
+  await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
+  await expect(page.getByRole('button', { name: /^01 Fita Caseira/ })).toBeVisible();
+
+  await page.goto('/t/_11111111111141118111111111111111');
+  await expect(page.getByRole('heading', { name: 'Fita Caseira' })).toBeVisible();
+  await expect(page).toHaveURL(/player=1/);
+});
+
+test('compartilhar entrega o link da faixa', async ({ page, context }) => {
+  // `navigator.share` de mentira: o que interessa é o que o app manda para
+  // ele, não a folha do sistema.
+  await page.addInitScript(() => {
+    (window as unknown as { __partilha?: unknown[] }).__partilha = [];
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: async (dados: unknown) => {
+        (window as unknown as { __partilha: unknown[] }).__partilha.push(dados);
+      },
+    });
+  });
+
+  await page.goto(LINK_DEMO);
+  await skipSplash(page);
+  await expect(page.getByRole('heading', { name: 'Maré Baixa' })).toBeVisible();
+
+  // Escopado no player: no largo cada linha da lista também tem o botão.
+  const botao = page.locator('[class*="keycaps"]').getByRole('button', { name: 'Compartilhar' });
+  await botao.click();
+  const enviado = await page.evaluate(
+    () => (window as unknown as { __partilha: { url: string; title: string }[] }).__partilha[0],
+  );
+  expect(enviado?.url).toContain(LINK_DEMO);
+  expect(enviado?.title).toBe('Maré Baixa');
+
+  // No desktop a tecla `c` faz o mesmo.
+  if (page.viewportSize()!.width >= 860) {
+    await page.keyboard.press('c');
+    const todos = await page.evaluate(
+      () => (window as unknown as { __partilha: unknown[] }).__partilha.length,
+    );
+    expect(todos).toBe(2);
+  }
+
+  // Sem `navigator.share`, cai no clipboard e avisa.
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+  });
+  await botao.click();
+  await expect(page.getByText('link copiado')).toBeVisible();
+  const copiado = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copiado).toContain(LINK_DEMO);
 });

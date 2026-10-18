@@ -15,6 +15,7 @@ import {
   setMediaPlaybackState,
   setMediaPosition,
 } from '../platform/mediaSession';
+import { compartilhar } from '../platform/share';
 import { applyTheme, storeTheme } from '../theme/applyTheme';
 import { queryClient } from '../query/client';
 import { catalogKey } from '../query/catalog';
@@ -146,6 +147,12 @@ export function toggleLike(id: string): void {
 export function likeCurrent(): void {
   const track = currentTrack();
   if (track) toggleLike(track.id);
+}
+
+/** Manda o link da faixa que está tocando (tecla `c` e botão do player). */
+export function shareCurrent(): void {
+  const track = currentTrack();
+  if (track) void compartilhar(track);
 }
 
 /**

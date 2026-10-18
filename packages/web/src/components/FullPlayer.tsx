@@ -11,6 +11,7 @@ import {
   DownloadSimple,
   Heart,
   RepeatOnce,
+  ShareNetwork,
   Shuffle,
   SkipBack,
   SkipForward,
@@ -138,6 +139,13 @@ export function FullPlayer({ track }: { track: Track }) {
                 onClick={() => void controller.download(track)}
               >
                 {cached ? <CheckCircle size={19} weight="fill" /> : <DownloadSimple size={19} />}
+              </Keycap>
+              <Keycap
+                keyLabel={dica('c')}
+                ariaLabel="Compartilhar"
+                onClick={() => controller.shareCurrent()}
+              >
+                <ShareNetwork size={19} />
               </Keycap>
             </div>
 

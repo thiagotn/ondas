@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AudiusCatalogClient } from '../catalog/audius.js';
 import { demoTracks } from '../catalog/demo.js';
-import { CATALOG_CACHE_MAX_AGE_MS, loadCatalog } from '../catalog/resolve.js';
-import type { Track } from '../types.js';
+import {
+  CATALOG_CACHE_MAX_AGE_MS,
+  comFaixasAvulsas,
+  loadCatalog,
+  MAX_AVULSAS,
+} from '../catalog/resolve.js';
+import type { Catalog, Track } from '../types.js';
 
 const json = (body: unknown) =>
   new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -37,6 +42,10 @@ describe('AudiusCatalogClient', () => {
         art: 'g.jpg',
         artThumb: 'p.jpg',
         stream: 'https://dn1.audius/v1/tracks/abc12/stream?app_name=ONDAS',
+        // Explícito mesmo quando falso: sem o boolean o `access.ts` cairia no
+        // heurístico posicional e a mesma faixa teria acesso diferente
+        // conforme a posição na lista.
+        premium: false,
       },
     ]);
     expect(client.streamUrl('abc12')).toContain('/v1/tracks/abc12/stream');
@@ -90,6 +99,123 @@ describe('AudiusCatalogClient', () => {
     await expect(
       new AudiusCatalogClient(fetchMock as unknown as typeof fetch).trending(),
     ).rejects.toThrow(/nenhum host/);
+  });
+});
+
+describe('AudiusCatalogClient.track — a faixa de um deeplink', () => {
+  const comHost = (resposta: (u: string) => Response) =>
+    vi.fn(async (url: string | URL | Request) => {
+      const u = String(url);
+      if (u === 'https://api.audius.co') return json({ data: ['https://dn1.audius'] });
+      return resposta(u);
+    });
+
+  it('busca pelo id e devolve EXATAMENTE o que o trending devolveria', async () => {
+    const fetchMock = comHost((u) => {
+      if (u.includes('/v1/tracks/trending')) return json({ data: [AUDIUS_TRACK] });
+      expect(u).toBe('https://dn1.audius/v1/tracks/abc12?app_name=ONDAS');
+      return json({ data: AUDIUS_TRACK });
+    });
+    const client = new AudiusCatalogClient(fetchMock as unknown as typeof fetch);
+
+    // Mesma carga pelos dois caminhos: é o que prova que o mapeador é um só —
+    // a faixa aberta por link não pode aparecer diferente da mesma faixa na
+    // lista.
+    const [daLista] = await client.trending();
+    const porId = await client.track('abc12');
+    expect(porId).toEqual(daLista);
+  });
+
+  it('reusa o host já sorteado em vez de redescobrir', async () => {
+    const fetchMock = comHost(() => json({ data: AUDIUS_TRACK }));
+    const client = new AudiusCatalogClient(fetchMock as unknown as typeof fetch);
+    await client.track('abc12');
+    await client.track('abc12');
+    const descobertas = fetchMock.mock.calls.filter(([u]) => String(u) === 'https://api.audius.co');
+    expect(descobertas).toHaveLength(1);
+  });
+
+  it('id que não existe é null, não erro', async () => {
+    const fetchMock = comHost(() => new Response('', { status: 404 }));
+    const client = new AudiusCatalogClient(fetchMock as unknown as typeof fetch);
+    await expect(client.track('sumiu')).resolves.toBeNull();
+  });
+
+  it('faixa não tocável é null — link não pode abrir player mudo', async () => {
+    for (const campo of [{ is_streamable: false }, { is_available: false }]) {
+      const fetchMock = comHost(() => json({ data: { ...AUDIUS_TRACK, ...campo } }));
+      const client = new AudiusCatalogClient(fetchMock as unknown as typeof fetch);
+      await expect(client.track('abc12')).resolves.toBeNull();
+    }
+  });
+
+  it('falha de rede continua sendo erro, para distinguir de "não existe"', async () => {
+    const fetchMock = comHost(() => new Response('', { status: 500 }));
+    const client = new AudiusCatalogClient(fetchMock as unknown as typeof fetch);
+    await expect(client.track('abc12')).rejects.toThrow(/500/);
+  });
+
+  it('o id vai escapado na URL', async () => {
+    const fetchMock = comHost((u) => {
+      expect(u).toContain('/v1/tracks/a%2Fb%3Fc');
+      return new Response('', { status: 404 });
+    });
+    const client = new AudiusCatalogClient(fetchMock as unknown as typeof fetch);
+    await client.track('a/b?c');
+  });
+
+  it('`premium` sai do gating da faixa, não da posição na lista', async () => {
+    const gated = comHost(() => json({ data: { ...AUDIUS_TRACK, is_stream_gated: true } }));
+    const livre = comHost(() => json({ data: AUDIUS_TRACK }));
+    const a = new AudiusCatalogClient(gated as unknown as typeof fetch);
+    const b = new AudiusCatalogClient(livre as unknown as typeof fetch);
+    expect((await a.track('abc12'))?.premium).toBe(true);
+    expect((await b.track('abc12'))?.premium).toBe(false);
+  });
+});
+
+describe('comFaixasAvulsas', () => {
+  const faixa = (id: string): Track => ({
+    id,
+    title: id,
+    artist: 'a',
+    genre: 'g',
+    dur: 1,
+    art: '',
+    stream: 's',
+  });
+  const catalogo: Catalog = {
+    tracks: [faixa('a'), faixa('b')],
+    source: 'catálogo demo',
+    acervo: 1,
+  };
+
+  it('entra no FIM, para não reembaralhar os índices de quem já estava', () => {
+    const saida = comFaixasAvulsas(catalogo, [faixa('z')]);
+    expect(saida!.tracks.map((t) => t.id)).toEqual(['a', 'b', 'z']);
+  });
+
+  it('não duplica faixa que já está na lista', () => {
+    expect(comFaixasAvulsas(catalogo, [faixa('a')])).toBe(catalogo);
+  });
+
+  it('preserva a contagem do acervo e a fonte', () => {
+    const saida = comFaixasAvulsas(catalogo, [faixa('z')])!;
+    expect(saida.acervo).toBe(1);
+    expect(saida.source).toBe('catálogo demo');
+  });
+
+  it('respeita o teto', () => {
+    const muitas = Array.from({ length: MAX_AVULSAS + 5 }, (_, i) => faixa('n' + i));
+    expect(comFaixasAvulsas(catalogo, muitas)!.tracks).toHaveLength(2 + MAX_AVULSAS);
+  });
+
+  it('catálogo ausente continua ausente', () => {
+    expect(comFaixasAvulsas(undefined, [faixa('z')])).toBeUndefined();
+  });
+
+  it('sem avulsas devolve o mesmo objeto', () => {
+    expect(comFaixasAvulsas(catalogo, [])).toBe(catalogo);
   });
 });
 

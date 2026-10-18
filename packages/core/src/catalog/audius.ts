@@ -12,6 +12,9 @@ interface AudiusTrack {
   genre?: string;
   duration?: number;
   is_streamable?: boolean;
+  is_available?: boolean;
+  /** Faixa com acesso condicionado (token, compra). É a nossa `[pro]` de verdade. */
+  is_stream_gated?: boolean;
   user?: { name?: string };
   artwork?: Record<string, string>;
 }
@@ -62,6 +65,36 @@ export class AudiusCatalogClient implements CatalogClient {
     return this.host;
   }
 
+  /**
+   * Faixa da API → `Track`.
+   *
+   * Existe como método para o trending e o deeplink saírem IDÊNTICOS: duas
+   * traduções separadas divergiriam calado, e a faixa aberta por link
+   * apareceria diferente da mesma faixa na lista.
+   */
+  private mapear(t: AudiusTrack, host: string): Track {
+    return {
+      id: String(t.id),
+      title: t.title,
+      artist: t.user?.name || '—',
+      genre: slugGenre(t.genre),
+      dur: t.duration || 0,
+      art: t.artwork?.['480x480'] || t.artwork?.['150x150'] || '',
+      artThumb: t.artwork?.['150x150'] || t.artwork?.['480x480'] || '',
+      stream: `${host}/v1/tracks/${t.id}/stream?app_name=${APP_NAME}`,
+      // Explícito, e vindo do gating da própria faixa. Sem isto o `access.ts`
+      // cai no heurístico posicional do protótipo (`index % 3`), e a MESMA
+      // faixa seria [pro] na lista e livre no link — a posição decidindo o
+      // acesso. Ver `isPremium` em `../access.ts`.
+      premium: t.is_stream_gated === true,
+    };
+  }
+
+  /** Tocável? O trending e o link usam a mesma régua. */
+  private tocavel(t: AudiusTrack): boolean {
+    return t.is_streamable !== false && t.is_available !== false;
+  }
+
   async trending(options?: TrendingOptions): Promise<Track[]> {
     const { signal, done } = withTimeout(options?.signal, TIMEOUT_MS);
     try {
@@ -73,18 +106,34 @@ export class AudiusCatalogClient implements CatalogClient {
       );
       if (!res.ok) throw new Error('audius: trending falhou (' + res.status + ')');
       const body = (await res.json()) as { data?: AudiusTrack[] };
-      return (body.data ?? [])
-        .filter((t) => t.is_streamable !== false)
-        .map((t) => ({
-          id: String(t.id),
-          title: t.title,
-          artist: t.user?.name || '—',
-          genre: slugGenre(t.genre),
-          dur: t.duration || 0,
-          art: t.artwork?.['480x480'] || t.artwork?.['150x150'] || '',
-          artThumb: t.artwork?.['150x150'] || t.artwork?.['480x480'] || '',
-          stream: `${host}/v1/tracks/${t.id}/stream?app_name=${APP_NAME}`,
-        }));
+      return (body.data ?? []).filter((t) => this.tocavel(t)).map((t) => this.mapear(t, host));
+    } finally {
+      done();
+    }
+  }
+
+  /**
+   * Uma faixa só, pelo id — é o que faz um deeplink abrir uma música que não
+   * está nas 24 do trending.
+   *
+   * `null` significa "não há o que tocar": id que não existe, faixa removida
+   * ou não tocável. Erro de rede continua sendo erro, para quem chamou poder
+   * distinguir "não existe" de "não deu para saber".
+   */
+  async track(id: string, options?: TrendingOptions): Promise<Track | null> {
+    const { signal, done } = withTimeout(options?.signal, TIMEOUT_MS);
+    try {
+      const host = await this.resolveHost(signal);
+      const res = await this.fetchImpl(
+        `${host}/v1/tracks/${encodeURIComponent(id)}?app_name=${APP_NAME}`,
+        { signal },
+      );
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error('audius: faixa falhou (' + res.status + ')');
+      const body = (await res.json()) as { data?: AudiusTrack };
+      const t = body.data;
+      if (!t || !t.id || !this.tocavel(t)) return null;
+      return this.mapear(t, host);
     } finally {
       done();
     }

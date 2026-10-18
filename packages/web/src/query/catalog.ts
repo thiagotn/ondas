@@ -1,5 +1,7 @@
-import { loadCatalog, type CachedCatalog, type Catalog } from '@ondas/core';
+import { comFaixasAvulsas, loadCatalog, type CachedCatalog, type Catalog } from '@ondas/core';
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useAvulsas } from '../app/extras';
 import { acervoClient, catalogClient, FORCE_DEMO, kv } from '../app/services';
 import { useSession } from '../app/stores';
 
@@ -18,9 +20,10 @@ export const catalogKey = (logado: boolean) =>
 export function useCatalog() {
   const user = useSession((s) => s.user);
   const restored = useSession((s) => s.restored);
+  const avulsas = useAvulsas((s) => s.list);
   const logado = !!user;
 
-  return useQuery<Catalog>({
+  const query = useQuery<Catalog>({
     // A chave inclui o escopo: entrar ou sair troca de catálogo em vez de
     // reaproveitar o anterior — e o cache persistido do visitante nunca
     // guarda faixa do acervo.
@@ -44,6 +47,12 @@ export function useCatalog() {
         { signal },
       ),
   });
+
+  // As faixas abertas por link entram aqui, e não na query: assim elas
+  // sobrevivem ao refetch do trending e ficam fora do cache persistido.
+  // Nenhum consumidor precisa saber — todos leem `data.tracks`.
+  const data = useMemo(() => comFaixasAvulsas(query.data, avulsas), [query.data, avulsas]);
+  return { ...query, data };
 }
 
 /** Lê o nível 2 descartando o formato antigo (um array solto, sem carimbo). */

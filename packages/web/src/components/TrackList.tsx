@@ -1,4 +1,5 @@
 import * as controller from '../app/controller';
+import { compartilhar } from '../platform/share';
 import type { RowModel } from '../hooks/useTrackRows';
 import { useWide } from '../hooks/useWide';
 import s from './shell.module.css';
@@ -24,9 +25,11 @@ export function TrackList({ rows, emptyText, loading }: TrackListProps) {
           key={row.track.id}
           row={row}
           showArt={wide}
+          showShare={wide}
           onPlay={(index) => void controller.play(index)}
           onLike={controller.toggleLike}
           onDownload={(r) => void controller.download(r.track)}
+          onShare={(r) => void compartilhar(r.track)}
         />
       ))}
     </div>
