@@ -20,6 +20,13 @@
   font-size: 12px;
 }
 
+/* 44px é o alvo mínimo de toque recomendado — e são 45 aqui porque a barra é
+   `border-box` e a borda de baixo tira 1px da altura que o botão herda. No
+   desktop, onde se aponta com o mouse, os 40px continuam valendo. */
+.tabbarNarrow {
+  height: 45px;
+}
+
 /* ...e só o conteúdo se alinha à coluna central. */
 .tabbarInner {
   max-width: var(--content-max);
@@ -86,12 +93,21 @@
   color: var(--color-text);
 }
 
-/* No estreito o espaço é escasso: cada aba parte do tamanho do próprio rótulo
-   e só depois divide a sobra. Com a base zerada do `flex: 1`, as três ficavam
-   com um terço cada — "~/buscar" sobrava espaço e "~/biblioteca" era cortada.
-   No wide a regra não entra: lá a divisão igual é o que se quer. */
-.tabNarrow {
-  flex: 1 1 auto;
+/* No celular o rótulo da aba sai e fica só o ícone. O nome não se perde: a
+   linha do prompt logo abaixo (`thiagotn@ondas ~/em-alta ❯`) já diz onde se
+   está, então o texto aqui era repetição ocupando o espaço que falta ao dedo.
+   Sem ele as três abas viram alvos iguais de 44px de altura — o mínimo de
+   toque — e "~/biblioteca", que era cortada, deixa de existir como texto. */
+.tabIcone {
+  flex: 1 1 0;
+  max-width: none;
+  padding: 0;
+}
+
+/* Sem rótulo o fundo sozinho distingue pouco uma aba da outra: é a linha do
+   accent embaixo que diz qual está aberta. */
+.tabIcone.tabActive {
+  box-shadow: inset 0 -2px 0 var(--color-accent);
 }
 
 .tabKey {

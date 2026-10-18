@@ -1,5 +1,5 @@
 import { themeIndex } from '@ondas/core';
-import { Palette } from '@phosphor-icons/react';
+import { Disc, Flame, MagnifyingGlass, Palette } from '@phosphor-icons/react';
 import { useSplash } from '../app/splash';
 import { uiStore, usePlayer, useUi } from '../app/stores';
 import { useCurrentTrack } from '../hooks/useCurrentTrack';
@@ -9,9 +9,9 @@ import { CassetteLogo } from './CassetteLogo';
 import s from './shell.module.css';
 
 const TABS = [
-  { id: 'home', label: '~/em-alta' },
-  { id: 'search', label: '~/buscar' },
-  { id: 'library', label: '~/biblioteca' },
+  { id: 'home', label: '~/em-alta', Icone: Flame },
+  { id: 'search', label: '~/buscar', Icone: MagnifyingGlass },
+  { id: 'library', label: '~/biblioteca', Icone: Disc },
 ] as const;
 
 /** Barra superior da "janela": luzes, abas e o botão de tema. */
@@ -21,25 +21,37 @@ export function TabBar() {
   const themeId = useUi((st) => st.themeId);
 
   return (
-    <div className={s.tabbar}>
+    <div className={wide ? s.tabbar : `${s.tabbar} ${s.tabbarNarrow}`}>
       <div className={s.tabbarInner}>
         {wide && <TrafficLights />}
         <TabLogo />
-        {TABS.map((t, i) => (
+        {TABS.map(({ id, label, Icone }, i) => (
           <button
-            key={t.id}
+            key={id}
             type="button"
-            onClick={() => goToTab(t.id)}
-            aria-current={tab === t.id ? 'page' : undefined}
-            className={[s.tab, wide ? '' : s.tabNarrow, tab === t.id ? s.tabActive : '']
+            onClick={() => goToTab(id)}
+            aria-current={tab === id ? 'page' : undefined}
+            // No estreito o rótulo vira ícone, então o nome da aba só existe
+            // para o leitor de tela — e é o mesmo que o olho lê no prompt.
+            aria-label={wide ? undefined : label}
+            className={[s.tab, wide ? '' : s.tabIcone, tab === id ? s.tabActive : '']
               .filter(Boolean)
               .join(' ')}
           >
-            {wide && <span className={s.tabKey}>{i + 1}</span>}
-            {t.label}
+            {wide ? (
+              <>
+                <span className={s.tabKey}>{i + 1}</span>
+                {label}
+              </>
+            ) : (
+              <Icone size={22} />
+            )}
           </button>
         ))}
-        <span className={s.spacer} />
+        {/* No estreito as abas tomam a barra inteira. O espaçador tem o mesmo
+            `flex: 1` delas, então ficaria com um quarto da sobra — uma quarta
+            coluna vazia entre a última aba e o tema. */}
+        {wide && <span className={s.spacer} />}
         <button
           type="button"
           title="Tema (t)"

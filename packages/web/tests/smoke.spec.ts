@@ -510,26 +510,56 @@ test('a lista de formatos do envio não quebra no meio', async ({ page }) => {
   expect(medida.direita).toBeLessThanOrEqual(medida.limite);
 });
 
-test('rótulos das abas cabem inteiros na barra', async ({ page }) => {
+test('as abas: rótulo inteiro no largo, só ícone no estreito', async ({ page }) => {
   await page.goto('/login');
   await skipSplash(page);
   await page.getByRole('button', { name: /continuar como visitante/ }).click();
 
-  // No estreito as abas dividiam a barra em três partes iguais: "~/buscar"
-  // sobrava espaço e "~/biblioteca" era cortada.
+  // As abas são as únicas da barra cujo nome é um caminho. No largo ele está no
+  // texto; no estreito, onde só há ícone, só no `aria-label`.
   const abas = await page.evaluate(() =>
     [...document.querySelectorAll('[class*="tabbarInner"] button')]
-      .filter((el) => el.textContent?.includes('~/'))
+      .filter((el) => `${el.textContent} ${el.getAttribute('aria-label') ?? ''}`.includes('~/'))
       .map((el) => {
         const r = document.createRange();
         r.selectNodeContents(el);
+        const caixa = el.getBoundingClientRect();
         return {
-          label: el.textContent!.trim(),
           texto: Math.round(r.getBoundingClientRect().width),
-          caixa: Math.round(el.getBoundingClientRect().width),
+          largura: Math.round(caixa.width),
+          altura: Math.round(caixa.height),
+          escrito: el.textContent!.trim(),
+          icones: el.querySelectorAll('svg').length,
         };
       }),
   );
   expect(abas).toHaveLength(3);
-  for (const aba of abas) expect(aba.texto).toBeLessThanOrEqual(aba.caixa);
+
+  if (page.viewportSize()!.width >= 860) {
+    // O que este teste guardava antes: no largo o rótulo não pode ser cortado.
+    for (const aba of abas) expect(aba.texto).toBeLessThanOrEqual(aba.largura);
+    return;
+  }
+
+  // No estreito a aba não tem texto nenhum — o nome dela é lido na linha do
+  // prompt, logo abaixo, que é o que torna a troca indolor. Cada uma vira um
+  // alvo de dedo de 44px.
+  for (const aba of abas) {
+    expect(aba.escrito).toBe('');
+    expect(aba.icones).toBe(1);
+    expect(aba.altura).toBeGreaterThanOrEqual(44);
+    expect(aba.largura).toBeGreaterThanOrEqual(44);
+  }
+  await expect(page.getByText('~/em-alta')).toBeVisible();
+
+  // E tomam a barra inteira: o espaçador tem o mesmo `flex: 1` das abas e, se
+  // for renderizado aqui, abre uma quarta coluna vazia antes do botão de tema.
+  const vao = await page.evaluate(() => {
+    const barra = document.querySelector('[class*="tabbarInner"]')!;
+    const botoes = [...barra.querySelectorAll('button')];
+    const tema = botoes[botoes.length - 1]!.getBoundingClientRect();
+    const ultima = botoes[botoes.length - 2]!.getBoundingClientRect();
+    return Math.round(tema.left - ultima.right);
+  });
+  expect(vao).toBe(0);
 });
