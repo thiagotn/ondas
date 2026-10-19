@@ -10,6 +10,19 @@ const CACHE_NAME = 'ondas-offline';
 const keyOf = (id: string) => '/offline/' + id;
 
 /**
+ * O aparelho encheu?
+ *
+ * Mora aqui, e não no controller, porque o nome do erro é coisa de navegador:
+ * o padrão é `QuotaExceededError`, e o Firefox antigo mandava
+ * `NS_ERROR_DOM_QUOTA_REACHED`. Quem chama só quer saber se a mensagem é
+ * "sem espaço" ou "sem rede" — são saídas diferentes para a pessoa.
+ */
+export function ehCotaExcedida(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED';
+}
+
+/**
  * Faixas baixadas na Cache API. O Service Worker não intercepta estas chaves:
  * quem escreve e lê é sempre esta classe, então o índice em `library` e os
  * bytes no cache não divergem.
@@ -46,33 +59,60 @@ export class CacheOfflineStore implements OfflineStore {
     return url;
   }
 
+  /**
+   * Baixa e grava **em fluxo**: os bytes passam da rede para a Cache API sem
+   * parar num array no meio.
+   *
+   * A versão anterior acumulava todos os pedaços e montava um `Blob` no fim —
+   * medido: um arquivo de 54,9 MB virava um único Blob de 54,9 MB, mais a
+   * cópia da construção. Para uma faixa de 4 minutos não faz diferença; para
+   * um set de uma hora (~120 MB) é o pico que o sistema usa para escolher qual
+   * aba matar no celular.
+   *
+   * O `TransformStream` conta os bytes de passagem, então a barra de progresso
+   * continua funcionando sem segurar nada: a contrapressão é do próprio cano —
+   * se o disco não acompanha a rede, a leitura desacelera junto.
+   */
   async put(id: string, url: string, onProgress?: (p: number) => void): Promise<number> {
     await this.requestPersistence();
+    const c = await this.cache();
+    // Sem Cache API não existe offline. Antes isto devolvia o tamanho como se
+    // tivesse gravado, e a faixa ficava marcada `[off]` sem bytes nenhum
+    // atrás (o `reconcile` do boot acabava desfazendo).
+    if (!c) throw new Error('este navegador não guarda faixas offline');
+
     const res = await fetch(url);
     if (!res.ok || !res.body) throw new Error('download falhou (' + res.status + ')');
     const total = Number(res.headers.get('content-length')) || 0;
-    const reader = res.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let received = 0;
-    let lastTick = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      received += value.length;
-      // Sem content-length, 6 MB serve de régua otimista (como no protótipo).
-      if (onProgress && Date.now() - lastTick > 150) {
-        lastTick = Date.now();
-        onProgress(total ? received / total : Math.min(0.95, received / 6e6));
-      }
-    }
-    const blob = new Blob(chunks as BlobPart[], {
-      type: res.headers.get('content-type') || 'audio/mpeg',
+
+    let recebidos = 0;
+    let ultimoAviso = 0;
+    const contador = new TransformStream<Uint8Array, Uint8Array>({
+      transform(pedaco, controlador) {
+        recebidos += pedaco.byteLength;
+        // Sem content-length, 6 MB serve de régua otimista (como no protótipo).
+        if (onProgress && Date.now() - ultimoAviso > 150) {
+          ultimoAviso = Date.now();
+          onProgress(total ? recebidos / total : Math.min(0.95, recebidos / 6e6));
+        }
+        controlador.enqueue(pedaco);
+      },
     });
-    const c = await this.cache();
-    if (c) await c.put(keyOf(id), new Response(blob));
+
+    const corpo = new Response(res.body.pipeThrough(contador), {
+      headers: { 'content-type': res.headers.get('content-type') || 'audio/mpeg' },
+    });
+    try {
+      await c.put(keyOf(id), corpo);
+    } catch (err) {
+      // Cota estourada no meio da gravação: a entrada não serve para nada, e
+      // deixá-la faria o `reconcile` do boot jurar que a faixa está no
+      // aparelho. Apagar antes de propagar.
+      await c.delete(keyOf(id)).catch(() => {});
+      throw err;
+    }
     onProgress?.(1);
-    return blob.size;
+    return recebidos;
   }
 
   async remove(id: string): Promise<void> {

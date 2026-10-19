@@ -21,6 +21,18 @@ export function fmtMB(bytes: number): string {
   return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
+/**
+ * Bytes → `X.X MB` ou `X.X GB`.
+ *
+ * Existe separado do `fmtMB` porque a cota do navegador é da ordem de giga, e
+ * "4005.4 MB" não é número que alguém leia. O `fmtMB` continua para o que é
+ * sempre pequeno (o tamanho de uma faixa).
+ */
+export function fmtBytes(bytes: number): string {
+  const gb = bytes / 1073741824;
+  return gb >= 1 ? gb.toFixed(1) + ' GB' : fmtMB(bytes);
+}
+
 /** Gênero → slug minúsculo sem acento nem separador. */
 export function slugGenre(g: string | null | undefined): string {
   return String(g || 'outros')

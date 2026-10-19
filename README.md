@@ -293,6 +293,21 @@ Decisões que valem registrar:
 - **Áudio offline fora do Service Worker.** O SW só pré-cacheia o app shell; as
   faixas baixadas são gravadas e lidas pelo `CacheOfflineStore`, para o índice da
   biblioteca e os bytes em disco nunca divergirem.
+- **Download grava em fluxo, não na memória.** O `put()` manda o corpo da resposta
+  direto para a Cache API através de um `TransformStream` que só conta os bytes de
+  passagem — a barra de progresso continua, e a contrapressão é do próprio cano.
+  A versão anterior acumulava os pedaços e montava um `Blob` no fim: medido com
+  uma espiã no construtor, um arquivo de 54,9 MB virava **um único Blob de
+  54,9 MB**. Para uma faixa de 4 min não faz diferença; para um set de uma hora
+  (~120 MB) é o pico que decide qual aba o celular mata. O teste de regressão é a
+  mesma espiã, agora exigindo que nenhum Blob grande exista.
+- **Encher o aparelho não é o mesmo que ficar sem rede.** `QuotaExceededError` do
+  `cache.put` tem saída própria (`ehCotaExcedida`) e mensagem que diz o que fazer;
+  antes as duas falhas mostravam "falha no download" e a pessoa tentava de novo
+  contra um telefone cheio. A entrada parcial é apagada antes de propagar o erro,
+  senão o `reconcile` do boot juraria que a faixa está lá. E o painel
+  `ondas whoami` mostra quanto ainda cabe (`storageLabel`), que é o número com que
+  se decide se vale baixar o set de uma hora.
 - **Tema aplicado antes do primeiro paint** por um script inline no `index.html`
   (daí ele morar no `localStorage`, que é síncrono). Os tokens completos saem de
   `themeCssVars()`; `mixOklab()` resolve os mesmos valores em hex para o

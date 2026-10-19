@@ -1,8 +1,9 @@
-import { fmtMB, offlineBytes, planLabel, whoAmI } from '@ondas/core';
-import { useState } from 'react';
+import { fmtMB, offlineBytes, planLabel, storageLabel, whoAmI, type OfflineUsage } from '@ondas/core';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as controller from '../app/controller';
 import { useGuestMode } from '../app/guest';
+import { offlineStore } from '../app/services';
 import { libraryStore, useLibrary, useSession } from '../app/stores';
 import { useAccountOverlay } from '../hooks/useAccountOverlay';
 import { useWide } from '../hooks/useWide';
@@ -30,6 +31,7 @@ export function AccountOverlay() {
   const [confirmando, setConfirmando] = useState(false);
 
   const count = Object.keys(cached).length;
+  const espaco = useEspaco(count);
 
   return (
     <div className={o.backdrop} onClick={closeAccount} role="presentation">
@@ -126,6 +128,11 @@ export function AccountOverlay() {
                 </span>
               )}
             </div>
+
+            <div className={s.panelRow}>
+              <span className={s.panelLabel}>espaço</span>
+              <span className={s.panelValue}>{storageLabel(espaco)}</span>
+            </div>
           </div>
 
           {/* Sair não leva a metade local embora — e isso tem de estar escrito,
@@ -139,4 +146,28 @@ export function AccountOverlay() {
       </div>
     </div>
   );
+}
+
+/**
+ * Espaço do navegador para esta origem.
+ *
+ * `navigator.storage.estimate()` é assíncrono e mede a origem INTEIRA — não
+ * só as faixas —, daí ficar numa linha própria em vez de encostar no total de
+ * downloads, que é outra conta. Remede quando o número de faixas muda: é o
+ * sinal de que alguém baixou ou limpou.
+ */
+function useEspaco(faixas: number): OfflineUsage | null {
+  const [uso, setUso] = useState<OfflineUsage | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    void offlineStore.usage().then((u) => {
+      if (vivo) setUso(u);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [faixas]);
+
+  return uso;
 }

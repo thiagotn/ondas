@@ -620,6 +620,103 @@ test('toque longo: casca não seleciona, o que se copia continua copiável', asy
   expect(await capa.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none');
 });
 
+/** Entra com a conta de teste e deixa a primeira faixa do acervo tocando. */
+async function logarEtocarAcervo(page: Page) {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
+  await page.getByPlaceholder('••••').fill('senha-forte');
+  await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
+  const linha = page.getByRole('button', { name: /^01 Fita Caseira/ });
+  await expect(linha).toBeVisible({ timeout: 30000 });
+  await linha.click();
+}
+
+test('baixar não faz o arquivo inteiro passar pela memória', async ({ page }) => {
+  const grande = wavDeSilencio(240); // ~3,8 MB
+  await page.route('**/api/acervo/*/audio', async (route) =>
+    route.fulfill({ status: 200, contentType: 'audio/wav', body: grande }),
+  );
+  // Espiã no construtor de `Blob`: com a gravação em fluxo, nenhum pedaço
+  // grande do arquivo chega a existir como objeto em memória. Foi esta mesma
+  // sonda que mostrou o problema — 54,9 MB de arquivo viravam um Blob de
+  // 54,9 MB.
+  await page.addInitScript(() => {
+    const Orig = window.Blob;
+    (window as unknown as { __blobs: number[] }).__blobs = [];
+    function Espia(this: unknown, partes: BlobPart[] = [], op?: BlobPropertyBag) {
+      let total = 0;
+      for (const p of partes) {
+        total += (p as ArrayBufferView).byteLength ?? (p as Blob).size ?? 0;
+      }
+      (window as unknown as { __blobs: number[] }).__blobs.push(total);
+      return new Orig(partes, op);
+    }
+    Espia.prototype = Orig.prototype;
+    (window as unknown as { Blob: unknown }).Blob = Espia;
+  });
+
+  await logarEtocarAcervo(page);
+  await page.keyboard.press('d');
+  await expect
+    .poll(
+      () => page.evaluate(async () => (await (await caches.open('ondas-offline')).keys()).length),
+      { timeout: 60000 },
+    )
+    .toBe(1);
+
+  const maior = await page.evaluate(() =>
+    Math.max(0, ...(window as unknown as { __blobs: number[] }).__blobs),
+  );
+  expect(maior, `maior Blob construído, em bytes (arquivo tem ${grande.length})`).toBeLessThan(
+    1048576,
+  );
+});
+
+test('sem espaço no aparelho avisa diferente de sem rede', async ({ page }) => {
+  // A cota estourando é um `QuotaExceededError` vindo do `cache.put`.
+  await page.addInitScript(() => {
+    Cache.prototype.put = () => {
+      const e = new Error('simulado');
+      e.name = 'QuotaExceededError';
+      return Promise.reject(e);
+    };
+  });
+
+  await logarEtocarAcervo(page);
+  await page.keyboard.press('d');
+
+  // A frase tem de dizer o que fazer. "falha no download" mandava a pessoa
+  // tentar de novo contra um telefone cheio.
+  await expect(page.getByText(/sem espaço no aparelho/)).toBeVisible();
+  await expect(page.getByText('falha no download')).toBeHidden();
+  // E nada ficou marcado como baixado.
+  await expect(page.getByText('[off]')).toBeHidden();
+});
+
+test('o painel mostra quanto espaço ainda cabe', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: {
+        estimate: async () => ({ usage: 1.2 * 1073741824, quota: 4.2 * 1073741824 }),
+        persist: async () => true,
+        persisted: async () => true,
+      },
+    });
+  });
+
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+  await abrirConta(page, 'rodape');
+
+  // O número que decide se cabe o mix de uma hora é o que SOBRA, não o usado.
+  await expect(
+    page.getByRole('dialog', { name: 'ondas whoami' }).getByText('3.0 GB livres de 4.2 GB'),
+  ).toBeVisible();
+});
+
 test('busca filtra por artista e mostra a mensagem de grep vazio', async ({ page }) => {
   await page.goto('/login');
   await skipSplash(page);

@@ -1,4 +1,4 @@
-import { fmtTime } from './format.js';
+import { fmtBytes, fmtTime } from './format.js';
 import type { Catalog, LibrarySegment, Session, TabId, Track } from './types.js';
 
 /** `tudo` + até 8 gêneros presentes no catálogo, na ordem em que aparecem. */
@@ -113,6 +113,24 @@ export function bufferSourceLabel(args: {
     return `baixando ${Math.round(args.downloading * 100)}% → disponível offline`;
   }
   return (args.hasStream ? 'stream · ' : 'prévia · ') + fmtTime(args.ahead) + ' em buffer à frente';
+}
+
+/**
+ * Linha `espaço` do painel de conta.
+ *
+ * O número que importa é quanto ainda CABE — é com ele que se decide se dá
+ * para baixar o mix de uma hora. O total aparece junto só para dar escala.
+ *
+ * `quota` é opcional de propósito: nem todo navegador informa o limite, e
+ * inventar um seria pior que dizer que não se sabe.
+ */
+export function storageLabel(uso: { bytes: number; quota?: number } | null): string {
+  if (!uso) return 'calculando…';
+  if (uso.quota == null) {
+    return fmtBytes(uso.bytes) + ' usados · o navegador não informa o limite';
+  }
+  const livres = Math.max(0, uso.quota - uso.bytes);
+  return `${fmtBytes(livres)} livres de ${fmtBytes(uso.quota)}`;
 }
 
 /** `buf:` da status line. */

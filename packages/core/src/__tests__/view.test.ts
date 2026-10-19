@@ -6,6 +6,7 @@ import {
   emptyText,
   genreOptions,
   promptLine,
+  storageLabel,
   visibleTracks,
 } from '../view.js';
 
@@ -152,5 +153,29 @@ describe('rótulos de buffer', () => {
   it('buf: da status line', () => {
     expect(bufferShortLabel(true, 99)).toBe('buf: local');
     expect(bufferShortLabel(false, 72)).toBe('buf: +1:12');
+  });
+});
+
+describe('storageLabel', () => {
+  it('diz quanto ainda cabe, que é o número com que se decide', () => {
+    expect(storageLabel({ bytes: 1.2 * 1073741824, quota: 4.2 * 1073741824 })).toBe(
+      '3.0 GB livres de 4.2 GB',
+    );
+  });
+
+  it('não inventa limite quando o navegador não informa', () => {
+    expect(storageLabel({ bytes: 213.3 * 1048576 })).toBe(
+      '213.3 MB usados · o navegador não informa o limite',
+    );
+  });
+
+  it('não mostra espaço negativo quando o uso passa da cota', () => {
+    // Acontece: a estimativa inclui outros armazenamentos da origem e pode
+    // chegar rente ao teto.
+    expect(storageLabel({ bytes: 5e9, quota: 4e9 })).toBe('0.0 MB livres de 3.7 GB');
+  });
+
+  it('enquanto não mediu, diz que está medindo', () => {
+    expect(storageLabel(null)).toBe('calculando…');
   });
 });

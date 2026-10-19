@@ -21,6 +21,7 @@ import { compartilhar } from '../platform/share';
 import { applyTheme, storeTheme } from '../theme/applyTheme';
 import { queryClient } from '../query/client';
 import { catalogKey } from '../query/catalog';
+import { ehCotaExcedida } from '../platform/CacheOfflineStore';
 import { auth, connectivity, engine, offlineStore } from './services';
 import { libraryStore, playerStore, sessionStore, uiStore } from './stores';
 
@@ -209,8 +210,16 @@ export async function download(track: Track, silent = false): Promise<void> {
     );
     done(size);
   } catch (err) {
-    console.warn('[ondas] download falhou:', err);
     libraryStore.getState().setDl(track.id, null);
+    // Sem espaço e sem rede falhavam com a mesma frase, e a pessoa ficava
+    // tentando de novo contra um telefone cheio. São saídas diferentes: uma
+    // espera sinal, a outra espera uma faxina.
+    if (ehCotaExcedida(err)) {
+      console.warn('[ondas] sem espaço para baixar:', err);
+      if (!silent) ui.flash('sem espaço no aparelho — limpe downloads em ondas whoami');
+      return;
+    }
+    console.warn('[ondas] download falhou:', err);
     if (!silent) ui.flash('falha no download');
   }
 }

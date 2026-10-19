@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { barraDeProgresso, dlPct, fmtMB, fmtTime, genreAnsiVar, hash, slugGenre } from '../format.js';
+import { barraDeProgresso, dlPct, fmtBytes, fmtMB, fmtTime, genreAnsiVar, hash, slugGenre } from '../format.js';
 
 describe('fmtTime', () => {
   it('formata m:ss', () => {
@@ -79,5 +79,16 @@ describe('barraDeProgresso', () => {
     expect(barraDeProgresso(-1)).toBe(barraDeProgresso(0));
     expect(barraDeProgresso(9)).toBe(barraDeProgresso(1));
     expect(barraDeProgresso(Number.NaN)).toBe(barraDeProgresso(0));
+  });
+});
+
+describe('fmtBytes', () => {
+  it('fica em MB abaixo de 1 GB e vira GB acima', () => {
+    expect(fmtBytes(0)).toBe('0.0 MB');
+    expect(fmtBytes(213.3 * 1048576)).toBe('213.3 MB');
+    // A fronteira exata: 1 GB redondo já é GB, um byte a menos ainda é MB.
+    expect(fmtBytes(1073741824)).toBe('1.0 GB');
+    expect(fmtBytes(1073741823)).toBe('1024.0 MB');
+    expect(fmtBytes(4.2 * 1073741824)).toBe('4.2 GB');
   });
 });
