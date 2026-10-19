@@ -25,7 +25,7 @@ pnpm preview    # serve o build em :4173 (service worker ativo)
 | Script | O que faz |
 | --- | --- |
 | `pnpm typecheck` | `tsc --noEmit` nos dois pacotes |
-| `pnpm test` | Vitest em `core` (90 testes) |
+| `pnpm test` | Vitest em `core` (216 testes) |
 | `pnpm test:e2e` | Playwright na web (build + preview + smoke) |
 | `pnpm --filter @ondas/web splash` | regenera as telas de abertura do iOS a partir do `splash.svg` da marca |
 
@@ -242,6 +242,11 @@ horizontal para a barra, e `-webkit-tap-highlight-color: transparent` tira o ret
 Chrome no Android pinta sobre a caixa inteira do botão ao tocar.
 
 ## Arquitetura
+
+Este README diz **o que** o sistema faz e como rodá-lo. Para **por que** cada escolha foi feita, o
+que foi descartado e o que cada decisão custou, há uma série de treze documentos em
+[`docs/engenharia/`](./docs/engenharia/00-indice.md) — stack, system design, frontend, backend,
+infra, produto e qualidade, em português e inglês, com referências `arquivo:linha`.
 
 [![Diagrama de arquitetura do Ondas](./docs/arquitetura.png)](./docs/arquitetura.html)
 
