@@ -60,6 +60,16 @@ func main() {
 		return
 	}
 
+	// `worker repicos [--gravar]` remede a forma de onda de quem ficou sem ela
+	// — quem foi ingerido antes da migração 0004. Sem `--gravar` só lista.
+	if len(os.Args) > 1 && os.Args[1] == "repicos" {
+		if err := repicos(os.Args[2:]); err != nil {
+			slog.Error("repicos", "erro", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if err := run(); err != nil {
 		slog.Error("encerrando", "erro", err)
 		os.Exit(1)

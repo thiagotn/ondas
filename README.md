@@ -109,13 +109,25 @@ Três coisas que o worker **recusa**, de propósito:
 - **formato que o navegador não toca** — a régua é a tag `<audio>` (mp3, aac, flac, opus, wav), e
   quem decide o que o arquivo é é o ffprobe, não o `Content-Type` da origem.
 
-O worker tem três subcomandos de operação, que rodam como Job com a imagem que já está no nó:
+O worker tem quatro subcomandos de operação, que rodam como Job com a imagem que já está no nó:
 
 ```bash
 worker diag                 # grava/lê/apaga um objeto de descarte: prova a credencial
 worker cors [origem]        # imprime a política de CORS para colar no painel da Cloudflare
 worker conferir <track-id>  # objeto no bucket + URL assinada honrando Range (206)
+worker repicos [--gravar]   # remede a forma de onda de quem está sem ela
 ```
+
+`repicos` existe porque a medição chegou **depois** do acervo (migração `0004_picos.sql`): quem
+foi ingerido antes ficou com `peaks` nulo, e a PWA desenha barra lisa — que é o certo, ela não
+conhece aquele áudio. Reingerir resolveria ao custo de um UUID novo, matando os links `/t/...` já
+compartilhados e subindo de novo um arquivo que já está no bucket; o subcomando baixa o áudio do
+R2, roda o mesmo `ingest.Picos` da ingestão e atualiza **uma coluna de 200 bytes**, mantendo id,
+capa e arquivo. Sem `--gravar` é ensaio: lista o que mudaria e não escreve nada. O `UPDATE` repete
+a condição `peaks IS NULL OR peaks = ''` da listagem, para nunca passar por cima de uma medição
+que tenha entrado no meio do caminho. O manifesto do Job está em `helm/apps/ondas/jobs/repicos.yml`
+no repo `homelab`, de fora do `kustomization.yaml` de propósito — ele roda uma vez, não é estado
+desejado.
 
 A política de CORS vive em `internal/storage/r2.go` e sai em duas formas da **mesma** regra: o XML
 do S3 API e o JSON do painel. Aplicar CORS é **configuração de bucket** e exige token
