@@ -143,21 +143,6 @@ function StatusLine({ track }: { track: Track | undefined }) {
   return (
     <div className={s.status}>
       <div className={s.statusInner}>
-        {/* Em produção o indicador só reflete a rede; a simulação é ferramenta de dev. */}
-        {import.meta.env.DEV ? (
-          <button
-            type="button"
-            className={`${s.net} ${s.netToggle} ${offline ? s.netOffline : ''}`}
-            onClick={controller.toggleSimulatedOffline}
-            title="Simular queda de rede (o)"
-          >
-            ● {offline ? 'offline' : 'online'}
-          </button>
-        ) : (
-          <span className={`${s.net} ${offline ? s.netOffline : ''}`}>
-            ● {offline ? 'offline' : 'online'}
-          </span>
-        )}
         {/* O próprio nome é a porta da conta: ele já está na tela e já
             significa "você". Abrir conta daqui evita um ícone novo na barra
             de cima, e fica na zona do polegar. */}
@@ -182,6 +167,23 @@ function StatusLine({ track }: { track: Track | undefined }) {
                 {'  '}
               </span>
             ))}
+          </span>
+        )}
+        {/* Rede na ponta direita: o nome (porta da conta) abre a linha à
+            esquerda, onde o olho começa. Em produção o indicador só reflete
+            a rede; a simulação é ferramenta de dev. */}
+        {import.meta.env.DEV ? (
+          <button
+            type="button"
+            className={`${s.net} ${s.netToggle} ${offline ? s.netOffline : ''}`}
+            onClick={controller.toggleSimulatedOffline}
+            title="Simular queda de rede (o)"
+          >
+            ● {offline ? 'offline' : 'online'}
+          </button>
+        ) : (
+          <span className={`${s.net} ${offline ? s.netOffline : ''}`}>
+            ● {offline ? 'offline' : 'online'}
           </span>
         )}
       </div>
