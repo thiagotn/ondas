@@ -29,7 +29,9 @@ export function TrackArt({ sources, className }: Props) {
     <img
       src={src}
       alt=""
-      className={className}
+      // `ondas-art` é global (styles/global.css): tira a capa do caminho do
+      // ponteiro, e com isso some o menu de imagem do toque longo.
+      className={className ? `ondas-art ${className}` : 'ondas-art'}
       loading="lazy"
       decoding="async"
       onError={() => setTentativa((n) => n + 1)}

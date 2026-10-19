@@ -321,6 +321,17 @@ Decisões que valem registrar:
   remove os bytes da Cache API, reconciliando o índice com o que sobrou (sem
   isso, sair deixava o áudio do acervo privado no navegador sem tela nenhuma
   para mostrá-lo).
+- **Toque longo não vira seleção na casca.** Quase tudo aqui é alvo de toque, e
+  segurar o dedo numa linha de faixa abria o callout do iOS ou a barra de copiar
+  do Android — ruído puro. O padrão é `user-select: none` no `body`; reabilitam
+  explicitamente os campos (`input`/`textarea`, senão o navegador perde cursor e
+  menu de colar), o título e o artista do player cheio (o único texto que
+  alguém leva embora) e o toast (o plano B do compartilhar mostra o link cru lá
+  para ser copiado). O `-webkit-touch-callout` acompanha cada exceção: no iOS,
+  selecionar sem callout é selecionar sem poder copiar. **Nada de `contextmenu`
+  no JS** — seria a única forma de matar o menu de imagem do Android e mataria o
+  clique direito do desktop junto; as capas resolvem isso com
+  `pointer-events: none`, que já são decorativas (`alt=""`).
 - **Sessão de visitante é efêmera**, como no protótipo: recarregar volta ao login
   (só o login persiste). Tema, curtidas e downloads sobrevivem.
 - **Simulação de queda de rede** (`o` e o clique no `●`) existe apenas no build de

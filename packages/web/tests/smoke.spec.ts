@@ -53,7 +53,10 @@ const ACERVO = [
     artist: 'Eu Mesmo',
     genre: 'acervo',
     dur: 184,
-    art: '',
+    // Caminho relativo: `artworkSources` só reescreve host de URL absoluta do
+    // Audius, então este chega intacto ao <img>. A faixa do acervo é a única
+    // do e2e com capa, e é por ela que o toque longo na imagem é testado.
+    art: '/capa-teste.png',
     stream: '/api/acervo/11111111-1111-4111-8111-111111111111/audio',
     peaks: PICOS_METADE,
     premium: false,
@@ -106,6 +109,18 @@ async function stubApi(page: Page) {
     logado
       ? route.fulfill({ status: 200, json: { tracks: acervo } })
       : route.fulfill({ status: 401, json: { error: 'sessão expirada' } }),
+  );
+
+  // A capa da faixa do acervo: 1x1 transparente, só para existir um <img>.
+  await page.route('**/capa-teste.png', async (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    }),
   );
 
   // O `/audio` da API real devolve um 302 para a URL assinada do R2; aqui os
@@ -566,6 +581,43 @@ test('o player cabe na tela sem rolar, e a capa continua quadrada', async ({ pag
     expect(Math.abs(m.largura - m.altura), onde).toBeLessThanOrEqual(1);
     expect(m.altura, onde).toBeGreaterThan(120);
   }
+});
+
+test('toque longo: casca não seleciona, o que se copia continua copiável', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+
+  // O campo de senha é o caso que quebra quando se desliga seleção na raiz.
+  const selecao = (loc: ReturnType<Page['locator']>) =>
+    loc.evaluate((el) => {
+      const c = getComputedStyle(el);
+      return [c.userSelect, c.webkitUserSelect].find(Boolean) ?? '';
+    });
+  expect(await selecao(page.getByPlaceholder('••••'))).toBe('text');
+
+  await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
+  await page.getByPlaceholder('••••').fill('senha-forte');
+  await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
+  const linha = page.getByRole('button', { name: /^01 Fita Caseira/ });
+  await expect(linha).toBeVisible();
+
+  // Linha da lista é alvo de toque: segurar nela não pode virar seleção.
+  expect(await selecao(linha)).toBe('none');
+
+  await linha.click();
+  await page.getByRole('button', { name: 'Abrir player' }).click();
+  await expect(page.getByRole('heading', { name: 'Fita Caseira' })).toBeVisible();
+
+  // Título e artista são o texto que alguém leva embora: continuam
+  // selecionáveis — e com callout, senão no iOS dá para marcar sem copiar.
+  expect(await selecao(page.getByRole('heading', { name: 'Fita Caseira' }))).toBe('text');
+
+  // A capa sai do caminho do ponteiro: é o que tira o "Baixar imagem" do
+  // toque longo no Android, sem precisar bloquear `contextmenu` no JS (o que
+  // mataria o clique direito no desktop).
+  const capa = page.locator('.ondas-art').first();
+  await expect(capa).toBeVisible();
+  expect(await capa.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none');
 });
 
 test('busca filtra por artista e mostra a mensagem de grep vazio', async ({ page }) => {

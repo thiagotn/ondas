@@ -135,6 +135,17 @@
   font-size: 12px;
 }
 
+/* A exceção do toque longo (ver `styles/global.css`): título e artista são o
+   único texto do app que alguém quer copiar — achar a faixa em outro lugar,
+   mandar o nome por mensagem — e não são alvo de toque. O `touch-callout` tem
+   de voltar junto: no iOS, selecionar sem callout é selecionar sem copiar. */
+.infoTitle,
+.infoArtist {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 .infoTitle {
   margin: 0;
   font-size: 22px;

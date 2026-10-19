@@ -46,6 +46,41 @@ input {
   font-size: inherit;
 }
 
+/* Toque longo.
+   Num app de celular, segurar um botão que toca música não pode virar seleção
+   de texto nem menu de contexto: quase tudo aqui é alvo de toque, e o callout
+   do iOS ("Copiar · Compartilhar · Procurar") sobre uma linha de faixa é ruído
+   puro. O padrão passa a ser "não seleciona"; o texto que alguém pode querer
+   levar embora reabilita na mão, logo abaixo e no título do player cheio.
+
+   Sem `contextmenu` no JS de propósito: seria a única forma de matar o menu de
+   imagem do Android, e mataria o clique direito do desktop junto — este app
+   também é ferramenta de teclado em tela grande. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Campo é para digitar, selecionar e colar. Sem esta exceção, alguns
+   navegadores perdem o posicionamento do cursor e o menu de colar dentro do
+   input — é o bug clássico de quem desliga seleção na raiz. O `touch-callout`
+   vem junto: no iOS, selecionar sem callout é selecionar sem poder copiar. */
+input,
+textarea,
+[contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* Capa é decoração (`alt=""`), e sem eventos de ponteiro o Android não tem o
+   que oferecer no toque longo ("Baixar imagem"). De brinde, o clique na linha
+   da lista não precisa mais atravessar o thumb. */
+.ondas-art {
+  pointer-events: none;
+}
+
 input::placeholder {
   color: var(--color-neutral-600);
 }

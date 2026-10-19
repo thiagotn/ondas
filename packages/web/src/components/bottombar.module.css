@@ -12,10 +12,16 @@
   background: var(--color-bg-a, var(--color-bg));
 }
 
+/* Exceção do toque longo (ver `styles/global.css`). Quando o clipboard falha,
+   `platform/share.ts` joga o LINK no toast justamente para a pessoa copiar na
+   mão — sem esta linha, o plano B deixaria de ter saída. */
 .toastInner {
   max-width: var(--content-max);
   margin: 0 auto;
   padding: 6px 14px;
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 
 .toastMark {
