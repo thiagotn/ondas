@@ -390,7 +390,12 @@ test('o acervo aparece só logado, marcado como [meu], e some ao sair', async ({
 
   // `^01` prova que é a PRIMEIRA da lista, não só que está nela.
   await expect(page.getByRole('button', { name: /^01 Fita Caseira/ })).toBeVisible();
-  await expect(page.getByText('[meu]')).toBeVisible();
+  // O selo [meu] só existe no largo; no estreito a lista é enxuta.
+  if (page.viewportSize()!.width >= 860) {
+    await expect(page.getByText('[meu]')).toBeVisible();
+  } else {
+    await expect(page.getByText('[meu]')).toBeHidden();
+  }
   // A linha do prompt passa a admitir as duas fontes.
   await expect(page.getByText(/\+ acervo \(1\)/)).toBeVisible();
 

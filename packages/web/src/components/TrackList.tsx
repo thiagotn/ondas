@@ -26,6 +26,7 @@ export function TrackList({ rows, emptyText, loading }: TrackListProps) {
           row={row}
           showArt={wide}
           showShare={wide}
+          compact={!wide}
           onPlay={(index) => void controller.play(index)}
           onLike={controller.toggleLike}
           onDownload={(r) => void controller.download(r.track)}
