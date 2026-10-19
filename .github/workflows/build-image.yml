@@ -3,8 +3,17 @@ name: Build and push container image
 on:
   push:
     branches: [main]
+    # Nada aqui entra em imagem nenhuma: o Dockerfile da raiz copia só os
+    # manifestos e `packages/`, e os dois de Go têm contexto `api/`. Sem esta
+    # lista, um commit só de documentação reconstruía as três imagens e
+    # disparava o rollout das três — por um markdown.
+    #
+    # Atenção ao jeito como o `paths-ignore` funciona: ele pula o workflow
+    # apenas quando TODOS os arquivos do push casam. Um commit que mexe em
+    # `docs/` e em `packages/` junto continua buildando, que é o certo.
     paths-ignore:
       - 'README.md'
+      - 'docs/**'
       - '.gitignore'
       - 'design_handoff_ondas_terminal_player/**'
   workflow_dispatch:
