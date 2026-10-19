@@ -13,6 +13,12 @@ export interface TrackRowProps {
    * compartilhamento do sistema.
    */
   showShare: boolean;
+  /**
+   * Lista enxuta do estreito: some com [meu], [off] e o #acervo. O ✓ verde do
+   * botão de download já diz que a faixa está no aparelho, e o filtro/ordem
+   * do acervo já diz de quem ela é — os selos só competiam com o título.
+   */
+  compact: boolean;
   onPlay(index: number): void;
   onLike(id: string): void;
   onDownload(row: RowModel): void;
@@ -24,6 +30,7 @@ export function TrackRow({
   row,
   showArt,
   showShare,
+  compact,
   onPlay,
   onLike,
   onDownload,
@@ -53,7 +60,12 @@ export function TrackRow({
           </span>
           <span className={s.meta}>
             <span className={s.artist}>{track.artist}</span>{' '}
-            <span style={{ color: row.genreColor }}>#{track.genre}</span> {row.durLabel}
+            {!(compact && row.minha) && (
+              <>
+                <span style={{ color: row.genreColor }}>#{track.genre}</span>{' '}
+              </>
+            )}
+            {row.durLabel}
           </span>
         </span>
       </button>
@@ -61,9 +73,9 @@ export function TrackRow({
       {/* Antes de [pro] e [off]: a origem da faixa é o que o dono procura
           primeiro na linha. [meu] e [pro] nunca aparecem juntos — faixa do
           acervo vem com premium: false e o selo [pro] só existe sem sessão. */}
-      {row.minha && <span className={`${s.tag} ${s.tagMeu}`}>[meu]</span>}
+      {row.minha && !compact && <span className={`${s.tag} ${s.tagMeu}`}>[meu]</span>}
       {row.locked && <span className={`${s.tag} ${s.tagPro}`}>[pro]</span>}
-      {row.cached && <span className={`${s.tag} ${s.tagOff}`}>[off]</span>}
+      {row.cached && !compact && <span className={`${s.tag} ${s.tagOff}`}>[off]</span>}
       {row.dlLabel && <span className={`${s.tag} ${s.tagDl}`}>[{row.dlLabel}]</span>}
 
       <button
