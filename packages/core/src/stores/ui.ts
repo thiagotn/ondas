@@ -34,6 +34,16 @@ export interface UiState {
   playerOpen: boolean;
   pickerOpen: boolean;
   pickIdx: number;
+  /** Linha de comando do prompt aberta (`:`). */
+  cmdOpen: boolean;
+  /**
+   * Linha marcada na lista, por ID.
+   *
+   * ID e não índice: entrar na conta põe o acervo na frente da lista e desloca
+   * todo índice (ver `comCatalogoProprio`/`setTracks`). Um cursor por posição
+   * passaria a apontar para outra faixa depois do login.
+   */
+  cursorId: string | null;
   /** Simulação de queda de rede — só habilitada em build de dev. */
   simulatedOffline: boolean;
   /** Transparência do fundo (0,3–1). Em 1 o app fica idêntico ao opaco. */
@@ -55,6 +65,8 @@ export interface UiState {
   openPicker(index: number): void;
   closePicker(): void;
   setPickIdx(index: number): void;
+  setCmdOpen(open: boolean): void;
+  setCursor(id: string | null): void;
   setSimulatedOffline(value: boolean): void;
   setOpacity(value: number): void;
   setBlur(value: number): void;
@@ -79,6 +91,8 @@ export function createUiStore(initial?: { themeId?: ThemeId; tab?: TabId; opacit
     playerOpen: false,
     pickerOpen: false,
     pickIdx: 0,
+    cmdOpen: false,
+    cursorId: null,
     simulatedOffline: false,
     opacity: clamp(initial?.opacity ?? OPACITY_MAX, OPACITY_MIN, OPACITY_MAX),
     blur: 16,
@@ -104,6 +118,8 @@ export function createUiStore(initial?: { themeId?: ThemeId; tab?: TabId; opacit
     openPicker: (pickIdx) => set({ pickerOpen: true, pickIdx }),
     closePicker: () => set({ pickerOpen: false }),
     setPickIdx: (pickIdx) => set({ pickIdx }),
+    setCmdOpen: (cmdOpen) => set({ cmdOpen }),
+    setCursor: (cursorId) => set({ cursorId }),
     setSimulatedOffline: (simulatedOffline) => set({ simulatedOffline }),
     setOpacity: (value) => set({ opacity: clamp(value, OPACITY_MIN, OPACITY_MAX) }),
     setBlur: (value) => set({ blur: clamp(Math.round(value), 0, BLUR_MAX) }),

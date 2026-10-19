@@ -18,6 +18,18 @@
   background: var(--color-accent-900);
 }
 
+/* Linha marcada por `j`/`k` ou `:08`. Barra à esquerda, e não um `▸` na calha:
+   a calha tem `width: 3ch` e mostra o número da faixa, então um glifo ali
+   empurraria a lista inteira. A barra mora nos 8px de sangria que a linha já
+   tem (`margin: 0 -8px`), sem deslocar nada. */
+.rowCursor {
+  box-shadow: inset 2px 0 0 0 var(--color-accent);
+}
+
+.rowCursor:not(.rowCurrent) {
+  background: var(--color-neutral-900);
+}
+
 /* Faixa fora de alcance (offline e não baixada). */
 .rowUnavailable {
   opacity: 0.4;

@@ -4,19 +4,25 @@ import { useNavigate } from 'react-router-dom';
 import * as controller from '../app/controller';
 import { playerStore, uiStore } from '../app/stores';
 import { applyTheme } from '../theme/applyTheme';
+import { cmdInputRef } from './cmdInputRef';
 import { useAccountOverlay } from './useAccountOverlay';
+import { useHelpOverlay } from './useHelpOverlay';
 import { usePlayerOverlay } from './usePlayerOverlay';
 import { useTabNavigation } from './useTabNavigation';
 
 /**
  * Atalhos globais, com os mesmos bindings do handoff. Ignorados enquanto o foco
  * está num input — exceto Esc, que sai do campo e fecha overlays.
+ *
+ * A lista que a pessoa lê — na janela `ondas --help` e na legenda do rodapé —
+ * vem de `shortcuts.ts`, no core. Tecla nova aqui pede linha nova lá.
  */
 export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): void {
   const navigate = useNavigate();
   const { goToTab } = useTabNavigation();
   const { openPlayer, closePlayer, isPlayerOpen } = usePlayerOverlay();
-  const { isAccountOpen, closeAccount } = useAccountOverlay();
+  const { isAccountOpen, openAccount, closeAccount } = useAccountOverlay();
+  const { isHelpOpen, openHelp, closeHelp } = useHelpOverlay();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -27,7 +33,7 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
 
       // Theme picker captura o teclado enquanto está aberto.
       if (ui.pickerOpen) {
-        if (k === 'Escape') {
+        if (k === 'Escape' || k === 't' || k === '4') {
           applyTheme(ui.themeId, ui.opacity);
           ui.closePicker();
         } else if (k === 'j' || k === 'ArrowDown' || k === 'k' || k === 'ArrowUp') {
@@ -47,7 +53,8 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
         if (typing) target?.blur();
         // Um Esc fecha UMA camada, a de cima: com conta aberta sobre o player,
         // fechar os dois de uma vez tiraria da tela algo que não se pediu.
-        if (isAccountOpen) closeAccount();
+        if (isHelpOpen) closeHelp();
+        else if (isAccountOpen) closeAccount();
         else if (isPlayerOpen) closePlayer();
         ui.closeGate();
         return;
@@ -59,6 +66,23 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
         ui.closeGate();
         if (isPlayerOpen) closePlayer();
         navigate('/login');
+        return;
+      }
+
+      // Com um overlay por cima, a lista não está na tela: andar com um cursor
+      // invisível deixaria o Enter tocando algo que ninguém viu.
+      const naLista = !isPlayerOpen && !isAccountOpen && !isHelpOpen;
+      const janelaDeAtalhos = () => (isHelpOpen ? closeHelp() : openHelp());
+
+      // Enter fica FORA do mapa de ações: lá o `preventDefault` é incondicional,
+      // e num botão ou link focado ele cancelaria o clique do próprio elemento
+      // — a tecla de ativar deixaria de ativar. Aqui só age quando é a lista
+      // que está na tela e o foco não é de ninguém.
+      if (k === 'Enter') {
+        const tag = target?.tagName;
+        if (!naLista || tag === 'BUTTON' || tag === 'A') return;
+        e.preventDefault();
+        controller.tocarCursor();
         return;
       }
 
@@ -75,13 +99,35 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
         r: () => playerStore.getState().toggleRepeat(),
         t: () => ui.openPicker(themeIndex(ui.themeId)),
         f: () => (isPlayerOpen ? closePlayer() : playerStore.getState().cur >= 0 && openPlayer()),
+        j: () => naLista && controller.moverCursor(1),
+        k: () => naLista && controller.moverCursor(-1),
+        // `0` é "a de agora", os outros dígitos são lugares. Faz o mesmo que o
+        // `f` do handoff, que fica valendo sem ser anunciado.
+        '0': () =>
+          isPlayerOpen ? closePlayer() : playerStore.getState().cur >= 0 && openPlayer(),
         '1': () => goToTab('home'),
         '2': () => goToTab('search'),
         '3': () => goToTab('library'),
+        // Alternar, não só abrir: `show()` empilha histórico, e abrir o que já
+        // está aberto deixaria um "voltar" que não volta nada.
+        '4': () => ui.openPicker(themeIndex(ui.themeId)),
+        '5': () => (isAccountOpen ? closeAccount() : openAccount()),
+        '6': janelaDeAtalhos,
+        '?': janelaDeAtalhos,
         '/': () => {
           goToTab('search');
           if (isPlayerOpen) closePlayer();
           setTimeout(() => searchInput.current?.focus(), 30);
+        },
+        // A linha de comando é um input de verdade, então o guarda `typing`
+        // desliga todo o resto enquanto se digita — inclusive os dígitos, que
+        // senão trocariam de aba no meio do `:12`.
+        ':': () => {
+          if (isHelpOpen) closeHelp();
+          if (isAccountOpen) closeAccount();
+          if (isPlayerOpen) closePlayer();
+          ui.setCmdOpen(true);
+          setTimeout(() => cmdInputRef.current?.focus(), 30);
         },
       };
       // A simulação de queda de rede só existe no build de dev.
@@ -96,5 +142,18 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [closeAccount, closePlayer, goToTab, isAccountOpen, isPlayerOpen, navigate, openPlayer, searchInput]);
+  }, [
+    closeAccount,
+    closeHelp,
+    closePlayer,
+    goToTab,
+    isAccountOpen,
+    isHelpOpen,
+    isPlayerOpen,
+    navigate,
+    openAccount,
+    openHelp,
+    openPlayer,
+    searchInput,
+  ]);
 }

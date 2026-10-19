@@ -22,9 +22,11 @@ export function useTabNavigation() {
 
   const goToTab = useCallback(
     (next: TabId) => {
-      // Trocar de aba fecha o full player, mantendo o resto da query.
+      // Trocar de aba fecha os overlays, mantendo o resto da query: sem isto
+      // apertar `1` com a janela de atalhos aberta trocava de aba e deixava o
+      // overlay colado na tela, com `?atalhos=1` no endereço.
       const params = new URLSearchParams(search);
-      params.delete('player');
+      for (const overlay of ['player', 'conta', 'atalhos']) params.delete(overlay);
       const qs = params.toString();
       navigate(TAB_PATHS[next] + (qs ? '?' + qs : ''));
     },

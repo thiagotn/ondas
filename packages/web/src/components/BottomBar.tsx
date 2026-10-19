@@ -1,6 +1,7 @@
 import {
   bufferShortLabel,
   fmtTime,
+  LEGENDA,
   playerMode,
   userTag,
   type Track,
@@ -15,17 +16,6 @@ import { useWide } from '../hooks/useWide';
 import s from './bottombar.module.css';
 import { CassetteLogo } from './CassetteLogo';
 import { Waveform } from './Waveform';
-
-const LEGEND: [string, string][] = [
-  ['␣', 'play'],
-  ['n/p', 'faixa'],
-  ['←/→', '±10s'],
-  ['/', 'buscar'],
-  ['l', 'curtir'],
-  ['d', 'offline'],
-  ['t', 'tema'],
-  ['o', 'rede'],
-];
 
 /** Toast → linha do player → status line. */
 export function BottomBar({ track }: { track: Track | undefined }) {
@@ -161,7 +151,7 @@ function StatusLine({ track }: { track: Track | undefined }) {
         <span className={s.spacer} />
         {wide && (
           <span>
-            {LEGEND.map(([key, label]) => (
+            {LEGENDA.map(([key, label]) => (
               <span key={key}>
                 <span className={s.legendKey}>{key}</span> {label}
                 {'  '}

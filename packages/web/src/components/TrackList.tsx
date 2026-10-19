@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import * as controller from '../app/controller';
 import { compartilhar } from '../platform/share';
 import type { RowModel } from '../hooks/useTrackRows';
@@ -14,6 +15,14 @@ export interface TrackListProps {
 
 export function TrackList({ rows, emptyText, loading }: TrackListProps) {
   const wide = useWide();
+
+  // `j`/`k` andam pelo que está na tela, e isto é o único lugar que sabe o que
+  // está na tela: `controller.tracks` é a lista completa, e em `--curtidas` ou
+  // na busca o recorte é um filtro esparso dela. Mesmo padrão do `setTracks`
+  // no `AppLayout`, um nível abaixo.
+  useEffect(() => {
+    controller.setVisible(rows.map((r) => r.track.id));
+  }, [rows]);
 
   if (loading) return <div className={s.loading}>⠋ carregando metadados…</div>;
   if (!rows.length) return <div className={s.empty}>{emptyText}</div>;

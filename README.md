@@ -321,8 +321,42 @@ Decisões que valem registrar:
   muda. Abaixo de ~570px de altura a capa bate no piso de 120px e a tela volta a
   rolar, que é o comportamento honesto.
 - **Full player é uma rota** (`?player=1`), então o botão voltar o fecha. Conta e
-  aparelho são o segundo overlay nesse molde (`?conta=1`); os dois saem do mesmo
-  `useOverlayParam`.
+  aparelho (`?conta=1`) e a janela de atalhos (`?atalhos=1`) são o segundo e o
+  terceiro overlay nesse molde; os três saem do mesmo `useOverlayParam`, e
+  trocar de aba limpa os três da query — antes o overlay ficava colado na tela
+  depois de um `1`.
+- **A fileira de dígitos cobre as telas, e `0` é "a de agora".** `1`/`2`/`3` são
+  as abas, `4` o tema, `5` a conta, `6` (ou `?`) os atalhos, e `0` abre os
+  detalhes do que está tocando — o mesmo que o `f` do handoff, que continua
+  valendo sem ser anunciado. Os que abrem overlay **alternam**, porque `show()`
+  empilha histórico e abrir o que já está aberto deixaria um "voltar" que não
+  volta nada.
+- **A lista de atalhos tem um dono só** (`core/src/shortcuts.ts`). Ela estava
+  espalhada por quatro lugares que já tinham divergido: a legenda do rodapé
+  anunciava `o` em produção, onde a tecla só existe sob `import.meta.env.DEV`, e
+  não anunciava `f`, `s`, `r` nem os dígitos. Agora a janela `ondas --help` e a
+  status line leem a mesma tabela, o grupo `dev` sai inteiro fora do dev, e a
+  legenda pôde encurtar — o que não cabe nela está a um `?` de distância.
+- **O prompt deixou de ser enfeite: `:08` leva à faixa 08.** O cabeçalho já
+  desenhava `❯ ondas trending --genero=tudo` com cursor piscando, e o `:` troca
+  aquilo por um `<input>` de verdade. Input, e não teclas lidas do handler
+  global, porque o guarda `typing` do `useShortcuts` já desliga todos os atalhos
+  enquanto se digita — sem ele, `:12` trocaria de aba no `1`.
+- **O número é o da calha, que é posição no catálogo INTEIRO** (`useTrackRows`
+  numera pela lista completa, não pelo recorte da aba). Por isso `:08` significa
+  a mesma faixa em qualquer tela — e por isso, quando ela não apareceria no
+  recorte atual, o comando leva para `~/em-alta`, que é a lista onde os números
+  são contíguos. O chip de gênero só é zerado quando é ele que esconde a faixa.
+- **O cursor da lista guarda `id`, nunca índice.** Entrar na conta põe o acervo
+  na frente e desloca todo número; um cursor por posição passaria a apontar para
+  outra faixa depois do login. Mesma lição do `curId` e do `indexOfTrack`.
+- **`j`/`k` andam pelo que está na tela**, e é o `TrackList` que diz ao
+  controller quais linhas são essas — ele é o único lugar que sabe. Sem esse
+  fio, `j` em `~/biblioteca --curtidas` pularia para vizinhos do catálogo que
+  não estão na lista. Com overlay aberto as duas teclas não fazem nada: a lista
+  não está na tela, e mover um cursor invisível deixaria o `enter` tocando algo
+  que ninguém viu. A marca é uma barra à esquerda, e não um `▸` na calha, que
+  tem `3ch` e já mostra o número.
 - **Conta e biblioteca são telas diferentes porque são coisas diferentes.** A
   conta vive no servidor e te segue para qualquer aparelho; `buffer`, curtidas e
   downloads vivem no IndexedDB **deste navegador** e não seguem ninguém. Os dois

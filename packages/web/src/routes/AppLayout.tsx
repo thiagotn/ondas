@@ -8,11 +8,13 @@ import { AccountOverlay } from '../components/AccountOverlay';
 import { BottomBar } from '../components/BottomBar';
 import { FullPlayer } from '../components/FullPlayer';
 import { Gate } from '../components/Gate';
+import { HelpOverlay } from '../components/HelpOverlay';
 import { TabBar } from '../components/TabBar';
 import s from '../components/shell.module.css';
 import { searchInputRef } from '../hooks/searchInputRef';
 import { useCurrentTrack } from '../hooks/useCurrentTrack';
 import { useAccountOverlay } from '../hooks/useAccountOverlay';
+import { useHelpOverlay } from '../hooks/useHelpOverlay';
 import { usePlayerOverlay } from '../hooks/usePlayerOverlay';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useCatalog } from '../query/catalog';
@@ -28,6 +30,7 @@ export function AppLayout() {
   const guest = useGuestMode((st) => st.guest);
   const gate = useUi((st) => st.gate);
   const { isPlayerOpen } = usePlayerOverlay();
+  const { isHelpOpen } = useHelpOverlay();
   const { isAccountOpen } = useAccountOverlay();
   const { pathname } = useLocation();
 
@@ -71,6 +74,9 @@ export function AppLayout() {
       {isPlayerOpen && current && <FullPlayer track={current} />}
       {/* Depois do player: aberto por cima dele quando os dois estão na URL. */}
       {isAccountOpen && <AccountOverlay />}
+      {/* Por cima de tudo: é referência passageira, quem abre quer fechar em
+          seguida — e é a primeira camada que o Esc tira. */}
+      {isHelpOpen && <HelpOverlay />}
       {gate && <Gate gate={gate} />}
     </div>
   );

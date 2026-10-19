@@ -8,7 +8,7 @@ import {
   type Track,
 } from '@ondas/core';
 import { useMemo } from 'react';
-import { useLibrary, usePlayer, useSession } from '../app/stores';
+import { useLibrary, usePlayer, useSession, useUi } from '../app/stores';
 import { useNetwork } from './useNetwork';
 
 export interface RowModel {
@@ -18,6 +18,8 @@ export interface RowModel {
   /** `01`, `02`… ou `▶`/`‖` na faixa atual. */
   idx: string;
   isCurrent: boolean;
+  /** Linha marcada pelo cursor (`j`/`k`, `:08`) — não é a que está tocando. */
+  isCursor: boolean;
   locked: boolean;
   cached: boolean;
   liked: boolean;
@@ -40,6 +42,7 @@ export function useTrackRows(visible: readonly Track[], all: readonly Track[]): 
   const session = useSession((s) => s.user);
   const { liked, cached, dl } = useLibrary((s) => s);
   const { cur, playing } = usePlayer((s) => s);
+  const cursorId = useUi((s) => s.cursorId);
   const { offline } = useNetwork();
 
   return useMemo(() => {
@@ -57,6 +60,7 @@ export function useTrackRows(visible: readonly Track[], all: readonly Track[]): 
         index,
         idx: isCurrent ? (playing ? '▶' : '‖') : String(index + 1).padStart(2, '0'),
         isCurrent,
+        isCursor: track.id === cursorId,
         locked: isLocked(track, index, session),
         cached: isCached,
         liked: !!liked[track.id],
@@ -68,5 +72,5 @@ export function useTrackRows(visible: readonly Track[], all: readonly Track[]): 
         minha: track.source === 'acervo',
       };
     });
-  }, [all, cached, cur, dl, liked, offline, playing, session, visible]);
+  }, [all, cached, cur, cursorId, dl, liked, offline, playing, session, visible]);
 }

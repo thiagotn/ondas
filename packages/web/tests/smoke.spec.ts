@@ -1157,3 +1157,208 @@ test('compartilhar entrega o link da faixa', async ({ page, context }) => {
   const copiado = await page.evaluate(() => navigator.clipboard.readText());
   expect(copiado).toContain(LINK_DEMO);
 });
+
+/** Entra como visitante em `~/em-alta`, que é onde os atalhos fazem sentido. */
+async function entrarVisitante(page: Page) {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+  await expect(page.getByRole('button', { name: /Maré Baixa/ })).toBeVisible();
+}
+
+/** A linha marcada pelo cursor — `aria-current="true"` só existe nela. */
+function cursor(page: Page) {
+  return page.locator('[aria-current="true"]');
+}
+
+/** Se o elemento está inteiro dentro da janela de rolagem. */
+function naTela(alvo: ReturnType<Page['locator']>) {
+  return alvo.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return r.top >= 0 && r.bottom <= window.innerHeight;
+  });
+}
+
+test('os dígitos abrem as cinco telas, e a janela de atalhos se explica', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+
+  const temas = page.getByRole('dialog', { name: 'ondas +list-themes' });
+  await page.keyboard.press('4');
+  await expect(temas).toBeVisible();
+  // O picker engole o teclado; antes só o Esc o fechava.
+  await page.keyboard.press('4');
+  await expect(temas).toBeHidden();
+
+  const conta = page.getByRole('dialog', { name: 'ondas whoami' });
+  await page.keyboard.press('5');
+  await expect(conta).toBeVisible();
+  await expect(page).toHaveURL(/conta=1/);
+  // Alternar, e não abrir de novo: `show()` empilharia um "voltar" vazio.
+  await page.keyboard.press('5');
+  await expect(conta).toBeHidden();
+  await expect(page).not.toHaveURL(/conta=1/);
+
+  const ajuda = page.getByRole('dialog', { name: 'ondas --help' });
+  await page.keyboard.press('?');
+  await expect(ajuda).toBeVisible();
+  await expect(ajuda.getByText('tocar ou pausar')).toBeVisible();
+  await expect(ajuda.getByText('ir para a faixa pelo número da calha')).toBeVisible();
+  // A janela se lista: sem isto, quem a abre não sabe como voltar nela.
+  await expect(ajuda.getByText('? ou 6', { exact: true })).toBeVisible();
+  // O e2e roda o build de produção, onde o atalho de rede não existe — e a
+  // tabela do core é quem tira o grupo `dev` da lista.
+  await expect(ajuda.getByText('simular queda de rede')).toBeHidden();
+
+  await page.keyboard.press('6');
+  await expect(ajuda).toBeHidden();
+  await page.keyboard.press('?');
+  await expect(ajuda).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(ajuda).toBeHidden();
+
+  // Trocar de aba leva o overlay embora; antes ele ficava colado com
+  // `?atalhos=1` no endereço.
+  await page.keyboard.press('?');
+  await expect(ajuda).toBeVisible();
+  await page.keyboard.press('3');
+  await expect(page).toHaveURL(/biblioteca/);
+  await expect(page).not.toHaveURL(/atalhos=1/);
+  await expect(ajuda).toBeHidden();
+
+  // `0` são os detalhes do que está tocando — o mesmo que o `f` do handoff.
+  await page.keyboard.press('1');
+  await page.getByRole('button', { name: /Maré Baixa/ }).click();
+  await page.keyboard.press('0');
+  await expect(page).toHaveURL(/player=1/);
+  await expect(page.getByText('agora-tocando — #ambient')).toBeVisible();
+  await page.keyboard.press('0');
+  await expect(page).not.toHaveURL(/player=1/);
+});
+
+test('j/k andam o cursor, enter toca e `:nº` salta pela calha', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+
+  await page.keyboard.press('j');
+  await expect(cursor(page)).toContainText('Maré Baixa');
+  await page.keyboard.press('j');
+  await expect(cursor(page)).toContainText('Concreto Molhado');
+  await page.keyboard.press('k');
+  await expect(cursor(page)).toContainText('Maré Baixa');
+  // No topo o `k` fica no topo: no vim ele não dá a volta para o fim.
+  await page.keyboard.press('k');
+  await expect(cursor(page)).toContainText('Maré Baixa');
+
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Maré Baixa — Lia Sombra')).toBeVisible();
+
+  // `:04` → 'Fio de Cobre'. 04 e não 03 porque o selo [pro] é posicional no
+  // catálogo demo e a 03 abriria o gate em vez de tocar.
+  await page.keyboard.press(':');
+  await page.getByLabel('Ir para a faixa pelo número').fill('04');
+  await page.keyboard.press('Enter');
+  await expect(cursor(page)).toContainText('Fio de Cobre');
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Fio de Cobre — Bruma')).toBeVisible();
+
+  // Marcar não serve de nada se a linha estiver fora da janela de rolagem.
+  // Aperta a altura de propósito: nos 12 do catálogo demo a lista inteira cabe
+  // na tela cheia, e aí o salto não provaria nada.
+  const janela = page.viewportSize()!;
+  await page.setViewportSize({ width: janela.width, height: 320 });
+  const ultima = page.getByRole('button', { name: /Fim de Turno/ });
+  expect(await naTela(ultima)).toBe(false);
+  await page.keyboard.press(':');
+  await page.getByLabel('Ir para a faixa pelo número').fill('12');
+  await page.keyboard.press('Enter');
+  await expect(cursor(page)).toContainText('Fim de Turno');
+  expect(await naTela(cursor(page))).toBe(true);
+  await page.setViewportSize(janela);
+
+  // Número que não existe avisa, em vez de não fazer nada em silêncio.
+  await page.keyboard.press(':');
+  await page.getByLabel('Ir para a faixa pelo número').fill('99');
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('faixa 99 não existe')).toBeVisible();
+
+  // Com o overlay por cima a lista não está na tela, e o cursor não anda —
+  // senão o Enter tocaria algo que ninguém viu. Marca a 01 primeiro: no fim da
+  // lista o `j` já pararia por causa do limite, e o teste não provaria nada.
+  await page.keyboard.press(':');
+  await page.getByLabel('Ir para a faixa pelo número').fill('01');
+  await page.keyboard.press('Enter');
+  await expect(cursor(page)).toContainText('Maré Baixa');
+  await page.keyboard.press('5');
+  await expect(page.getByRole('dialog', { name: 'ondas whoami' })).toBeVisible();
+  await page.keyboard.press('j');
+  await page.keyboard.press('j');
+  await page.keyboard.press('Escape');
+  await expect(cursor(page)).toContainText('Maré Baixa');
+});
+
+test('enter num botão focado ativa o botão, e não a linha marcada', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+
+  await page.keyboard.press(':');
+  await page.getByLabel('Ir para a faixa pelo número').fill('04');
+  await page.keyboard.press('Enter');
+  await expect(cursor(page)).toContainText('Fio de Cobre');
+
+  // Enter é A tecla de ativar: num botão focado ele tem de clicar o botão. Se o
+  // atalho do cursor desse `preventDefault` aqui, a tecla deixaria de ativar
+  // qualquer botão do app — e quem navega por teclado ficaria sem saída.
+  await page.getByRole('button', { name: /Maré Baixa/ }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Maré Baixa — Lia Sombra')).toBeVisible();
+  // E a marca não se mexeu: quem mandou foi o foco, não o cursor.
+  await expect(cursor(page)).toContainText('Fio de Cobre');
+});
+
+test('`:nº` digita sem acionar atalho, e traz a faixa para uma lista onde ela aparece', async ({
+  page,
+}) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+
+  await page.keyboard.press('3');
+  await expect(page).toHaveURL(/biblioteca/);
+
+  // Digitar `1` dentro do comando NÃO troca de aba: o campo é um input de
+  // verdade, e o guarda `typing` do useShortcuts desliga os atalhos.
+  await page.keyboard.press(':');
+  await page.getByLabel('Ir para a faixa pelo número').fill('1');
+  await expect(page).toHaveURL(/biblioteca/);
+
+  // Confirmar leva para `~/em-alta`: o número é posição no catálogo inteiro, e
+  // na biblioteca a faixa 01 pode nem estar na lista.
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/$|\/\?/);
+  await expect(cursor(page)).toContainText('Maré Baixa');
+});
+
+test('o cursor anda pelas linhas da tela, não pelos vizinhos do catálogo', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+
+  // Curte a 01 e a 05 — números de propósito não vizinhos.
+  await page
+    .getByRole('button', { name: /Maré Baixa/ })
+    .locator('xpath=../button[@aria-label="Curtir"]')
+    .click();
+  await page
+    .getByRole('button', { name: /Último Trem/ })
+    .locator('xpath=../button[@aria-label="Curtir"]')
+    .click();
+
+  await page.keyboard.press('3');
+  await expect(page.getByRole('button', { name: /Último Trem/ })).toBeVisible();
+
+  // Na biblioteca a tela tem duas linhas, `01` e `05`. Se o cursor andasse na
+  // lista completa, o segundo `j` cairia na 02 — que não está aqui.
+  await page.keyboard.press('j');
+  await expect(cursor(page)).toContainText('Maré Baixa');
+  await page.keyboard.press('j');
+  await expect(cursor(page)).toContainText('Último Trem');
+});

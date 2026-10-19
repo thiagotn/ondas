@@ -54,7 +54,7 @@ export function TabBar() {
         {wide && <span className={s.spacer} />}
         <button
           type="button"
-          title="Tema (t)"
+          title="Tema (t ou 4)"
           aria-label="Trocar tema"
           className={s.palette}
           onClick={() => uiStore.getState().openPicker(themeIndex(themeId))}

@@ -200,6 +200,35 @@
   animation: blink 1.1s steps(1) infinite;
 }
 
+/* ── linha de comando (`:`) ────────────────────────────────────── */
+
+.cmdLinha {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.cmdDoisPontos {
+  color: var(--color-accent);
+}
+
+/* Parece a continuação do prompt, não um formulário: sem borda, sem fundo, com
+   o caret do próprio navegador no lugar do cursor piscando de CSS.
+   Largura do conteúdo, e não `flex: 1`: o campo aceita três dígitos, e esticado
+   até a borda o anel de foco do app virava uma caixa atravessando a tela. */
+.cmdInput {
+  width: 11ch;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  padding: 0;
+}
+
+.cmdInput::placeholder {
+  color: var(--color-neutral-700);
+}
+
 .comment {
   color: var(--color-neutral-500);
 }

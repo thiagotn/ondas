@@ -1,4 +1,5 @@
 import { CheckCircle, DownloadSimple, Heart, ShareNetwork } from '@phosphor-icons/react';
+import { useEffect, useRef } from 'react';
 import type { RowModel } from '../hooks/useTrackRows';
 import s from './row.module.css';
 import { TrackArt } from './TrackArt';
@@ -40,13 +41,22 @@ export function TrackRow({
   const className = [
     s.row,
     row.isCurrent ? s.rowCurrent : '',
+    row.isCursor ? s.rowCursor : '',
     row.unavailable ? s.rowUnavailable : '',
   ]
     .filter(Boolean)
     .join(' ');
 
+  // `:08` pode marcar uma linha fora da janela de rolagem, e aí a marca não
+  // serviria de nada. `nearest` para `j` descendo não recentralizar a lista a
+  // cada tecla.
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (row.isCursor) ref.current?.scrollIntoView({ block: 'nearest' });
+  }, [row.isCursor]);
+
   return (
-    <div className={className}>
+    <div ref={ref} className={className} aria-current={row.isCursor ? 'true' : undefined}>
       <button type="button" className={s.main} onClick={() => onPlay(row.index)}>
         <span className={row.isCurrent ? `${s.idx} ${s.idxCurrent}` : s.idx}>{row.idx}</span>
         {showArt && (

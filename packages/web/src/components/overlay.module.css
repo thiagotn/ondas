@@ -585,7 +585,10 @@
 
 /* `margin-top` compensa o rótulo e o [fechar], que sentam FORA da borda em
    `top: -10px`/`-14px`: sem ele os dois seriam cortados pelo backdrop. */
-.conta {
+/* A janela de atalhos usa a mesma caixa da conta — é o mesmo tipo de painel,
+   e um terceiro nome só para repetir dez linhas de borda não ajudaria. */
+.conta,
+.atalhos {
   position: relative;
   width: 100%;
   max-width: 520px;
@@ -599,7 +602,8 @@
 
 /* A rolagem fica AQUI dentro, e não na caixa: o rótulo e o [fechar] sentam
    fora da borda (`top: -10px`), e `overflow` na caixa os decepa. */
-.contaCorpo {
+.contaCorpo,
+.atalhosCorpo {
   max-height: calc(100vh - 80px);
   overflow-y: auto;
   display: flex;
@@ -626,4 +630,44 @@
 
 .contaConfirma {
   color: var(--ansi-3);
+}
+
+/* ── ondas --help ─────────────────────────────────────────────── */
+
+/* Mais folga que no painel de conta: aqui os grupos precisam se separar. */
+.atalhosCorpo {
+  gap: 14px;
+}
+
+.atalhosSecao {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atalhosLista {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Calha fixa para as teclas: `? ou 6` é a mais larga, e sem a coluna firme as
+   ações sairiam em degrau. */
+.atalhosLinha {
+  display: grid;
+  grid-template-columns: 7ch 1fr;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.atalhosTecla {
+  color: var(--color-accent);
+}
+
+.atalhosAcao {
+  margin: 0;
+  color: var(--color-neutral-400);
+  font-size: 13px;
+  text-wrap: pretty;
 }

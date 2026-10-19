@@ -1,4 +1,5 @@
 import {
+  faixaPorNumero,
   firstPlayable,
   fmtMB,
   indexOfTrack,
@@ -128,6 +129,61 @@ export function togglePlay(): void {
 export function step(dir: 1 | -1): void {
   const next = stepIndex(queueContext(), dir);
   if (next >= 0) void play(next);
+}
+
+/** Ids das linhas que estão na tela, em ordem. */
+let visiveis: readonly string[] = [];
+
+/**
+ * O recorte visível, empurrado pelo `TrackList`.
+ *
+ * `tracks` é a lista completa; `j`/`k` precisam andar pelo que a pessoa vê, e
+ * em `--curtidas` ou na busca isso é um filtro esparso dela. Sem este fio o
+ * cursor pularia para faixas fora da tela.
+ */
+export function setVisible(ids: readonly string[]): void {
+  visiveis = ids;
+}
+
+/**
+ * Marca a faixa pelo número da calha (`:08`). Devolve-a, ou `undefined` com um
+ * toast quando aquele número não existe.
+ */
+export function irParaFaixa(numero: number): Track | undefined {
+  const track = faixaPorNumero(tracks, numero);
+  const ui = uiStore.getState();
+  if (!track) {
+    ui.flash('faixa ' + numero + ' não existe');
+    return undefined;
+  }
+  ui.setCursor(track.id);
+  return track;
+}
+
+/**
+ * Anda o cursor na lista visível, sem dar a volta: `k` no topo fica no topo,
+ * como no vim.
+ *
+ * Sem cursor — ou com um cursor que saiu do recorte, ao trocar o gênero —
+ * começa na faixa que está tocando, se ela estiver na tela, e senão na
+ * primeira linha.
+ */
+export function moverCursor(dir: 1 | -1): void {
+  if (!visiveis.length) return;
+  const ui = uiStore.getState();
+  const atual = ui.cursorId ? visiveis.indexOf(ui.cursorId) : -1;
+  if (atual < 0) {
+    const tocando = visiveis.indexOf(playerStore.getState().curId ?? '');
+    ui.setCursor(visiveis[Math.max(0, tocando)] ?? null);
+    return;
+  }
+  ui.setCursor(visiveis[Math.min(visiveis.length - 1, Math.max(0, atual + dir))] ?? null);
+}
+
+/** Toca a linha marcada. Resolve por id — índice guardado envelhece. */
+export function tocarCursor(): void {
+  const index = indexOfTrack(tracks, uiStore.getState().cursorId);
+  if (index >= 0) void play(index);
 }
 
 /** Seek por fração da duração (clique na waveform). */
