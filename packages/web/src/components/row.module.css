@@ -71,12 +71,15 @@
   background: var(--color-surface);
 }
 
+/* Sem `image-rendering: pixelated`: a capa chega com 150px e é desenhada em
+   36px, e em redução vizinho-mais-próximo não pixeliza — ele sorteia um pixel
+   a cada ~17 e descarta o resto. O serrilhado que isso dava era ruído de
+   aliasing, não pixel art, e piorava quanto maior fosse a original. */
 .thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
-  image-rendering: pixelated;
 }
 
 .lines {

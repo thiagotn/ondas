@@ -97,9 +97,9 @@
   background: var(--color-surface);
 }
 
-/* Sem `image-rendering: pixelated` aqui, ao contrário do thumb da lista: no
-   thumb de 40px o serrilhado é a estética; nos 400px do player ele é só a capa
-   reamostrada por vizinho-mais-próximo, que foi parte da queixa de nitidez. */
+/* Sem `image-rendering: pixelated` aqui nem no thumb da lista: nos dois a capa
+   é REDUZIDA, e em redução vizinho-mais-próximo sorteia um pixel por bloco em
+   vez de tirar a média — foi o que gerou a queixa de nitidez. */
 .cover img {
   width: 100%;
   height: 100%;
