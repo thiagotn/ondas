@@ -14,10 +14,6 @@
   /* `line-height` sobra do botão: sem isto o <svg> inline ganha uns pixels
      embaixo e a barra desalinha do tempo ao lado. */
   line-height: 0;
-  /* O Chrome no Android pinta a caixa INTEIRA do botão ao tocar. Num keycap
-     de 44px isso passa por retorno de toque; aqui vira um retângulo cinza
-     sobre a forma de onda toda. O retorno já é o cursor seguindo o dedo. */
-  -webkit-tap-highlight-color: transparent;
   /* `pan-y` e não `none`: o gesto vertical continua rolando a página (a barra
      atravessa a tela e seria uma faixa morta para rolar), e o horizontal é
      nosso — é assim que o arrasto funciona no toque. Quando o navegador

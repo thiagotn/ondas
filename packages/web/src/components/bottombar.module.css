@@ -224,7 +224,6 @@
   color: inherit;
   font: inherit;
   cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
 }
 
 .quem:hover {

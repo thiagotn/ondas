@@ -176,7 +176,6 @@
   cursor: pointer;
   text-decoration: underline dotted var(--color-neutral-700);
   text-underline-offset: 4px;
-  -webkit-tap-highlight-color: transparent;
 }
 
 .whoBotao:hover {

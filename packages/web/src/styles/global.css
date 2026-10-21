@@ -62,6 +62,21 @@ body {
   -webkit-touch-callout: none;
 }
 
+/* O Chrome no Android pinta a caixa INTEIRA do elemento tocado. Num botão de
+   44px isso passa por retorno de toque; numa linha de faixa que atravessa a
+   tela, ou sobre a forma de onda toda, vira um retângulo piscando — e o app já
+   dá o retorno certo (a linha vira a faixa atual, o cursor segue o dedo).
+
+   Na raiz e não em cada componente porque a propriedade é HERDADA: uma
+   declaração cobre tudo. Antes isto vivia solto em três arquivos, e a lista —
+   o lugar onde mais se toca — tinha ficado de fora.
+
+   Em `html` e não em `body`: o padrão do Chrome é `rgba(51, 181, 229, .4)` no
+   elemento raiz, e declarar no `body` deixava a própria raiz com o azul. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Campo é para digitar, selecionar e colar. Sem esta exceção, alguns
    navegadores perdem o posicionamento do cursor e o menu de colar dentro do
    input — é o bug clássico de quem desliga seleção na raiz. O `touch-callout`
