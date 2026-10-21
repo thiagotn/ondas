@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-tema="gruvbox-dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ondas — do link no Telegram ao acervo</title>
+<meta name="description" content="Passo a passo interativo da ingestão do Ondas: o link chega no Telegram, atravessa a API, a fila, a trava de SSRF, o R2, e termina tocando na PWA.">
+<style>
+/* ---------------------------------------------------------------------------
+   Tokens. Mesma ideia do app: cada tema declara bg, fg, accent e os 8 ANSI, e
+   todo o resto sai de `color-mix(in oklab, ...)`. A lista de temas é a de
+   `packages/core/src/themes.ts`, para esta página não envelhecer sozinha.
+   --------------------------------------------------------------------------- */
+:root {
+  --bg: #282828; --fg: #ebdbb2; --accent: #fabd2f;
+  --a0: #3c3836; --a1: #fb4934; --a2: #b8bb26; --a3: #fabd2f;
+  --a4: #83a598; --a5: #d3869b; --a6: #8ec07c; --a7: #a89984;
+
+  --surface:  color-mix(in oklab, var(--bg) 88%, var(--fg));
+  --surface2: color-mix(in oklab, var(--bg) 80%, var(--fg));
+  --linha:    color-mix(in oklab, var(--bg) 70%, var(--fg));
+  --fraco:    color-mix(in oklab, var(--fg) 55%, var(--bg));
+  --fraquin:  color-mix(in oklab, var(--fg) 34%, var(--bg));
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+          "DejaVu Sans Mono", monospace;
+  --r: 4px;
+}
+
+* { box-sizing: border-box; }
+
+html { color-scheme: dark; }
+html[data-tema="github-light"] { color-scheme: light; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.6 var(--mono);
+  -webkit-text-size-adjust: 100%;
+}
+
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+/* ------------------------------- barra -------------------------------- */
+.barra {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--linha);
+  flex-wrap: wrap;
+}
+.marca { color: var(--accent); font-weight: 700; }
+.rota  { color: var(--fraco); }
+.barra .espaco { flex: 1; }
+
+.cenarios { display: flex; gap: 2px; flex-wrap: wrap; }
+.cenarios button {
+  padding: 5px 11px; border-radius: var(--r);
+  color: var(--fraco); white-space: nowrap;
+}
+.cenarios button:hover { color: var(--fg); background: var(--surface2); }
+.cenarios button[aria-pressed="true"] { color: var(--bg); background: var(--accent); }
+
+.pilula {
+  padding: 5px 10px; border: 1px solid var(--linha);
+  border-radius: var(--r); color: var(--fraco); white-space: nowrap;
+}
+.pilula:hover { color: var(--fg); border-color: var(--fraco); }
+
+/* ------------------------------- palco -------------------------------- */
+.palco {
+  padding: 14px 16px 0;
+  overflow-x: auto;
+}
+svg { display: block; width: 100%; min-width: 820px; height: auto; }
+
+/* O padrão é o estado APAGADO: nó que o cenário não toca é cenário de fundo.
+   Visitado fica legível, e só o ativo tem cor. */
+.caixa      { fill: var(--surface); stroke: var(--linha); stroke-width: 1; rx: 4; }
+.caixa-rot  { fill: var(--fraco); font: 600 13px var(--mono); }
+.caixa-sub  { fill: var(--fraquin); font: 11px var(--mono); }
+
+/* O nó aceso é o único com cor. Tudo o mais fica legível, mas apagado:
+   o olho tem de achar o passo atual sem procurar. */
+g.no.ativo .caixa     { fill: color-mix(in oklab, var(--accent) 22%, var(--bg));
+                        stroke: var(--accent); stroke-width: 1.5; }
+g.no.ativo .caixa-rot { fill: var(--accent); }
+g.no.ativo .caixa-sub { fill: color-mix(in oklab, var(--accent) 70%, var(--fg)); }
+
+g.no.falhou .caixa     { fill: color-mix(in oklab, var(--a1) 22%, var(--bg));
+                         stroke: var(--a1); stroke-width: 1.5; }
+g.no.falhou .caixa-rot { fill: var(--a1); }
+
+g.no.visitado .caixa     { stroke: var(--fraco); }
+g.no.visitado .caixa-rot { fill: var(--fg); }
+
+.aresta      { fill: none; stroke: var(--linha); stroke-width: 1.5; }
+.aresta.viva { stroke: var(--accent); stroke-width: 2; }
+.aresta.viva.ruim { stroke: var(--a1); }
+.aresta.usada { stroke: var(--fraco); }
+
+.pacote { fill: var(--accent); }
+.pacote.ruim { fill: var(--a1); }
+
+.rotulo-aresta { fill: var(--fraquin); font: 10px var(--mono); }
+.rotulo-aresta.viva { fill: var(--accent); }
+
+/* ----------------------------- controles ------------------------------ */
+.controles {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--linha);
+}
+.controles .bt {
+  padding: 6px 13px; border: 1px solid var(--linha); border-radius: var(--r);
+}
+.controles .bt:hover { border-color: var(--fraco); background: var(--surface); }
+.controles .bt.principal {
+  background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 700;
+}
+.controles .contador { color: var(--fraco); margin-left: auto; }
+.controles label { color: var(--fraquin); display: flex; align-items: center; gap: 6px; }
+input[type=range] { accent-color: var(--accent); width: 96px; }
+
+/* ------------------------------ colunas ------------------------------- */
+.colunas {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+  border-bottom: 1px solid var(--linha);
+}
+.colunas > section { padding: 14px 16px; min-height: 230px; }
+.detalhe { border-right: 1px solid var(--linha); }
+
+.detalhe h2 { margin: 0 0 8px; font-size: 14px; color: var(--accent); }
+.detalhe h2 .n { color: var(--fraquin); margin-right: 8px; }
+.detalhe p { margin: 0 0 10px; color: var(--fg); }
+.detalhe .ref {
+  display: inline-block; padding: 2px 7px; margin-bottom: 10px;
+  background: var(--surface2); border-radius: var(--r);
+  color: var(--a4); font-size: 12px;
+}
+.detalhe .risco {
+  border-left: 2px solid var(--a1); padding: 2px 0 2px 10px;
+  color: var(--fraco); font-size: 12px;
+}
+.detalhe .risco b { color: var(--a1); font-weight: 600; }
+
+/* ------------------------------ console ------------------------------- */
+.console h3 {
+  margin: 0 0 8px; font-size: 11px; color: var(--fraquin);
+  text-transform: uppercase; letter-spacing: .08em; font-weight: 600;
+}
+/* Rola por dentro em vez de empurrar a página: é o que faz o `scrollTop`
+   do script levar a linha nova para a vista. */
+.console ol {
+  margin: 0; padding: 0; list-style: none; font-size: 12px;
+  max-height: 196px; overflow-y: auto; overscroll-behavior: contain;
+}
+.console li { display: flex; gap: 10px; padding: 1px 0; color: var(--fraco); }
+.console li .hora { color: var(--fraquin); flex-shrink: 0; }
+.console li.nova  { color: var(--fg); }
+.console li.ruim  { color: var(--a1); }
+.console li.bom   { color: var(--a2); }
+
+/* ------------------------------ trilha -------------------------------- */
+.trilha { display: flex; flex-wrap: wrap; gap: 2px; padding: 12px 16px; }
+.trilha button {
+  min-width: 30px; padding: 5px 7px; border-radius: var(--r);
+  color: var(--fraquin); font-size: 12px;
+}
+.trilha button:hover { color: var(--fg); background: var(--surface); }
+.trilha button.visitado { color: var(--fraco); }
+.trilha button[aria-current="step"] {
+  background: var(--accent); color: var(--bg); font-weight: 700;
+}
+
+footer {
+  padding: 14px 16px 28px; color: var(--fraquin); font-size: 12px;
+  border-top: 1px solid var(--linha);
+}
+footer a { color: var(--a4); }
+
+@media (max-width: 760px) {
+  .colunas { grid-template-columns: 1fr; }
+  .detalhe { border-right: 0; border-bottom: 1px solid var(--linha); }
+  .colunas > section { min-height: 0; }
+  .barra { gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pacote { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="barra">
+  <span class="marca">ondas</span>
+  <span class="rota" id="rota">~/ingestao</span>
+  <nav class="cenarios" id="cenarios" aria-label="cenário"></nav>
+  <span class="espaco"></span>
+  <button class="pilula" id="bt-idioma">EN</button>
+  <button class="pilula" id="bt-tema">gruvbox-dark</button>
+</header>
+
+<main>
+  <section class="palco">
+    <svg id="palco" viewBox="0 0 1016 420" role="img" aria-labelledby="palco-tit">
+      <title id="palco-tit"></title>
+      <defs>
+        <marker id="seta" viewBox="0 0 8 8" refX="7" refY="4"
+                markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L8,4 L0,8 Z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g id="arestas"></g>
+      <g id="rotulos"></g>
+      <g id="nos"></g>
+      <circle id="pacote" class="pacote" r="5" style="display:none"/>
+    </svg>
+  </section>
+
+  <section class="controles">
+    <button class="bt principal" id="bt-tocar">▶ tocar</button>
+    <button class="bt" id="bt-passo">passo ›</button>
+    <button class="bt" id="bt-voltar">‹ volta</button>
+    <button class="bt" id="bt-zerar">↺</button>
+    <label><span id="rot-vel">velocidade</span>
+      <input type="range" id="vel" min="1" max="6" step="1" value="3">
+    </label>
+    <span class="contador" id="contador"></span>
+  </section>
+
+  <div class="colunas">
+    <section class="detalhe">
+      <h2><span class="n" id="d-num"></span><span id="d-tit"></span></h2>
+      <p id="d-corpo"></p>
+      <div class="ref" id="d-ref"></div>
+      <div class="risco" id="d-risco"></div>
+    </section>
+    <section class="console">
+      <h3 id="rot-console">console</h3>
+      <ol id="log"></ol>
+    </section>
+  </div>
+
+  <nav class="trilha" id="trilha" aria-label="passos"></nav>
+</main>
+
+<footer id="rodape"></footer>
+
+<script>
+"use strict";
+
+/* =============================================================================
+   Os 9 temas, copiados de packages/core/src/themes.ts. Só bg, fg, accent e os
+   8 ANSI; o resto o CSS deriva.
+   ========================================================================== */
+const TEMAS = [
+  ['nocturne',        '#161826','#e9e9ed','#9184d9', ['#292b31','#d98484','#84d9a0','#d9c784','#84a6d9','#9184d9','#84d0d9','#cfd3e5']],
+  ['catppuccin-mocha','#1e1e2e','#cdd6f4','#cba6f7', ['#45475a','#f38ba8','#a6e3a1','#f9e2af','#89b4fa','#f5c2e7','#94e2d5','#bac2de']],
+  ['tokyonight',      '#1a1b26','#c0caf5','#7aa2f7', ['#15161e','#f7768e','#9ece6a','#e0af68','#7aa2f7','#bb9af7','#7dcfff','#a9b1d6']],
+  ['dracula',         '#282a36','#f8f8f2','#bd93f9', ['#21222c','#ff5555','#50fa7b','#f1fa8c','#bd93f9','#ff79c6','#8be9fd','#f8f8f2']],
+  ['gruvbox-dark',    '#282828','#ebdbb2','#fabd2f', ['#3c3836','#fb4934','#b8bb26','#fabd2f','#83a598','#d3869b','#8ec07c','#a89984']],
+  ['nord',            '#2e3440','#d8dee9','#88c0d0', ['#3b4252','#bf616a','#a3be8c','#ebcb8b','#81a1c1','#b48ead','#88c0d0','#e5e9f0']],
+  ['rose-pine',       '#191724','#e0def4','#ebbcba', ['#26233a','#eb6f92','#9ccfd8','#f6c177','#31748f','#c4a7e7','#ebbcba','#e0def4']],
+  ['solarized-dark',  '#002b36','#93a1a1','#268bd2', ['#073642','#dc322f','#859900','#b58900','#268bd2','#d33682','#2aa198','#eee8d5']],
+  ['github-light',    '#ffffff','#24292f','#0969da', ['#24292f','#cf222e','#116329','#9a6700','#0969da','#8250df','#1b7c83','#6e7781']],
+];
+
+/* =============================================================================
+   O palco. Nove caixas e dez arestas; o cenário escolhe quais acendem.
+   ========================================================================== */
+const NOS = {
+  tg:     { x:  24, y: 196, w: 124, h: 54,
+            rot: {pt:'Telegram',       en:'Telegram'},
+            sub: {pt:'você manda o link', en:'you send the link'} },
+  node:   { x: 184, y: 196, w: 152, h: 54,
+            rot: {pt:'node do Hermes',  en:'Hermes node'},
+            sub: {pt:'bot + skill scdl', en:'bot + scdl skill'} },
+  api:    { x: 372, y: 196, w: 120, h: 54,
+            rot: {pt:'API',             en:'API'},
+            sub: {pt:'Go + chi',        en:'Go + chi'} },
+  fila:   { x: 528, y: 196, w: 140, h: 54,
+            rot: {pt:'fila',            en:'queue'},
+            sub: {pt:'ingest_jobs',     en:'ingest_jobs'} },
+  worker: { x: 704, y: 196, w: 126, h: 54,
+            rot: {pt:'worker',          en:'worker'},
+            sub: {pt:'ffmpeg',          en:'ffmpeg'} },
+  db:     { x: 866, y: 196, w: 126, h: 54,
+            rot: {pt:'Postgres',        en:'Postgres'},
+            sub: {pt:'tracks',          en:'tracks'} },
+  origem: { x: 704, y:  48, w: 126, h: 54,
+            rot: {pt:'a origem',        en:'the origin'},
+            sub: {pt:'internet',        en:'internet'} },
+  r2:     { x: 528, y: 336, w: 140, h: 54,
+            rot: {pt:'R2',              en:'R2'},
+            sub: {pt:'bucket privado',  en:'private bucket'} },
+  pwa:    { x: 866, y: 336, w: 126, h: 54,
+            rot: {pt:'PWA',             en:'PWA'},
+            sub: {pt:'o acervo',        en:'the library'} },
+};
+
+/* Os rótulos da fileira ficam ACIMA das caixas, não no vão entre elas: o vão
+   tem 36px e `X-Ondas-Token` tem ~78px, então ali o texto era pintado por
+   baixo da caixa vizinha e aparecia cortado. */
+const ARESTAS = {
+  'tg>node':       { d:'M148,223 H184',            rot:{pt:'link',          en:'link'},          rx:166, ry:186 },
+  'node>api':      { d:'M336,223 H372',            rot:{pt:'X-Ondas-Token', en:'X-Ondas-Token'}, rx:354, ry:186 },
+  'api>fila':      { d:'M492,223 H528',            rot:{pt:'enfileira',     en:'enqueue'},       rx:510, ry:186 },
+  'fila>worker':   { d:'M668,223 H704',            rot:{pt:'reivindica',    en:'claim'},         rx:686, ry:186 },
+  'worker>origem': { d:'M767,196 V102',            rot:{pt:'baixa',         en:'download'},      rx:775, ry:152, anc:'start' },
+  'worker>db':     { d:'M830,223 H866',            rot:{pt:'cria',          en:'insert'},        rx:848, ry:186 },
+  'node>r2':       { d:'M260,250 V363 H528',       rot:{pt:'PUT assinado',  en:'signed PUT'},    rx:300, ry:356, anc:'start' },
+  'worker>r2':     { d:'M767,250 V376 H668',       rot:{pt:'áudio + capas', en:'audio + covers'},rx:760, ry:300, anc:'end' },
+  'db>pwa':        { d:'M929,250 V336',            rot:{pt:'catálogo',      en:'catalog'},       rx:937, ry:296, anc:'start' },
+  'pwa>r2':        { d:'M866,350 H668',            rot:{pt:'302 assinado',  en:'signed 302'},    rx:767, ry:343, anc:'middle' },
+};
+
+/* =============================================================================
+   Os cenários. Cada passo: nó que acende, aresta que corre, texto, referência
+   no código e o modo de falha. As referências são as mesmas da série em
+   docs/engenharia/, já conferidas contra o código.
+   ========================================================================== */
+
+/* O tronco comum: tudo o que acontece depois que o job entra na fila. Os três
+   cenários se reencontram aqui, que é justamente a graça do desenho. */
+function tronco(origemDoAudio) {
+  const baixar = origemDoAudio === 'internet' ? [{
+    no: 'origem', aresta: 'worker>origem', dt: 1400,
+    tit: {pt:'A trava de SSRF roda depois do DNS',
+          en:'The SSRF guard runs after DNS'},
+    corpo: {pt:'"Baixe esta URL" é, literalmente, "faça uma requisição HTTP para onde eu disser" — '+
+               'executada por um processo que roda dentro do cluster. A checagem não fica na '+
+               'validação do nome: ela é o Control do net.Dialer, que o Go chama com o IP já '+
+               'resolvido, imediatamente antes do connect. Não há janela entre conferir e usar.',
+            en:'"Download this URL" is literally "make an HTTP request wherever I say" — run by a '+
+               'process inside the cluster. The check does not live in name validation: it is the '+
+               'net.Dialer Control hook, which Go calls with the IP already resolved, right before '+
+               'connect. There is no window between checking and using.'},
+    ref: 'api/internal/ingest/baixar.go:71-76',
+    risco: {pt:'Validar o nome antes de conectar deixa passar DNS rebinding: um host que responde '+
+                'IP público na primeira consulta e privado na segunda. Por isso a trava vale para '+
+                'cada salto de redirect — cada salto abre a própria conexão.',
+             en:'Validating the name before connecting lets DNS rebinding through: a host that '+
+                'answers a public IP on the first lookup and a private one on the second. That is '+
+                'why the guard applies to every redirect hop — each hop opens its own connection.'},
+    log: [{pt:'dns ok · conferindo o ip antes do connect', en:'dns ok · checking ip before connect'},
+          {pt:'connect liberado · 203.0.113.9:443', en:'connect allowed · 203.0.113.9:443', k:'bom'}],
+  }, {
+    no: 'worker', aresta: 'worker>origem', dir: -1, dt: 1400,
+    tit: {pt:'O teto de bytes não acredita no Content-Length',
+          en:'The byte ceiling does not trust Content-Length'},
+    corpo: {pt:'io.Copy(destino, io.LimitReader(resp.Body, maxBytes+1)). O +1 é o detalhe inteiro: '+
+               'sem ele o arquivo grande demais seria truncado em silêncio; com ele, o byte '+
+               'excedente aparece e o download é recusado. O Content-Type da origem serve de pista '+
+               'e nada mais.',
+            en:'io.Copy(dst, io.LimitReader(resp.Body, maxBytes+1)). The +1 is the whole trick: '+
+               'without it an oversized file would be silently truncated; with it the extra byte '+
+               'shows up and the download is refused. The origin Content-Type is a hint, nothing more.'},
+    ref: 'api/internal/ingest/baixar.go:171-179',
+    risco: {pt:'Confiar no <b>Content-Length</b> declarado é confiar em quem mandou a URL. Ele pode '+
+                'mentir ou simplesmente faltar.',
+             en:'Trusting the declared <b>Content-Length</b> is trusting whoever sent the URL. It '+
+                'can lie, or simply be absent.'},
+    log: [{pt:'baixado · 7.431.552 bytes', en:'downloaded · 7,431,552 bytes'}],
+  }] : [{
+    no: 'worker', aresta: 'worker>r2', dir: -1, dt: 1200,
+    tit: {pt:'O worker pega o arquivo da área de espera',
+          en:'The worker picks the file up from staging'},
+    corpo: {pt:'Não há download da internet neste ramo: os bytes já estão no bucket, sob '+
+               'stage/<dono>/<id>.bin, postos lá pelo node. O worker lê de lá e segue exatamente '+
+               'o mesmo caminho do outro ramo.',
+            en:'There is no internet download on this branch: the bytes are already in the bucket '+
+               'under stage/<owner>/<id>.bin, put there by the node. The worker reads from there '+
+               'and follows exactly the same path as the other branch.'},
+    ref: 'api/internal/storage/r2.go:127',
+    risco: {pt:'O prefixo é <b>stage/</b> e não <b>u/&lt;dono&gt;/stage/</b> de propósito: a '+
+                'varredura de abandonados precisa de um lugar só para olhar.',
+             en:'The prefix is <b>stage/</b>, not <b>u/&lt;owner&gt;/stage/</b>, on purpose: the '+
+                'abandoned-file sweep needs a single place to look.'},
+    log: [{pt:'lendo stage/… · 7.431.552 bytes', en:'reading stage/… · 7,431,552 bytes'}],
+  }];
+
+  return baixar.concat([
+    { no: 'worker', dt: 1100,
+      tit: {pt:'O ffprobe é quem decide o que o arquivo é',
+            en:'ffprobe decides what the file is'},
+      corpo: {pt:'Extensão e Content-Type não decidem nada. O ffprobe abre o arquivo e diz o que ele '+
+                 'é — e a régua de aceitação não é "o que o ffmpeg sabe ler": são os oito codecs que '+
+                 'a tag <audio> toca em navegador atual.',
+              en:'Extension and Content-Type decide nothing. ffprobe opens the file and says what it '+
+                 'is — and the acceptance rule is not "whatever ffmpeg can read": it is the eight '+
+                 'codecs the <audio> tag plays in a current browser.'},
+      ref: 'api/internal/ingest/midia.go:20-22',
+      risco: {pt:'Aceitar um <b>.wma</b> seria guardar um arquivo que a PWA nunca conseguiria tocar. '+
+                  'É validação de produto disfarçada de validação técnica, e por isso a lista é '+
+                  'curta e enumerada à mão.',
+               en:'Accepting a <b>.wma</b> would mean storing a file the PWA could never play. It is '+
+                  'product validation dressed as technical validation, which is why the list is '+
+                  'short and spelled out by hand.'},
+      log: [{pt:'ffprobe · mp3 · 44100 Hz · 3:51', en:'ffprobe · mp3 · 44100 Hz · 3:51', k:'bom'}],
+    },
+    { no: 'r2', aresta: 'worker>r2', dt: 1300,
+      tit: {pt:'O áudio sobe com o dono na própria chave',
+            en:'The audio goes up with the owner in the key'},
+      corpo: {pt:'A chave é u/<dono>/a/<id>.<ext> — a fronteira fica legível no bucket, não só no '+
+                 'banco. E ela é derivada do usuário autenticado, nunca recebida do pedido: é isso, '+
+                 'e não o middleware, que impede alguém de escrever no acervo dos outros.',
+              en:'The key is u/<owner>/a/<id>.<ext> — the boundary is legible in the bucket, not only '+
+                 'in the database. And it is derived from the authenticated user, never taken from '+
+                 'the request: that, not the middleware, is what stops anyone writing into someone '+
+                 'else’s library.'},
+      ref: 'api/internal/worker/worker.go:176-179',
+      risco: {pt:'Nada de e-mail ou nome na chave: ela aparece em log e em mensagem de erro.',
+               en:'No e-mail or name in the key: it shows up in logs and in error messages.'},
+      log: [{pt:'PUT u/…/a/….mp3 · ok', en:'PUT u/…/a/….mp3 · ok', k:'bom'}],
+    },
+    { no: 'r2', aresta: 'worker>r2', dt: 1100,
+      tit: {pt:'Capas e forma de onda são melhor esforço',
+            en:'Covers and waveform are best-effort'},
+      corpo: {pt:'Duas capas, 960 e 150. A grande é 960 porque o player mostra 400px de CSS, que '+
+                 'numa tela 2x são 800 físicos. Depois a forma de onda: 200 baldes de RMS medidos a '+
+                 '4 kHz, codificados num alfabeto de 6 bits — 200 bytes que viajam junto do catálogo.',
+              en:'Two covers, 960 and 150. The large one is 960 because the player shows 400 CSS px, '+
+                 'which is 800 physical on a 2x screen. Then the waveform: 200 RMS buckets measured '+
+                 'at 4 kHz, encoded in a 6-bit alphabet — 200 bytes that travel with the catalog.'},
+      ref: 'api/internal/ingest/picos.go:19',
+      risco: {pt:'Falhar aqui <b>não</b> reprova a ingestão. Faixa sem forma de onda desenha barra '+
+                  'lisa, que é o sinal honesto: a PWA não conhece aquele áudio.',
+               en:'Failing here does <b>not</b> fail the ingestion. A track without a waveform draws '+
+                  'a flat bar, which is the honest signal: the PWA does not know that audio.'},
+      log: [{pt:'capas 960/150 · ok', en:'covers 960/150 · ok'},
+            {pt:'forma de onda · 200 baldes', en:'waveform · 200 buckets'}],
+    },
+    { no: 'db', aresta: 'worker>db', dt: 1200,
+      tit: {pt:'A linha no banco, e a limpeza se ela falhar',
+            en:'The database row, and the cleanup if it fails'},
+      corpo: {pt:'O título sai de uma precedência: o que veio no pedido ganha das tags do arquivo, '+
+                 'que ganham do nome do arquivo, que ganha de "sem título". O nome do arquivo entra '+
+                 'depois das tags de propósito — um álbum etiquetado não deve virar "01 - Faixa".',
+              en:'The title comes from a precedence: what the request sent beats the file tags, which '+
+                 'beat the file name, which beats "untitled". The file name comes after the tags on '+
+                 'purpose — a properly tagged album should not become "01 - Track".'},
+      ref: 'api/internal/worker/worker.go:198-201',
+      risco: {pt:'Se o INSERT falhar, o áudio <b>já subiu</b>. Sem a limpeza explícita o objeto fica '+
+                  'órfão, pagando armazenamento sem nenhuma linha que o aponte.',
+               en:'If the INSERT fails, the audio is <b>already up</b>. Without the explicit cleanup '+
+                  'the object is orphaned, costing storage with no row pointing at it.'},
+      log: [{pt:'faixa criada · acervo', en:'track created · library', k:'bom'}],
+    },
+    { no: 'pwa', aresta: 'db>pwa', dt: 1100,
+      tit: {pt:'A faixa aparece no acervo',
+            en:'The track shows up in the library'},
+      corpo: {pt:'O catálogo é um JSON só, pedido pela PWA. A forma de onda vem junto, porque são '+
+                 '200 bytes; o áudio não vem, porque é o arquivo inteiro.',
+              en:'The catalog is a single JSON the PWA requests. The waveform comes with it, because '+
+                 'it is 200 bytes; the audio does not, because it is the whole file.'},
+      ref: 'api/internal/httpapi/acervo.go:144-157',
+      risco: {pt:'O acervo é privado por definição: nada nesse grupo de rotas é público, e a prévia '+
+                  'de link não diz nada sobre faixa do acervo.',
+               en:'The library is private by definition: nothing in that route group is public, and '+
+                  'the link preview says nothing about a library track.'},
+      log: [{pt:'GET /api/acervo · 1 faixa nova', en:'GET /api/acervo · 1 new track'}],
+    },
+    { no: 'r2', aresta: 'pwa>r2', dt: 1300, fim: true,
+      tit: {pt:'Tocar: um 302, e o áudio nunca passa por casa',
+            en:'Play: a 302, and the audio never goes through the house'},
+      corpo: {pt:'A API não serve os bytes. Ela responde 302 para uma URL assinada de 1 hora, e o '+
+                 'navegador busca direto no R2. O que atravessa o túnel do homelab é um redirect de '+
+                 '~1 KB. Como a assinatura é feita a cada pedido, ela nunca vence dentro do cache.',
+              en:'The API does not serve the bytes. It answers 302 with a one-hour signed URL, and '+
+                 'the browser fetches straight from R2. What crosses the homelab tunnel is a ~1 KB '+
+                 'redirect. Because the signature is made per request, it never expires inside the cache.'},
+      ref: 'api/internal/httpapi/acervo.go:159-167',
+      risco: {pt:'Uma hora não é arbitrário: tem de cobrir o <b>seek</b>. Uma URL que vence no meio '+
+                  'da música faria o arrasto da barra falhar sem explicação.',
+               en:'One hour is not arbitrary: it has to cover <b>seeking</b>. A URL expiring mid-song '+
+                  'would make dragging the scrubber fail with no explanation.'},
+      log: [{pt:'302 → r2 · tocando', en:'302 → r2 · playing', k:'bom'}],
+    },
+  ]);
+}
+
+const CENARIOS = {
+  media: {
+    nome: {pt:'link de mídia', en:'direct media link'},
+    entrada: {pt:'https://…/faixa.mp3', en:'https://…/track.mp3'},
+    passos: [
+      { no:'tg', aresta:'tg>node', dt:1100,
+        tit:{pt:'O link chega no Telegram', en:'The link arrives on Telegram'},
+        corpo:{pt:'Você manda uma URL para o bot. É a interface mais barata que existe: não tem app '+
+                  'para instalar, não tem tela para desenhar, e funciona do celular de qualquer lugar.',
+               en:'You send a URL to the bot. It is the cheapest interface there is: no app to '+
+                  'install, no screen to design, and it works from a phone anywhere.'},
+        ref:'api/internal/httpapi/acervo.go:108',
+        risco:{pt:'O bot não tem sessão de navegador, logo não tem cookie. Ele entra por um '+
+                  '<b>token de máquina</b>, e o que limita esse token não é o middleware.',
+               en:'The bot has no browser session, so it has no cookie. It comes in with a '+
+                  '<b>machine token</b>, and what limits that token is not the middleware.'},
+        log:[{pt:'telegram · mensagem recebida', en:'telegram · message received'}] },
+
+      { no:'node', dt:1000,
+        tit:{pt:'O bot olha o link e escolhe o caminho', en:'The bot looks at the link and picks a path'},
+        corpo:{pt:'A URL termina em arquivo de mídia, então não precisa de truque nenhum: dá para '+
+                  'passar a URL adiante e deixar o worker baixar. É o caminho curto.',
+               en:'The URL ends in a media file, so no trick is needed: the URL can be passed along '+
+                  'and the worker will download it. This is the short path.'},
+        ref:'api/internal/httpapi/server.go:98-104',
+        risco:{pt:'Quando a URL é <b>página</b> e não mídia — o caso do SoundCloud — este caminho não '+
+                  'serve, e o desenho muda inteiro. É o outro cenário aqui em cima.',
+               en:'When the URL is a <b>page</b> and not media — the SoundCloud case — this path does '+
+                  'not work and the design changes entirely. That is the other scenario above.'},
+        log:[{pt:'url é mídia direta · usando /ingest', en:'url is direct media · using /ingest'}] },
+
+      { no:'api', aresta:'node>api', dt:1200,
+        tit:{pt:'POST /api/acervo/ingest, com o token de máquina',
+             en:'POST /api/acervo/ingest, with the machine token'},
+        corpo:{pt:'A API valida só o óbvio: a URL é http(s) e cabe em 2048 caracteres. A validação de '+
+                  'verdade — esquema, destino, tamanho, formato — é do worker, que é quem vai '+
+                  'conectar. Barrar aqui o que é obviamente inútil enfileirar, e nada além disso.',
+               en:'The API validates only the obvious: the URL is http(s) and fits in 2048 chars. The '+
+                  'real validation — scheme, destination, size, format — belongs to the worker, which '+
+                  'is the one that will connect. Block what is obviously pointless to enqueue, nothing more.'},
+        ref:'api/internal/httpapi/acervo.go:241-265',
+        risco:{pt:'As rotas de <b>entrar com faixa nova</b> aceitam token; as de <b>mexer no acervo '+
+                  'que já existe</b> (listar, baixar, apagar) só aceitam sessão. É aí que um token '+
+                  'vazado viraria exfiltração, e um teste trava essa divisão.',
+               en:'The <b>bring in a new track</b> routes accept the token; the <b>touch the existing '+
+                  'library</b> ones (list, fetch, delete) take sessions only. That is where a leaked '+
+                  'token would become exfiltration, and a test locks the split.'},
+        log:[{pt:'POST /api/acervo/ingest · 202', en:'POST /api/acervo/ingest · 202', k:'bom'}] },
+
+      { no:'fila', aresta:'api>fila', dt:1300,
+        tit:{pt:'A fila é uma tabela, e o índice é parcial',
+             en:'The queue is a table, and the index is partial'},
+        corpo:{pt:'Baixar uma URL arbitrária não cabe no ReadTimeout de 15 s do servidor, então a '+
+                  'ingestão é assíncrona — uma tabela no Postgres, sem broker. A unicidade vale só '+
+                  'enquanto o job está ativo: mesma URL pedida de novo antes de terminar é a mesma '+
+                  'ingestão, não duas.',
+               en:'Downloading an arbitrary URL does not fit the server’s 15 s ReadTimeout, so '+
+                  'ingestion is asynchronous — a Postgres table, no broker. Uniqueness holds only '+
+                  'while the job is active: the same URL asked again before it finishes is the same '+
+                  'ingestion, not two.'},
+        ref:'api/internal/db/migrations/0002_acervo.sql:48-50',
+        risco:{pt:'O bot reenvia sozinho — quando você toca no botão de novo, e quando o <b>Telegram '+
+                  'repete a entrega</b>. Unicidade incondicional resolveria o reenvio e proibiria '+
+                  'reingerir para sempre; parcial resolve os dois.',
+               en:'The bot resends by itself — when you tap the button again, and when <b>Telegram '+
+                  'redelivers</b>. Unconditional uniqueness would fix the resend and forbid ever '+
+                  're-ingesting; a partial index fixes both.'},
+        log:[{pt:'job enfileirado · pending', en:'job enqueued · pending'}] },
+
+      { no:'worker', aresta:'fila>worker', dt:1200,
+        tit:{pt:'FOR UPDATE SKIP LOCKED, e o resgate do travado',
+             en:'FOR UPDATE SKIP LOCKED, and the stuck-job rescue'},
+        corpo:{pt:'Dois workers nunca pegam o mesmo job, e nenhum espera o outro: sem o SKIP LOCKED o '+
+                  'segundo bloquearia na linha travada; com ele, pega a próxima. A consulta tem uma '+
+                  'segunda cláusula que resgata job preso em processing há mais de 15 minutos.',
+               en:'Two workers never take the same job, and neither waits on the other: without SKIP '+
+                  'LOCKED the second would block on the locked row; with it, it takes the next one. '+
+                  'The query has a second clause that rescues jobs stuck in processing for over 15 minutes.'},
+        ref:'api/internal/acervo/jobs.go:144-149',
+        risco:{pt:'Sem esse resgate, um <b>OOMKill</b> na hora errada deixa o job em processing para '+
+                  'sempre: invisível para a fila e nunca concluído.',
+               en:'Without that rescue, an <b>OOMKill</b> at the wrong moment leaves the job in '+
+                  'processing forever: invisible to the queue and never finished.'},
+        log:[{pt:'job reivindicado · tentativa 1/3', en:'job claimed · attempt 1/3'}] },
+    ].concat(tronco('internet')),
+  },
+
+  soundcloud: {
+    nome: {pt:'SoundCloud', en:'SoundCloud'},
+    entrada: {pt:'https://soundcloud.com/…', en:'https://soundcloud.com/…'},
+    passos: [
+      { no:'tg', aresta:'tg>node', dt:1000,
+        tit:{pt:'O mesmo bot, um link diferente', en:'Same bot, a different link'},
+        corpo:{pt:'Do seu lado não muda nada: você manda o link e espera. Do lado de dentro, este é '+
+                  'o caminho longo, e ele existe por um motivo bem específico.',
+               en:'On your side nothing changes: you send the link and wait. Inside, this is the long '+
+                  'path, and it exists for a very specific reason.'},
+        ref:'api/internal/httpapi/upload.go:27-29',
+        risco:{pt:'Um caminho a mais é uma superfície a mais. A pergunta certa não é "funciona?", é '+
+                  '"o que esse caminho passa a permitir que o outro não permitia?".',
+               en:'One more path is one more surface. The right question is not "does it work?" but '+
+                  '"what does this path now allow that the other did not?".'},
+        log:[{pt:'telegram · mensagem recebida', en:'telegram · message received'}] },
+
+      { no:'node', dt:1300,
+        tit:{pt:'URL do SoundCloud é página, não mídia',
+             en:'A SoundCloud URL is a page, not media'},
+        corpo:{pt:'Não há URL de mídia para mandar à API: o que existe é uma página. E o worker do '+
+                  'cluster não tem scdl. Quem baixa, então, é o node — e aí os bytes passam a existir '+
+                  'só no disco dele, longe do cluster.',
+               en:'There is no media URL to hand the API: what exists is a page. And the cluster '+
+                  'worker has no scdl. So the node is what downloads — and the bytes then exist only '+
+                  'on its disk, far from the cluster.'},
+        ref:'api/internal/httpapi/server.go:102-104',
+        risco:{pt:'É esse fato — <b>os bytes só existem no disco do node</b> — que força todo o resto '+
+                  'do desenho. Não foi preferência de arquitetura.',
+               en:'It is this fact — <b>the bytes exist only on the node’s disk</b> — that forces '+
+                  'the rest of the design. It was not an architectural preference.'},
+        log:[{pt:'scdl · baixando…', en:'scdl · downloading…'},
+             {pt:'scdl · 7.431.552 bytes · tags ok', en:'scdl · 7,431,552 bytes · tags ok'}] },
+
+      { no:'api', aresta:'node>api', dt:1200,
+        tit:{pt:'Passo 1: pedir uma vaga', en:'Step 1: ask for a slot'},
+        corpo:{pt:'POST /api/acervo/upload. A API reserva uma vaga e devolve uma URL assinada de PUT, '+
+                  'válida por 15 minutos. O prazo tem de cobrir o envio inteiro: 15 minutos para '+
+                  '60 MB ainda funciona num link de ~70 kB/s. É dimensionado pelo pior caso plausível.',
+               en:'POST /api/acervo/upload. The API reserves a slot and returns a signed PUT URL, '+
+                  'valid for 15 minutes. The window must cover the whole upload: 15 minutes for 60 MB '+
+                  'still works on a ~70 kB/s link. It is sized for the worst plausible case.'},
+        ref:'api/internal/httpapi/upload.go:42-44',
+        risco:{pt:'Essa URL é <b>credencial de escrita</b> no bucket pelo prazo da validade. Não vai '+
+                  'para log, não é ecoada em erro e não é impressa por subcomando nenhum.',
+               en:'That URL is a <b>write credential</b> on the bucket for its lifetime. It does not '+
+                  'go to logs, is not echoed in errors, and is printed by no subcommand.'},
+        log:[{pt:'POST /acervo/upload · 200 · vaga', en:'POST /acervo/upload · 200 · slot'},
+             {pt:'put assinado · expira em 900s', en:'signed put · expires in 900s'}] },
+
+      { no:'r2', aresta:'node>r2', dt:1500,
+        tit:{pt:'Passo 2: o node grava direto no bucket',
+             en:'Step 2: the node writes straight to the bucket'},
+        corpo:{pt:'Os bytes não passam pela API, e aqui o motivo é quase cômico: o node está na casa, '+
+                  'o cluster está na casa. Subir por dentro faria os bytes SAÍREM DE CASA PARA '+
+                  'VOLTAR PARA CASA, gastando o upload residencial duas vezes — e o túnel tem '+
+                  'teto de ~100 MB por requisição.',
+               en:'The bytes do not go through the API, and here the reason is almost comic: the node '+
+                  'is in the house, the cluster is in the house. Going through would make the bytes '+
+                  'LEAVE HOME TO COME BACK HOME, spending the residential uplink twice — and '+
+                  'the tunnel caps at ~100 MB per request.'},
+        ref:'api/internal/httpapi/upload.go:31-35',
+        risco:{pt:'A chave é <b>stage/&lt;dono&gt;/&lt;id&gt;.bin</b>, derivada do usuário '+
+                  'autenticado e nunca recebida no pedido. Um token vazado, no máximo, põe arquivo '+
+                  'no acervo do próprio dono dele.',
+               en:'The key is <b>stage/&lt;owner&gt;/&lt;id&gt;.bin</b>, derived from the '+
+                  'authenticated user and never taken from the request. A leaked token can at most '+
+                  'put a file in its own owner’s library.'},
+        log:[{pt:'PUT stage/… · 7.431.552 bytes', en:'PUT stage/… · 7,431,552 bytes'},
+             {pt:'r2 · 200', en:'r2 · 200', k:'bom'}] },
+
+      { no:'api', aresta:'node>api', dt:1200,
+        tit:{pt:'Passo 3: finalizar', en:'Step 3: finalize'},
+        corpo:{pt:'POST /api/acervo/upload/{id}/finalizar. A API confere o tamanho — três vezes o '+
+                  'mesmo número, no pedido, na vaga e no objeto — e enfileira. A skill não manda '+
+                  'título de propósito, para as tags que o scdl escreveu ganharem do nome do arquivo.',
+               en:'POST /api/acervo/upload/{id}/finalize. The API checks the size — the same number '+
+                  'three times, in the request, in the slot and on the object — and enqueues. The '+
+                  'skill deliberately sends no title, so the tags scdl wrote beat the file name.'},
+        ref:'api/internal/httpapi/upload.go:17-25',
+        risco:{pt:'Quem subiu e nunca finalizou vira lixo pago. Uma varredura apaga o que está na '+
+                  'área de espera há mais de <b>24 h</b> — folgado, porque o pior caso legítimo são '+
+                  '3 tentativas com resgate a cada 15 min.',
+               en:'Whatever was uploaded and never finalized becomes paid garbage. A sweep deletes '+
+                  'staging files older than <b>24 h</b> — generous, since the worst legitimate case '+
+                  'is 3 attempts with a 15-minute rescue.'},
+        log:[{pt:'POST /acervo/upload/…/finalizar · 202', en:'POST /acervo/upload/…/finalize · 202', k:'bom'}] },
+
+      { no:'fila', aresta:'api>fila', dt:1100,
+        tit:{pt:'E aqui os dois caminhos se reencontram',
+             en:'And here the two paths meet again'},
+        corpo:{pt:'Do passo 3 em diante é a mesma fila da ingestão por URL: mesmo worker, mesma '+
+                  'tabela, mesmo GET /acervo/ingest/{id} para acompanhar. Quem envia não precisa '+
+                  'aprender um segundo mecanismo.',
+               en:'From step 3 on it is the same queue as URL ingestion: same worker, same table, '+
+                  'same GET /acervo/ingest/{id} to follow along. The sender does not have to learn a '+
+                  'second mechanism.'},
+        ref:'api/internal/acervo/jobs.go:27',
+        risco:{pt:'Dois caminhos de entrada e <b>um</b> caminho de processamento. Se fossem dois, '+
+                  'cada correção teria de ser feita duas vezes, e um dos lados ficaria para trás.',
+               en:'Two entry paths and <b>one</b> processing path. Were there two, every fix would '+
+                  'have to be made twice, and one side would fall behind.'},
+        log:[{pt:'job enfileirado · pending', en:'job enqueued · pending'}] },
+
+      { no:'worker', aresta:'fila>worker', dt:1100,
+        tit:{pt:'O worker reivindica', en:'The worker claims it'},
+        corpo:{pt:'Mesma consulta do outro cenário, com FOR UPDATE SKIP LOCKED e o resgate de job '+
+                  'travado. A diferença é só de onde virão os bytes.',
+               en:'Same query as the other scenario, with FOR UPDATE SKIP LOCKED and the stuck-job '+
+                  'rescue. The only difference is where the bytes will come from.'},
+        ref:'api/internal/acervo/jobs.go:144-149',
+        risco:{pt:'Polling de 5 s, não LISTEN/NOTIFY: para uma fila de alguns itens por dia, manter '+
+                  'uma conexão de notificação viva custa mais que a consulta.',
+               en:'5 s polling, not LISTEN/NOTIFY: for a queue of a few items a day, keeping a '+
+                  'notification connection alive costs more than the query.'},
+        log:[{pt:'job reivindicado · tentativa 1/3', en:'job claimed · attempt 1/3'}] },
+    ].concat(tronco('stage')),
+  },
+
+  ssrf: {
+    nome: {pt:'SSRF negado', en:'SSRF denied'},
+    entrada: {pt:'http://interno.exemplo/x.mp3', en:'http://internal.example/x.mp3'},
+    passos: [
+      { no:'tg', aresta:'tg>node', dt:1000,
+        tit:{pt:'Um link que parece comum', en:'A link that looks ordinary'},
+        corpo:{pt:'O nome é público e resolve normalmente. Nada no texto da URL denuncia o que ela '+
+                  'vai virar depois do DNS — e é exatamente por isso que validar o nome não basta.',
+               en:'The name is public and resolves normally. Nothing in the URL text gives away what '+
+                  'it becomes after DNS — which is exactly why validating the name is not enough.'},
+        ref:'api/internal/ingest/baixar.go:16-19',
+        risco:{pt:'"Ingira esta URL" seria, sem trava, um <b>proxy</b> para os serviços internos do '+
+                  'cluster, para o Postgres e para o servidor de metadados da nuvem. É SSRF clássico, '+
+                  'e quem manda a URL é o bot.',
+               en:'"Ingest this URL" would be, without a guard, a <b>proxy</b> into the cluster’s '+
+                  'internal services, the Postgres, and the cloud metadata server. Classic SSRF, and '+
+                  'the URL comes from the bot.'},
+        log:[{pt:'telegram · mensagem recebida', en:'telegram · message received'}] },
+
+      { no:'api', aresta:'node>api', dt:1100,
+        tit:{pt:'A API aceita, e isso é proposital',
+             en:'The API accepts it, and that is on purpose'},
+        corpo:{pt:'A URL é http(s) e cabe no limite, então entra na fila. A API não tenta adivinhar o '+
+                  'destino: ela não é quem vai conectar. Quem conecta é quem confere.',
+               en:'The URL is http(s) and fits the limit, so it enters the queue. The API does not try '+
+                  'to guess the destination: it is not the one that will connect. Whoever connects is '+
+                  'whoever checks.'},
+        ref:'api/internal/httpapi/acervo.go:259-264',
+        risco:{pt:'Conferir nos dois lugares parece mais seguro e é pior: <b>duas cópias da regra '+
+                  'divergem com o tempo</b>. A política do Ondas mora num campo só.',
+               en:'Checking in both places looks safer and is worse: <b>two copies of a rule drift '+
+                  'apart</b>. The Ondas policy lives in a single field.'},
+        log:[{pt:'POST /api/acervo/ingest · 202', en:'POST /api/acervo/ingest · 202'}] },
+
+      { no:'worker', aresta:'fila>worker', dt:1000,
+        tit:{pt:'O worker pega o job', en:'The worker takes the job'},
+        corpo:{pt:'Nada de anormal ainda. O job é idêntico a qualquer outro, e vai até o momento da '+
+                  'conexão sem levantar suspeita.',
+               en:'Nothing abnormal yet. The job is identical to any other, and goes all the way to '+
+                  'the connection without raising a flag.'},
+        ref:'api/internal/acervo/jobs.go:144-149',
+        risco:{pt:'Uma trava que só roda "quando algo parece suspeito" não é uma trava. Esta roda em '+
+                  '<b>toda</b> conexão, sempre.',
+               en:'A guard that only runs "when something looks suspicious" is not a guard. This one '+
+                  'runs on <b>every</b> connection, always.'},
+        log:[{pt:'job reivindicado · tentativa 1/3', en:'job claimed · attempt 1/3'}] },
+
+      { no:'origem', aresta:'worker>origem', dt:1500, ruim:true,
+        tit:{pt:'O DNS responde um endereço interno', en:'DNS answers an internal address'},
+        corpo:{pt:'O nome resolveu para um endereço da rede do cluster. Se a checagem tivesse sido '+
+                  'feita antes, no texto da URL, ela já teria passado — e a conexão seria aberta '+
+                  'agora, para dentro.',
+               en:'The name resolved to an address on the cluster network. Had the check been done '+
+                  'earlier, on the URL text, it would already have passed — and the connection would '+
+                  'now be opened, inward.'},
+        ref:'api/internal/ingest/baixar.go:20-39',
+        risco:{pt:'A lista tem 18 faixas, e três quase nunca aparecem em listas caseiras: <b>NAT64, '+
+                  '6to4 e Teredo</b>. São transições IPv6→IPv4, e por elas se alcança a rede privada '+
+                  'de novo. Nenhum teste funcional pega essa lacuna.',
+               en:'The list has 18 ranges, and three almost never show up in homegrown lists: '+
+                  '<b>NAT64, 6to4 and Teredo</b>. They are IPv6→IPv4 transitions, and through them '+
+                  'the private network is reachable again. No functional test catches that gap.'},
+        log:[{pt:'dns · resolveu para endereço interno', en:'dns · resolved to internal address'}] },
+
+      { no:'worker', dt:1400, ruim:true,
+        tit:{pt:'O Control do dialer nega antes do connect',
+             en:'The dialer Control hook denies before connect'},
+        corpo:{pt:'O gancho roda com o IP já escolhido, imediatamente antes do connect. A conexão '+
+                  'nunca chega a ser aberta. E como o keep-alive está desligado de propósito, '+
+                  'conexão reusada não escapa da checagem.',
+               en:'The hook runs with the IP already chosen, immediately before connect. The '+
+                  'connection is never opened. And because keep-alive is deliberately off, a reused '+
+                  'connection cannot slip past the check.'},
+        ref:'api/internal/ingest/baixar.go:130',
+        risco:{pt:'Desligar a reutilização custa um <b>handshake por requisição</b>. É o preço de '+
+                  'garantir que toda conexão passa pela trava, e foi considerado barato.',
+               en:'Disabling reuse costs <b>one handshake per request</b>. That is the price of '+
+                  'guaranteeing every connection goes through the guard, and it was judged cheap.'},
+        log:[{pt:'connect NEGADO · faixa vetada', en:'connect DENIED · blocked range', k:'ruim'}] },
+
+      { no:'fila', aresta:'fila>worker', dir:-1, dt:1300, ruim:true,
+        tit:{pt:'Volta para a fila, e o retry é todo no SQL',
+             en:'Back to the queue, and the retry lives in SQL'},
+        corpo:{pt:'O job volta para pending enquanto houver tentativa sobrando. São três, e o número '+
+                  'tem justificativa empírica: as falhas que se repetem aqui são quase sempre '+
+                  'permanentes — URL morta, formato que não toca. As temporárias passam na segunda.',
+               en:'The job goes back to pending while attempts remain. There are three, and the number '+
+                  'is empirically justified: failures that repeat here are almost always permanent — '+
+                  'dead URL, unplayable format. The temporary ones pass on the second try.'},
+        ref:'api/internal/acervo/jobs.go:178-180',
+        risco:{pt:'Sem o encerramento na última tentativa, o worker repetiria <b>para sempre</b> uma '+
+                  'URL que não existe mais.',
+               en:'Without closing it out on the last attempt, the worker would retry a URL that no '+
+                  'longer exists <b>forever</b>.'},
+        log:[{pt:'tentativa 2/3 · falhou', en:'attempt 2/3 · failed', k:'ruim'},
+             {pt:'tentativa 3/3 · falhou', en:'attempt 3/3 · failed', k:'ruim'}] },
+
+      { no:'fila', dt:1200, ruim:true, fim:true,
+        tit:{pt:'O job morre como error, e a mensagem tem política',
+             en:'The job ends as error, and the message has a policy'},
+        corpo:{pt:'Você lê "endereço de destino não é público — só URLs da internet". Esse caso '+
+                  'aparece inteiro de propósito: é a resposta para "por que minha URL interna não '+
+                  'funciona". O que vira texto genérico é o erro de rede cru, que pode carregar '+
+                  'endereço e porta — a lista enumera o que PODE ser dito, e o resto cai no padrão.',
+               en:'You read "destination address is not public — internet URLs only". This case is '+
+                  'shown in full on purpose: it is the answer to "why does my internal URL not work". '+
+                  'What becomes generic text is the raw network error, which can carry address and '+
+                  'port — the list enumerates what MAY be said, and everything else falls to the default.'},
+        ref:'api/internal/worker/worker.go:121-125',
+        risco:{pt:'O padrão é o <b>genérico</b>, e essa é a escolha certa: enumerar o que pode ser '+
+                  'dito é seguro; tentar enumerar o que não pode deixa buracos. Dois testes travam '+
+                  'as duas pontas.',
+               en:'The default is the <b>generic</b> one, and that is the right choice: enumerating '+
+                  'what may be said is safe; trying to enumerate what may not leaves holes. Two tests '+
+                  'lock both ends.'},
+        log:[{pt:'job · error · nada foi gravado', en:'job · error · nothing was written', k:'ruim'}] },
+    ],
+  },
+};
+
+/* =============================================================================
+   Textos da interface.
+   ========================================================================== */
+const UI = {
+  rota:     {pt:'~/ingestao', en:'~/ingestion'},
+  tocar:    {pt:'▶ tocar',  en:'▶ play'},
+  pausar:   {pt:'❚❚ pausar', en:'❚❚ pause'},
+  passo:    {pt:'passo ›',  en:'step ›'},
+  volta:    {pt:'‹ volta',  en:'‹ back'},
+  vel:      {pt:'velocidade', en:'speed'},
+  console:  {pt:'console',  en:'console'},
+  contador: {pt:(a,b)=>`passo ${a} de ${b}`, en:(a,b)=>`step ${a} of ${b}`},
+  risco:    {pt:'onde isso quebra', en:'where this breaks'},
+  titPalco: {pt:'Diagrama do caminho de uma faixa, do Telegram ao acervo.',
+             en:'Diagram of a track’s path, from Telegram to the library.'},
+  rodape: {
+    pt:'As referências <code>arquivo:linha</code> apontam para o repositório público '+
+       '<a href="https://github.com/thiagotn/ondas">github.com/thiagotn/ondas</a>, e são as mesmas '+
+       'da série em <code>docs/engenharia/</code>. O console é encenado: os números vêm do código e '+
+       'das constantes, não de uma execução real.',
+    en:'The <code>file:line</code> references point at the public repository '+
+       '<a href="https://github.com/thiagotn/ondas">github.com/thiagotn/ondas</a>, and are the same '+
+       'ones used in the series under <code>docs/engenharia/</code>. The console is staged: the '+
+       'numbers come from the code and its constants, not from a real run.',
+  },
+};
+
+/* =============================================================================
+   Estado e desenho.
+   ========================================================================== */
+const $ = (id) => document.getElementById(id);
+const SVGNS = 'http://www.w3.org/2000/svg';
+
+let lang = 'pt';
+let tema = 4;                 // gruvbox-dark
+let cenario = 'media';
+let i = 0;                    // passo atual
+let tocando = false;
+let relogio = null;
+let anim = null;
+let base = Date.UTC(2026, 9, 21, 17, 32, 18) / 1000;
+
+const L = (o) => (o && typeof o === 'object' && !Array.isArray(o)) ? (o[lang] ?? o.pt) : o;
+const passos = () => CENARIOS[cenario].passos;
+const atual  = () => passos()[i];
+
+/* ----------------------------- tema ----------------------------- */
+function aplicarTema() {
+  const [id, bg, fg, ac, ansi] = TEMAS[tema];
+  const r = document.documentElement.style;
+  r.setProperty('--bg', bg); r.setProperty('--fg', fg); r.setProperty('--accent', ac);
+  ansi.forEach((c, n) => r.setProperty('--a' + n, c));
+  document.documentElement.dataset.tema = id;
+  $('bt-tema').textContent = id;
+}
+
+/* ----------------------------- palco ----------------------------- */
+function montarPalco() {
+  const gA = $('arestas'), gR = $('rotulos'), gN = $('nos');
+  gA.textContent = ''; gR.textContent = ''; gN.textContent = '';
+
+  for (const [id, a] of Object.entries(ARESTAS)) {
+    const p = document.createElementNS(SVGNS, 'path');
+    p.setAttribute('d', a.d);
+    p.setAttribute('class', 'aresta');
+    p.setAttribute('marker-end', 'url(#seta)');
+    p.dataset.id = id;
+    gA.appendChild(p);
+
+    const t = document.createElementNS(SVGNS, 'text');
+    t.setAttribute('x', a.rx); t.setAttribute('y', a.ry);
+    t.setAttribute('class', 'rotulo-aresta');
+    t.setAttribute('text-anchor', a.anc || 'middle');
+    t.textContent = L(a.rot);
+    t.dataset.id = id;
+    gR.appendChild(t);
+  }
+
+  for (const [id, n] of Object.entries(NOS)) {
+    const g = document.createElementNS(SVGNS, 'g');
+    g.setAttribute('class', 'no'); g.dataset.id = id;
+
+    const r = document.createElementNS(SVGNS, 'rect');
+    r.setAttribute('x', n.x); r.setAttribute('y', n.y);
+    r.setAttribute('width', n.w); r.setAttribute('height', n.h);
+    r.setAttribute('rx', 4); r.setAttribute('class', 'caixa');
+    g.appendChild(r);
+
+    const t1 = document.createElementNS(SVGNS, 'text');
+    t1.setAttribute('x', n.x + n.w / 2); t1.setAttribute('y', n.y + 23);
+    t1.setAttribute('text-anchor', 'middle'); t1.setAttribute('class', 'caixa-rot');
+    t1.textContent = L(n.rot);
+    g.appendChild(t1);
+
+    const t2 = document.createElementNS(SVGNS, 'text');
+    t2.setAttribute('x', n.x + n.w / 2); t2.setAttribute('y', n.y + 40);
+    t2.setAttribute('text-anchor', 'middle'); t2.setAttribute('class', 'caixa-sub');
+    t2.textContent = L(n.sub);
+    g.appendChild(t2);
+
+    gN.appendChild(g);
+  }
+  $('palco-tit').textContent = L(UI.titPalco);
+}
+
+/* Quais nós/arestas já foram tocados até o passo n — é o que dá o rastro. */
+function rastro(n) {
+  const nos = new Set(), ar = new Set();
+  for (let k = 0; k <= n && k < passos().length; k++) {
+    const p = passos()[k];
+    if (p.no) nos.add(p.no);
+    if (p.aresta) ar.add(p.aresta);
+  }
+  return { nos, ar };
+}
+
+function pintarPalco() {
+  const p = atual();
+  const r = rastro(i - 1);
+
+  for (const g of $('nos').children) {
+    const id = g.dataset.id;
+    g.classList.toggle('ativo', id === p.no && !p.ruim);
+    g.classList.toggle('falhou', id === p.no && !!p.ruim);
+    g.classList.toggle('visitado', id !== p.no && r.nos.has(id));
+  }
+  for (const e of $('arestas').children) {
+    const id = e.dataset.id;
+    e.classList.toggle('viva', id === p.aresta);
+    e.classList.toggle('ruim', id === p.aresta && !!p.ruim);
+    e.classList.toggle('usada', id !== p.aresta && r.ar.has(id));
+  }
+  for (const t of $('rotulos').children) {
+    t.classList.toggle('viva', t.dataset.id === p.aresta);
+  }
+}
+
+/* O pacote anda pela aresta com getPointAtLength: controle total, sem depender
+   de animação declarativa que não dá para rebobinar. */
+function correrPacote(p) {
+  cancelarPacote();
+  const bola = $('pacote');
+  if (!p.aresta) { bola.style.display = 'none'; return; }
+  const path = [...$('arestas').children].find((e) => e.dataset.id === p.aresta);
+  if (!path) { bola.style.display = 'none'; return; }
+
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const total = path.getTotalLength();
+  const dur = Math.max(260, (p.dt || 1100) / velocidade() * 0.72);
+  const inverso = p.dir === -1;
+  bola.classList.toggle('ruim', !!p.ruim);
+  bola.style.display = '';
+
+  const t0 = performance.now();
+  const quadro = (t) => {
+    const u = Math.min(1, (t - t0) / dur);
+    const pt = path.getPointAtLength((inverso ? 1 - u : u) * total);
+    bola.setAttribute('cx', pt.x); bola.setAttribute('cy', pt.y);
+    if (u < 1) anim = requestAnimationFrame(quadro);
+    else { bola.style.display = 'none'; anim = null; }
+  };
+  anim = requestAnimationFrame(quadro);
+}
+function cancelarPacote() {
+  if (anim) { cancelAnimationFrame(anim); anim = null; }
+  $('pacote').style.display = 'none';
+}
+
+/* ----------------------------- console ----------------------------- */
+function hhmmss(seg) {
+  const d = new Date(seg * 1000);
+  return [d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()]
+    .map((n) => String(n).padStart(2, '0')).join(':');
+}
+
+function pintarLog() {
+  const ol = $('log');
+  ol.textContent = '';
+  let t = base;
+  for (let k = 0; k <= i; k++) {
+    for (const linha of (passos()[k].log || [])) {
+      t += 1 + (k % 3);
+      const li = document.createElement('li');
+      if (k === i) li.classList.add('nova');
+      if (linha.k) li.classList.add(linha.k);
+      const h = document.createElement('span');
+      h.className = 'hora'; h.textContent = hhmmss(t);
+      const m = document.createElement('span');
+      m.textContent = L(linha);
+      li.append(h, m);
+      ol.appendChild(li);
+    }
+  }
+  ol.scrollTop = ol.scrollHeight;
+}
+
+/* ----------------------------- trilha ----------------------------- */
+function montarTrilha() {
+  const nav = $('trilha');
+  nav.textContent = '';
+  passos().forEach((_, n) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = String(n + 1).padStart(2, '0');
+    b.addEventListener('click', () => { parar(); ir(n); });
+    nav.appendChild(b);
+  });
+}
+function pintarTrilha() {
+  [...$('trilha').children].forEach((b, n) => {
+    b.classList.toggle('visitado', n < i);
+    if (n === i) b.setAttribute('aria-current', 'step');
+    else b.removeAttribute('aria-current');
+  });
+}
+
+/* ----------------------------- detalhe ----------------------------- */
+function pintarDetalhe() {
+  const p = atual();
+  $('d-num').textContent = String(i + 1).padStart(2, '0');
+  // `tit` e `corpo` são TEXTO PURO: vão por textContent porque carregam `<audio>`,
+  // `u/<dono>/a/<id>.<ext>` e afins, que innerHTML comeria. Ênfase só em `risco`,
+  // que é o único pintado como HTML — e lá todo < literal vai escapado.
+  $('d-tit').textContent = L(p.tit);
+  $('d-corpo').textContent = L(p.corpo);
+  $('d-ref').textContent = p.ref;
+  $('d-risco').innerHTML = '<b>' + L(UI.risco) + ' — </b>' + L(p.risco);
+  $('contador').textContent = UI.contador[lang](i + 1, passos().length);
+}
+
+/* ----------------------------- navegação ----------------------------- */
+function ir(n) {
+  i = Math.max(0, Math.min(passos().length - 1, n));
+  pintarPalco(); pintarDetalhe(); pintarLog(); pintarTrilha();
+  correrPacote(atual());
+}
+const velocidade = () => Number($('vel').value) || 3;
+
+function agendar() {
+  clearTimeout(relogio);
+  if (!tocando) return;
+  const dur = (atual().dt || 1100) / velocidade() * 1.6;
+  relogio = setTimeout(() => {
+    if (i >= passos().length - 1) { parar(); return; }
+    ir(i + 1);
+    agendar();
+  }, dur);
+}
+function tocar() {
+  if (i >= passos().length - 1) ir(0);
+  tocando = true;
+  $('bt-tocar').textContent = L(UI.pausar);
+  agendar();
+}
+function parar() {
+  tocando = false;
+  clearTimeout(relogio);
+  $('bt-tocar').textContent = L(UI.tocar);
+}
+function trocarCenario(c) {
+  parar(); cenario = c; i = 0;
+  montarTrilha(); pintarCenarios(); ir(0);
+}
+
+function pintarCenarios() {
+  const nav = $('cenarios');
+  nav.textContent = '';
+  for (const [id, c] of Object.entries(CENARIOS)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = L(c.nome);
+    b.setAttribute('aria-pressed', String(id === cenario));
+    b.addEventListener('click', () => trocarCenario(id));
+    nav.appendChild(b);
+  }
+}
+
+/* ----------------------------- idioma ----------------------------- */
+function pintarIdioma() {
+  document.documentElement.lang = lang === 'pt' ? 'pt-BR' : 'en';
+  $('bt-idioma').textContent = lang === 'pt' ? 'EN' : 'PT';
+  $('rota').textContent = L(UI.rota);
+  $('bt-passo').textContent = L(UI.passo);
+  $('bt-voltar').textContent = L(UI.volta);
+  $('rot-vel').textContent = L(UI.vel);
+  $('rot-console').textContent = L(UI.console);
+  $('bt-tocar').textContent = tocando ? L(UI.pausar) : L(UI.tocar);
+  $('rodape').innerHTML = L(UI.rodape);
+}
+
+/* ----------------------------- eventos ----------------------------- */
+$('bt-tocar').addEventListener('click', () => tocando ? parar() : tocar());
+$('bt-passo').addEventListener('click', () => { parar(); ir(i + 1); });
+$('bt-voltar').addEventListener('click', () => { parar(); ir(i - 1); });
+$('bt-zerar').addEventListener('click', () => { parar(); ir(0); });
+$('vel').addEventListener('input', () => { if (tocando) agendar(); });
+$('bt-tema').addEventListener('click', () => { tema = (tema + 1) % TEMAS.length; aplicarTema(); });
+$('bt-idioma').addEventListener('click', () => {
+  lang = lang === 'pt' ? 'en' : 'pt';
+  pintarIdioma(); montarPalco(); pintarCenarios(); ir(i);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.matches('input, textarea')) return;
+  if (e.key === 'ArrowRight' || e.key === 'j') { parar(); ir(i + 1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'k') { parar(); ir(i - 1); }
+  else if (e.key === ' ') { e.preventDefault(); tocando ? parar() : tocar(); }
+  else if (e.key === 'r') { parar(); ir(0); }
+  else return;
+});
+
+/* ----------------------------- início ----------------------------- */
+aplicarTema();
+pintarIdioma();
+montarPalco();
+pintarCenarios();
+montarTrilha();
+ir(0);
+</script>
+</body>
+</html>

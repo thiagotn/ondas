@@ -248,6 +248,11 @@ que foi descartado e o que cada decisão custou, há uma série de treze documen
 [`docs/engenharia/`](./docs/engenharia/00-indice.md) — stack, system design, frontend, backend,
 infra, produto e qualidade, em português e inglês, com referências `arquivo:linha`.
 
+E para ver o caminho **acontecer** em vez de lê-lo, [`docs/ingestao.html`](./docs/ingestao.html) é
+um passo a passo interativo da ingestão: um link cai no Telegram e você acompanha, com console e
+trilha de capítulos, até a faixa tocar no acervo. Três cenários — link de mídia direto, SoundCloud
+(que força o PUT assinado) e um SSRF negado. É um arquivo só, abre offline, em pt e en.
+
 [![Diagrama de arquitetura do Ondas](./docs/arquitetura.png)](./docs/arquitetura.html)
 
 O desenho acima é um recorte estático de [`docs/arquitetura.html`](./docs/arquitetura.html) —
