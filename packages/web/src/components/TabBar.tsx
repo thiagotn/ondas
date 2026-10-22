@@ -14,7 +14,7 @@ const TABS = [
   { id: 'library', label: '~/biblioteca', Icone: Disc },
 ] as const;
 
-/** Barra superior da "janela": luzes, abas e o botão de tema. */
+/** Barra superior: logo, abas e o botão de tema. */
 export function TabBar() {
   const wide = useWide();
   const { tab, goToTab } = useTabNavigation();
@@ -23,7 +23,6 @@ export function TabBar() {
   return (
     <div className={wide ? s.tabbar : `${s.tabbar} ${s.tabbarNarrow}`}>
       <div className={s.tabbarInner}>
-        {wide && <TrafficLights />}
         <TabLogo />
         {TABS.map(({ id, label, Icone }, i) => (
           <button
@@ -80,16 +79,5 @@ function TabLogo() {
         <CassetteLogo playing={playing} progress={duration ? t / duration : 0} />
       </span>
     </button>
-  );
-}
-
-/** Os três pontos do canto, só no wide. */
-export function TrafficLights() {
-  return (
-    <span className={s.lights} aria-hidden="true">
-      <span className={s.light} style={{ background: 'var(--ansi-1)' }} />
-      <span className={s.light} style={{ background: 'var(--ansi-3)' }} />
-      <span className={s.light} style={{ background: 'var(--ansi-2)' }} />
-    </span>
   );
 }

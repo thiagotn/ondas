@@ -6,7 +6,7 @@ import { useGuestMode } from '../app/guest';
 import { CassetteLogo } from '../components/CassetteLogo';
 import { auth } from '../app/services';
 import { sessionStore, uiStore, useUi } from '../app/stores';
-import { TrafficLights } from '../components/TabBar';
+import { TrafficLights } from '../components/TrafficLights';
 import s from './login.module.css';
 
 /**
