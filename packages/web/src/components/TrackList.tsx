@@ -37,6 +37,7 @@ export function TrackList({ rows, emptyText, loading }: TrackListProps) {
           showShare={wide}
           compact={!wide}
           onPlay={(index) => void controller.play(index)}
+          onCursor={controller.marcarCursor}
           onLike={controller.toggleLike}
           onDownload={(r) => void controller.download(r.track)}
           onShare={(r) => void compartilhar(r.track)}

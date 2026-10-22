@@ -21,6 +21,8 @@ export interface TrackRowProps {
    */
   compact: boolean;
   onPlay(index: number): void;
+  /** O Tab chegou nesta linha: o cursor da lista vem junto. */
+  onCursor(id: string): void;
   onLike(id: string): void;
   onDownload(row: RowModel): void;
   onShare(row: RowModel): void;
@@ -33,6 +35,7 @@ export function TrackRow({
   showShare,
   compact,
   onPlay,
+  onCursor,
   onLike,
   onDownload,
   onShare,
@@ -51,13 +54,39 @@ export function TrackRow({
   // serviria de nada. `nearest` para `j` descendo não recentralizar a lista a
   // cada tecla.
   const ref = useRef<HTMLDivElement>(null);
+  const botao = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (row.isCursor) ref.current?.scrollIntoView({ block: 'nearest' });
+    if (!row.isCursor) return;
+    ref.current?.scrollIntoView({ block: 'nearest' });
+
+    // O foco anda com o cursor, mas só se já estava na lista. Sem isto o `j`
+    // deixava para trás o anel do Tab na linha antiga e a marca do cursor ia
+    // sozinha para a nova — duas linhas marcadas, e o Enter obedecia à do
+    // anel, que é o botão que o navegador ativa. Quem está fora da lista fica
+    // onde está: `:08` marca a faixa com o foco ainda na linha de comando, e
+    // roubá-lo fecharia o campo no meio do comando.
+    const ativo = document.activeElement;
+    if (ativo && ativo !== botao.current && ref.current?.parentElement?.contains(ativo)) {
+      botao.current?.focus({ preventScroll: true });
+    }
   }, [row.isCursor]);
 
   return (
     <div ref={ref} className={className} aria-current={row.isCursor ? 'true' : undefined}>
-      <button type="button" className={s.main} onClick={() => onPlay(row.index)}>
+      <button
+        ref={botao}
+        type="button"
+        className={s.main}
+        onClick={() => onPlay(row.index)}
+        onFocus={(e) => {
+          // Só o foco que o teclado desenha arrasta a marca. O clique e o
+          // toque também focam o botão, e sem esta pergunta a linha tocada
+          // ganharia a barra do cursor sem ninguém ter andado com `j`/`k` —
+          // no celular, onde ninguém anda, ela apareceria em toda faixa
+          // tocada. É a mesma pergunta que o `:focus-visible` do CSS faz.
+          if (e.currentTarget.matches(':focus-visible')) onCursor(track.id);
+        }}
+      >
         <span className={row.isCurrent ? `${s.idx} ${s.idxCurrent}` : s.idx}>{row.idx}</span>
         {showArt && (
           <span className={s.thumb}>

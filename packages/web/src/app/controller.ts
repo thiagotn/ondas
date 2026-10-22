@@ -161,6 +161,14 @@ export function irParaFaixa(numero: number): Track | undefined {
 }
 
 /**
+ * Marca uma linha pelo id, sem tocá-la. É por aqui que o Tab entra: a linha
+ * que recebe o foco vira a linha do cursor, para a lista ter uma marca só.
+ */
+export function marcarCursor(id: string): void {
+  uiStore.getState().setCursor(id);
+}
+
+/**
  * Anda o cursor na lista visível, sem dar a volta: `k` no topo fica no topo,
  * como no vim.
  *

@@ -1297,7 +1297,7 @@ test('j/k andam o cursor, enter toca e `:nº` salta pela calha', async ({ page }
   await expect(cursor(page)).toContainText('Maré Baixa');
 });
 
-test('enter num botão focado ativa o botão, e não a linha marcada', async ({ page }) => {
+test('o foco do Tab e a marca da lista são a mesma linha', async ({ page }) => {
   await blockAudius(page);
   await entrarVisitante(page);
 
@@ -1305,15 +1305,33 @@ test('enter num botão focado ativa o botão, e não a linha marcada', async ({ 
   await page.getByLabel('Ir para a faixa pelo número').fill('04');
   await page.keyboard.press('Enter');
   await expect(cursor(page)).toContainText('Fio de Cobre');
+  // `:04` marca com o foco ainda na linha de comando: a marca não o rouba de
+  // um campo que está sendo digitado.
+  await expect(page.locator('[aria-current="true"] button').first()).not.toBeFocused();
+
+  // O foco arrasta a marca. Sem isto a tela mostrava duas linhas marcadas — o
+  // anel do Tab numa, a barra do cursor noutra — e o Enter obedecia ao anel.
+  await page.getByRole('button', { name: /Maré Baixa/ }).focus();
+  await expect(cursor(page)).toContainText('Maré Baixa');
 
   // Enter é A tecla de ativar: num botão focado ele tem de clicar o botão. Se o
   // atalho do cursor desse `preventDefault` aqui, a tecla deixaria de ativar
   // qualquer botão do app — e quem navega por teclado ficaria sem saída.
-  await page.getByRole('button', { name: /Maré Baixa/ }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByText('Maré Baixa — Lia Sombra')).toBeVisible();
-  // E a marca não se mexeu: quem mandou foi o foco, não o cursor.
-  await expect(cursor(page)).toContainText('Fio de Cobre');
+  await expect(cursor(page)).toContainText('Maré Baixa');
+
+  // E a volta: com o foco já na lista, `j` o leva junto, em vez de deixar o
+  // anel para trás na linha antiga.
+  await page.keyboard.press('j');
+  await expect(cursor(page)).toContainText('Concreto Molhado');
+  await expect(page.locator('[aria-current="true"] button').first()).toBeFocused();
+
+  // Mas só o foco do teclado arrasta a marca. O clique e o toque também focam
+  // o botão, e sem essa distinção a barra do cursor apareceria em toda faixa
+  // tocada no celular, onde ninguém anda com `j`/`k`.
+  await page.getByRole('button', { name: /Último Trem/ }).click();
+  await expect(cursor(page)).toContainText('Concreto Molhado');
 });
 
 test('`:nº` digita sem acionar atalho, e traz a faixa para uma lista onde ela aparece', async ({

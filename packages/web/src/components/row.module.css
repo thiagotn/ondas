@@ -50,6 +50,17 @@
   cursor: pointer;
 }
 
+/* Sem o anel global de foco aqui, e só aqui. Este botão não recebe foco de
+   teclado sem virar o cursor da lista (`onFocus` → `marcarCursor`), e é só aí
+   que o anel sairia — as duas condições são a mesma, `:focus-visible`. Então
+   quando o anel apareceria a linha inteira já está pintada, e ele seria um
+   segundo desenho do mesmo fato: era daí que vinham as duas marcas na tela.
+   Nos botões de ação da linha o anel fica — lá ele aponta o controle, que a
+   barra do cursor não distingue. */
+.main:focus-visible {
+  outline: none;
+}
+
 .idx {
   width: 3ch;
   flex-shrink: 0;
