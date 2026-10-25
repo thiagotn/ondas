@@ -109,6 +109,12 @@ Três coisas que o worker **recusa**, de propósito:
 - **formato que o navegador não toca** — a régua é a tag `<audio>` (mp3, aac, flac, opus, wav), e
   quem decide o que o arquivo é é o ffprobe, não o `Content-Type` da origem.
 
+URL de **página** não serve aqui, e isso não é limitação a consertar: `/ingest` quer URL de mídia.
+Link do SoundCloud e do YouTube são página, então quem baixa é o **node do Hermes** (com `scdl` ou
+`yt-dlp`) e o arquivo entra pelo PUT assinado — mesmo worker, mesma fila, mesmo
+`GET /acervo/ingest/{id}` dali em diante. As três skills do bot vivem no repo `homelab`, em
+`ansible/roles/hermes/files/skills/`.
+
 O worker tem quatro subcomandos de operação, que rodam como Job com a imagem que já está no nó:
 
 ```bash
@@ -250,8 +256,9 @@ infra, produto e qualidade, em português e inglês, com referências `arquivo:l
 
 E para ver o caminho **acontecer** em vez de lê-lo, [`docs/ingestao.html`](./docs/ingestao.html) é
 um passo a passo interativo da ingestão: um link cai no Telegram e você acompanha, com console e
-trilha de capítulos, até a faixa tocar no acervo. Três cenários — link de mídia direto, SoundCloud
-(que força o PUT assinado) e um SSRF negado. É um arquivo só, abre offline, em pt e en.
+trilha de capítulos, até a faixa tocar no acervo. Quatro cenários — link de mídia direto, SoundCloud
+e YouTube (os dois forçam o PUT assinado) e um SSRF negado. É um arquivo só, abre offline, em pt e
+en.
 
 [![Diagrama de arquitetura do Ondas](./docs/arquitetura.png)](./docs/arquitetura.html)
 

@@ -279,7 +279,7 @@ const NOS = {
             sub: {pt:'você manda o link', en:'you send the link'} },
   node:   { x: 184, y: 196, w: 152, h: 54,
             rot: {pt:'node do Hermes',  en:'Hermes node'},
-            sub: {pt:'bot + skill scdl', en:'bot + scdl skill'} },
+            sub: {pt:'bot + skills',     en:'bot + skills'} },
   api:    { x: 372, y: 196, w: 120, h: 54,
             rot: {pt:'API',             en:'API'},
             sub: {pt:'Go + chi',        en:'Go + chi'} },
@@ -325,8 +325,9 @@ const ARESTAS = {
    docs/engenharia/, já conferidas contra o código.
    ========================================================================== */
 
-/* O tronco comum: tudo o que acontece depois que o job entra na fila. Os três
-   cenários se reencontram aqui, que é justamente a graça do desenho. */
+/* O tronco comum: tudo o que acontece depois que o job entra na fila. Os
+   cenários de sucesso se reencontram aqui, que é justamente a graça do
+   desenho — três portas de entrada, um caminho de processamento. */
 function tronco(origemDoAudio) {
   const baixar = origemDoAudio === 'internet' ? [{
     no: 'origem', aresta: 'worker>origem', dt: 1400,
@@ -687,6 +688,134 @@ const CENARIOS = {
                en:'5 s polling, not LISTEN/NOTIFY: for a queue of a few items a day, keeping a '+
                   'notification connection alive costs more than the query.'},
         log:[{pt:'job reivindicado · tentativa 1/3', en:'job claimed · attempt 1/3'}] },
+    ].concat(tronco('stage')),
+  },
+
+  youtube: {
+    nome: {pt:'YouTube', en:'YouTube'},
+    entrada: {pt:'https://youtube.com/watch?v=…', en:'https://youtube.com/watch?v=…'},
+    passos: [
+      { no:'tg', aresta:'tg>node', dt:1000,
+        tit:{pt:'O mesmo bot, um terceiro tipo de link',
+             en:'Same bot, a third kind of link'},
+        corpo:{pt:'Do seu lado, igual aos outros: manda o link e espera. A primeira coisa que a '+
+                  'skill faz é reduzir a URL a watch?v=<id> — guarda o v e joga fora list, index, '+
+                  'si e pp. Isso trava a playlist, tira o rastreador do link compartilhado e faz o '+
+                  'mesmo vídeo colado do app, do youtu.be ou com playlist contar como um só.',
+               en:'On your side, same as the others: send the link and wait. The first thing the '+
+                  'skill does is reduce the URL to watch?v=<id> — keep v, drop list, index, si and '+
+                  'pp. That blocks the playlist, strips the tracker from the shared link, and makes '+
+                  'the same video pasted from the app, from youtu.be or with a playlist count once.'},
+        ref:'homelab: roles/hermes/files/skills/ondas-youtube/scripts/ondas-youtube.py:146-200',
+        risco:{pt:'No SoundCloud a query é descartada inteira. Aqui ela <b>é</b> o vídeo: copiar '+
+                  'aquela regra teria quebrado todo link do YouTube.',
+               en:'On SoundCloud the query is dropped entirely. Here it <b>is</b> the video: '+
+                  'copying that rule would have broken every YouTube link.'},
+        log:[{pt:'telegram · mensagem recebida', en:'telegram · message received'},
+             {pt:'url canônica · playlist ignorada', en:'canonical url · playlist ignored'}] },
+
+      { no:'node', dt:1300,
+        tit:{pt:'Três recusas, todas antes de baixar',
+             en:'Three refusals, all before downloading'},
+        corpo:{pt:'Uma sonda (yt-dlp --dump-single-json) traz duração, estado de transmissão e '+
+                  'metadados <b>sem baixar nada</b>. Dali saem as recusas: ao vivo e estreia não '+
+                  'têm fim; vídeo acima de 20 minutos não é faixa de acervo, é mix ou podcast; '+
+                  'playlist pura seriam dezenas de ingestões por uma linha de conversa.',
+               en:'A probe (yt-dlp --dump-single-json) brings duration, live status and metadata '+
+                  '<b>without downloading anything</b>. The refusals come from there: live streams '+
+                  'and premieres have no end; a video over 20 minutes is not a library track, it is '+
+                  'a mix or a podcast; a bare playlist would be dozens of ingestions from one line.'},
+        ref:'homelab: roles/hermes/files/skills/ondas-youtube/scripts/ondas-youtube.py:247-311',
+        risco:{pt:'Contar <b>depois</b> obrigaria a baixar três horas de áudio para então recusá-lo. '+
+                  'É a mesma razão pela qual o set do SoundCloud é contado antes.',
+               en:'Counting <b>afterwards</b> would mean downloading three hours of audio only to '+
+                  'then refuse it. Same reason the SoundCloud set is counted up front.'},
+        log:[{pt:'sonda · 3min35 · not_live', en:'probe · 3min35 · not_live'}] },
+
+      { no:'node', dt:1400,
+        tit:{pt:'De onde saem título e artista',
+             en:'Where title and artist come from'},
+        corpo:{pt:'Três níveis de confiança. Se o vídeo é do YouTube Music, track e artist já vêm '+
+                  'separados e limpos — e trazem álbum e ano. Senão, o título é quebrado no primeiro '+
+                  'separador. Em último caso, o canal vira artista, sem o sufixo - Topic. O título '+
+                  'perde o ruído de produção: (Official Music Video), [HD], (Letra).',
+               en:'Three levels of confidence. If the video is from YouTube Music, track and artist '+
+                  'already come separated and clean — and bring album and year. Otherwise the title '+
+                  'is split on the first separator. As a last resort the channel becomes the artist, '+
+                  'minus the - Topic suffix. The title loses production noise: (Official Music '+
+                  'Video), [HD], (Lyrics).'},
+        ref:'homelab: roles/hermes/files/skills/ondas-youtube/scripts/ondas-youtube.py:314-371',
+        risco:{pt:'A limpeza só remove o parêntese quando ele é ruído <b>inteiro</b>. Uma régua mais '+
+                  'larga comeria (feat. Alguém), (Live at Wembley) e (Remix) — que são parte do nome '+
+                  'da música, não enfeite.',
+               en:'The cleanup only removes a parenthesis when the whole of it is noise. A looser '+
+                  'rule would eat (feat. Someone), (Live at Wembley) and (Remix) — which are part of '+
+                  'the song name, not decoration.'},
+        log:[{pt:'faixa · Los Hermanos — Anna Júlia', en:'track · Los Hermanos — Anna Júlia'},
+             {pt:'yt-dlp · bestaudio · opus · sem reencode', en:'yt-dlp · bestaudio · opus · no re-encode'}] },
+
+      { no:'node', dt:1500,
+        tit:{pt:'A capa tem duas rotas, e a culpa é do ffmpeg',
+             en:'The cover has two routes, and ffmpeg is to blame'},
+        corpo:{pt:'O worker extrai arte do stream com attached_pic. Em m4a a capa entra como stream '+
+                  'anexado e pronto. Em opus — que é o que o YouTube costuma dar — o ffmpeg <b>lê</b> '+
+                  'capa (ele promove o METADATA_BLOCK_PICTURE a stream de vídeo) mas <b>não sabe '+
+                  'escrevê-la</b>. Então a skill monta o bloco PICTURE à mão e o grava como tag.',
+               en:'The worker extracts art from the stream with attached_pic. In m4a the cover goes '+
+                  'in as an attached stream and that is that. In opus — what YouTube usually serves '+
+                  '— ffmpeg <b>reads</b> covers (it promotes METADATA_BLOCK_PICTURE to a video '+
+                  'stream) but <b>cannot write</b> one. So the skill builds the PICTURE block by '+
+                  'hand and stores it as a tag.'},
+        ref:'api/internal/ingest/midia.go:109-114',
+        risco:{pt:'A documentação dizia que o ffmpeg <b>não lia</b> essa capa, e o plano desta fase '+
+                  'era ensinar o worker a ler o bloco em Go. Medir antes de escrever apagou a '+
+                  'mudança inteira: nenhuma linha do worker precisou mudar.',
+               en:'The docs claimed ffmpeg <b>could not read</b> that cover, and the plan for this '+
+                  'phase was to teach the worker to parse the block in Go. Measuring before writing '+
+                  'erased the whole change: not one line of the worker had to move.'},
+        log:[{pt:'thumbnail · recortada 1000×1000', en:'thumbnail · cropped 1000×1000'},
+             {pt:'ffmpeg · tags + capa · -c:a copy', en:'ffmpeg · tags + cover · -c:a copy'}] },
+
+      { no:'r2', aresta:'node>r2', dt:1500,
+        tit:{pt:'Daqui para frente é o caminho do SoundCloud',
+             en:'From here on it is the SoundCloud path'},
+        corpo:{pt:'Os bytes só existem no disco do node, então a única porta é a mesma: pedir uma '+
+                  'vaga, gravar direto no bucket com o PUT assinado e finalizar. Os três passos '+
+                  'estão detalhados no cenário do SoundCloud — e é de propósito que sejam os '+
+                  'mesmos, porque o que muda entre as duas skills é só quem baixa.',
+               en:'The bytes exist only on the node disk, so the only door is the same one: ask for '+
+                  'a slot, write straight to the bucket with the signed PUT, and finalize. The three '+
+                  'steps are detailed in the SoundCloud scenario — and it is deliberate that they '+
+                  'are the same, because what differs between the two skills is only who downloads.'},
+        ref:'api/internal/httpapi/upload.go:27-29',
+        risco:{pt:'Uma skill nova que inventasse o próprio envio teria de reaprender o token, os '+
+                  'erros de HTTP e os códigos de saída. Ela chama o <b>ondas-ingerir</b> da skill '+
+                  'irmã e segue sem conhecer o segredo.',
+               en:'A new skill inventing its own upload would have to relearn the token, the HTTP '+
+                  'errors and the exit codes. It calls the sibling skill <b>ondas-ingerir</b> and '+
+                  'stays with no knowledge of the secret.'},
+        log:[{pt:'POST /acervo/upload · 200 · vaga', en:'POST /acervo/upload · 200 · slot'},
+             {pt:'PUT stage/… · 3.904.512 bytes', en:'PUT stage/… · 3,904,512 bytes'},
+             {pt:'r2 · 200', en:'r2 · 200', k:'bom'}] },
+
+      { no:'fila', aresta:'api>fila', dt:1100,
+        tit:{pt:'E os três caminhos se reencontram',
+             en:'And the three paths meet again'},
+        corpo:{pt:'Do finalizar em diante é a mesma fila dos outros dois: mesmo worker, mesma tabela, '+
+                  'mesmo GET /acervo/ingest/{id} para acompanhar. A skill manda título e artista, '+
+                  'ao contrário da do SoundCloud — aqui as tags do arquivo são as que ela mesma '+
+                  'escreveu, das mesmas duas strings, então os dois lados concordam.',
+               en:'From finalize on it is the same queue as the other two: same worker, same table, '+
+                  'same GET /acervo/ingest/{id} to follow along. The skill does send title and '+
+                  'artist, unlike the SoundCloud one — here the file tags are the ones it wrote '+
+                  'itself, from those same two strings, so both sides agree.'},
+        ref:'api/internal/worker/worker.go:195-211',
+        risco:{pt:'Três caminhos de entrada e <b>um</b> de processamento. Se cada skill trouxesse o '+
+                  'seu, cada correção teria de ser feita três vezes.',
+               en:'Three entry paths and <b>one</b> processing path. If each skill brought its own, '+
+                  'every fix would have to be made three times.'},
+        log:[{pt:'POST /acervo/upload/…/finalizar · 202', en:'POST /acervo/upload/…/finalize · 202'},
+             {pt:'job enfileirado · pending', en:'job enqueued · pending'}] },
     ].concat(tronco('stage')),
   },
 
