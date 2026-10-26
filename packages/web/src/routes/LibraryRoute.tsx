@@ -11,9 +11,10 @@ import s from '../components/shell.module.css';
 const SEGMENTS: [LibrarySegment, string][] = [
   ['liked', '--curtidas'],
   ['offline', '--offline'],
+  ['acervo', '--acervo'],
 ];
 
-/** `~/biblioteca`: envio para o acervo, os dois segmentos e a lista. */
+/** `~/biblioteca`: envio para o acervo, os três segmentos e a lista. */
 export function LibraryRoute() {
   const { data, isLoading } = useCatalog();
   const seg = useUi((st) => st.seg);
@@ -46,8 +47,12 @@ export function LibraryRoute() {
           rodapé). Enviar fica: é trabalho de acervo, e acervo é conteúdo. */}
       {/* Enviar arquivo só faz sentido com conta: o acervo é por usuário. */}
       {user && <UploadPanel />}
+      {/* `--acervo` só com conta, pela mesma razão do painel de envio: sem
+          sessão o catálogo não traz faixa própria nenhuma, e o chip seria uma
+          lista sempre vazia. Quem sai da conta com ele escolhido cai no texto
+          de vazio que explica o login (ver `emptyText`). */}
       <div className={s.segments}>
-        {SEGMENTS.map(([id, label]) => (
+        {SEGMENTS.filter(([id]) => id !== 'acervo' || user).map(([id, label]) => (
           <button
             key={id}
             type="button"

@@ -68,7 +68,7 @@ export interface ThemeDef {
 }
 
 export type TabId = 'home' | 'search' | 'library';
-export type LibrarySegment = 'liked' | 'offline';
+export type LibrarySegment = 'liked' | 'offline' | 'acervo';
 export type GateKind = 'play' | 'dl';
 
 export interface Gate {

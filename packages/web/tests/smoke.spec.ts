@@ -508,6 +508,9 @@ test('enviar arquivo sobe para o bucket, processa e a faixa entra no acervo', as
   await page.getByRole('button', { name: /continuar como visitante/ }).click();
   await aba(/~\/biblioteca/).click();
   await expect(page.getByText('enviar', { exact: true })).toBeHidden();
+  // O chip `--acervo` some junto, pelo mesmo motivo: sem conta o catálogo não
+  // traz faixa própria nenhuma, e ele seria uma lista sempre vazia.
+  await expect(page.getByRole('button', { name: '--acervo' })).toBeHidden();
 
   await page.goto('/login');
   await skipSplash(page);
@@ -539,6 +542,13 @@ test('enviar arquivo sobe para o bucket, processa e a faixa entra no acervo', as
   await aba(/~\/biblioteca/).click();
   await page.getByRole('button', { name: 'dispensar Noite Fria' }).click();
   await expect(page.getByText('pronto', { exact: true })).toBeHidden();
+
+  // E a biblioteca sabe mostrar o acervo: o segmento vai pela procedência da
+  // faixa, não por curtida nem download — `--curtidas` continua vazia.
+  await expect(page.getByText(/vazio — pressione \[l\]/)).toBeVisible();
+  await page.getByRole('button', { name: '--acervo' }).click();
+  await expect(page.getByRole('button', { name: /Noite Fria/ })).toBeVisible();
+
   await aba(/~\/em-alta/).click();
   await expect(page.getByRole('button', { name: /Noite Fria/ })).toBeVisible();
 });

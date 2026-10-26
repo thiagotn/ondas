@@ -26,6 +26,10 @@ export function visibleTracks(v: ListQuery): Track[] {
     if (!q) return v.tracks.slice(0, 8);
     return v.tracks.filter((t) => `${t.title} ${t.artist} ${t.genre}`.toLowerCase().includes(q));
   }
+  // `acervo` não olha estado local: curtida e offline são marcas que o
+  // aparelho guarda, e o acervo é o que a conta tem. Daí o filtro ser a
+  // procedência da faixa, posta pelo adaptador em `catalog/acervo.ts`.
+  if (v.seg === 'acervo') return v.tracks.filter((t) => t.source === 'acervo');
   return v.tracks.filter((t) => (v.seg === 'liked' ? v.liked[t.id] : v.cached[t.id]));
 }
 
@@ -64,7 +68,7 @@ export function promptLine(args: {
     return {
       who,
       cwd: '~/biblioteca',
-      cmd: 'ondas ls --' + (seg === 'liked' ? 'curtidas' : 'offline'),
+      cmd: 'ondas ls --' + (seg === 'liked' ? 'curtidas' : seg),
       comment: `${count} itens`,
     };
   }
@@ -94,6 +98,9 @@ export function emptyText(args: {
   if (tab === 'search') return `grep: nenhum resultado para "${q}"`;
   if (tab === 'library') {
     if (seg === 'liked') return 'vazio — pressione [l] ou o coração para curtir.';
+    if (seg === 'acervo') {
+      return user ? 'vazio — envie um arquivo com [+ arquivo].' : 'o acervo exige login.';
+    }
     return user
       ? 'vazio — baixe faixas [d] ou ative o buffer para ouvir sem rede.'
       : 'downloads offline exigem login.';

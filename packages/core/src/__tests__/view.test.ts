@@ -48,6 +48,16 @@ describe('visibleTracks', () => {
     expect(visibleTracks({ ...base, tab: 'library', seg: 'liked', liked, cached })).toHaveLength(1);
     expect(visibleTracks({ ...base, tab: 'library', seg: 'offline', liked, cached })).toHaveLength(2);
   });
+
+  it('o segmento acervo vai pela procedência, não pelo que o aparelho marcou', () => {
+    const proprias = tracks.slice(0, 2).map((t) => ({ ...t, source: 'acervo' as const }));
+    const misturadas = [...proprias, ...tracks.slice(2)];
+    const so = visibleTracks({ ...base, tracks: misturadas, tab: 'library', seg: 'acervo' });
+    expect(so).toHaveLength(2);
+    expect(so.every((t) => t.source === 'acervo')).toBe(true);
+    // Nada de curtida nem de offline: as duas marcas estão vazias aqui.
+    expect(visibleTracks({ ...base, tracks: misturadas, tab: 'library', seg: 'liked' })).toHaveLength(0);
+  });
 });
 
 describe('promptLine', () => {
@@ -109,6 +119,7 @@ describe('promptLine', () => {
     const args = { tab: 'library' as const, who: 'a', genre: 'tudo', q: '', source: '' as const, count: 3 };
     expect(promptLine({ ...args, seg: 'liked' }).cmd).toBe('ondas ls --curtidas');
     expect(promptLine({ ...args, seg: 'offline' }).cmd).toBe('ondas ls --offline');
+    expect(promptLine({ ...args, seg: 'acervo' }).cmd).toBe('ondas ls --acervo');
     expect(promptLine({ ...args, seg: 'offline' }).comment).toBe('3 itens');
   });
 });
@@ -130,6 +141,12 @@ describe('emptyText', () => {
     ).toBe('vazio — baixe faixas [d] ou ative o buffer para ouvir sem rede.');
     expect(emptyText({ tab: 'library', seg: 'offline', q: '', loading: false, user: null })).toBe(
       'downloads offline exigem login.',
+    );
+    expect(
+      emptyText({ tab: 'library', seg: 'acervo', q: '', loading: false, user: { name: 'a' } }),
+    ).toBe('vazio — envie um arquivo com [+ arquivo].');
+    expect(emptyText({ tab: 'library', seg: 'acervo', q: '', loading: false, user: null })).toBe(
+      'o acervo exige login.',
     );
   });
 });
