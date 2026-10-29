@@ -1,4 +1,5 @@
 import {
+  defaultLibrarySegment,
   emptyText,
   LIBRARY_SEGMENTS,
   parseLibrarySegment,
@@ -30,14 +31,17 @@ const ROTULOS: Record<LibrarySegment, string> = {
  *
  * O segmento é o path (`/library/offline`), e não estado de tela: assim cada
  * recorte é linkável, sobrevive a um reload e o voltar anda entre eles.
- * `/library` sem segmento vale `--curtidas`, e um segmento desconhecido cai
- * nele em vez de dar tela de erro.
+ * `/library` sem segmento vale `--acervo` com conta e `--curtidas` sem ela
+ * (`defaultLibrarySegment`), e um segmento desconhecido cai no mesmo padrão em
+ * vez de dar tela de erro.
  */
 export function LibraryRoute() {
   const { data, isLoading } = useCatalog();
   const navigate = useNavigate();
-  const seg = parseLibrarySegment(useParams().seg);
   const user = useSession((st) => st.user);
+  // O padrão depende da sessão, então ele é lido DEPOIS do usuário: sem conta,
+  // abrir em `--acervo` marcaria um chip que a linha abaixo nem desenha.
+  const seg = parseLibrarySegment(useParams().seg, defaultLibrarySegment(user));
   const liked = useLibrary((st) => st.liked);
   const cached = useLibrary((st) => st.cached);
 

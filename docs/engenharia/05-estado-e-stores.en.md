@@ -155,6 +155,11 @@ What crosses the boundary the other way is small too: `parseLibrarySegment`
 `/library/garbage` would make the prompt write `ondas ls --garbage` and the list show the wrong
 segment — the URL ruling the app.
 
+The sieve needs a default, and it is not a constant: `defaultLibrarySegment` returns `acervo` when
+there is an account and `liked` when there is not. It is where both `/library` without a segment and
+the garbage land, and it depends on the session because without an account the private library does
+not exist — opening on it would press a chip the screen does not even draw.
+
 ## The boundary with the query cache
 
 Two state libraries in one app need a rule, and Ondas' is:

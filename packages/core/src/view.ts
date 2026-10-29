@@ -30,18 +30,37 @@ export function librarySegmentSlug(seg: LibrarySegment): string {
 }
 
 /**
+ * O recorte que `/library` sem segmento significa.
+ *
+ * Com conta é `acervo`: a biblioteca é onde ficam as faixas que são da pessoa,
+ * e é o recorte que o envio alimenta — abrir em `--curtidas` pedia um clique
+ * antes de mostrar o que ela tem. Sem conta o acervo não existe: o catálogo não
+ * traz faixa própria nenhuma e o chip nem é desenhado (`LibraryRoute`), então
+ * ali o padrão volta a ser `liked`, que vive no aparelho e não pede servidor.
+ *
+ * Aqui, e não na tela, porque é a mesma regra que decide duas coisas: onde
+ * `/library` abre e onde cai um segmento que não existe.
+ */
+export function defaultLibrarySegment(user: Session): LibrarySegment {
+  return user ? 'acervo' : 'liked';
+}
+
+/**
  * Palavra da URL → recorte da biblioteca; o que não é uma das três vale
- * `liked`, que é também o que `/library` sem segmento significa.
+ * `padrao` — na tela, o de `defaultLibrarySegment`.
  *
  * Normaliza em silêncio em vez de dar tela de erro: `/library/lixo` é um
  * endereço digitado errado, não uma falha a explicar. O que ele NÃO pode fazer
  * é atravessar para dentro do app — sem isto, `promptLine` escreveria
  * `ondas ls --lixo` no prompt e a lista mostraria o recorte errado. Pela mesma
- * régua, `/library/acervo` (a palavra velha) cai em `liked`: paths em
- * português não redirecionam, eles simplesmente não existem mais.
+ * régua, `/library/acervo` (a palavra velha) cai no padrão: paths em português
+ * não redirecionam, eles simplesmente não existem mais.
  */
-export function parseLibrarySegment(raw: string | undefined): LibrarySegment {
-  return LIBRARY_SEGMENTS.find((seg) => SEGMENT_SLUGS[seg] === raw) ?? 'liked';
+export function parseLibrarySegment(
+  raw: string | undefined,
+  padrao: LibrarySegment,
+): LibrarySegment {
+  return LIBRARY_SEGMENTS.find((seg) => SEGMENT_SLUGS[seg] === raw) ?? padrao;
 }
 
 /** `tudo` + até 8 gêneros presentes no catálogo, na ordem em que aparecem. */

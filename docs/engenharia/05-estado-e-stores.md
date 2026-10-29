@@ -152,6 +152,10 @@ O que atravessa a fronteira em sentido contrário também é pouco: `parseLibrar
 (`packages/core/src/view.ts`) é a peneira do que entra pela URL. Sem ela, `/library/lixo` faria o
 prompt escrever `ondas ls --lixo` e a lista mostrar o recorte errado — a URL mandando no app.
 
+A peneira precisa de um padrão, e ele não é constante: `defaultLibrarySegment` dá `acervo` com conta
+e `liked` sem ela. É para onde vai tanto `/library` sem segmento quanto o lixo, e depende da sessão
+porque sem conta o acervo não existe — abrir nele marcaria um chip que a tela nem desenha.
+
 ## A fronteira com o cache de consultas
 
 Duas bibliotecas de estado no mesmo app precisam de uma regra, e a do Ondas é:

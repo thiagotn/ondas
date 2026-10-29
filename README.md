@@ -183,7 +183,7 @@ não redirecionam: uso pessoal, e um endereço a menos para manter.
 | --- | --- |
 | `/` | em-alta; `?genre=<slug>` é o chip, omitido quando é `tudo` |
 | `/search` | busca; `?q=<termo>` escrito com `replace`, para o voltar não andar letra por letra |
-| `/library/<recorte>` | `liked`, `offline` ou `archive`; `/library` vale `liked`, e o que não é um dos três também (`parseLibrarySegment`) |
+| `/library/<recorte>` | `liked`, `offline` ou `archive`; `/library` vale `archive` com conta e `liked` sem ela — e o que não é um dos três cai no mesmo padrão (`defaultLibrarySegment`, `parseLibrarySegment`) |
 | `/t/<slug>-<id>` | a faixa: o link que se manda E o player cheio aberto |
 | `/login` | fora do `AppLayout`, é a única tela sem abas |
 | `?account=1` / `?shortcuts=1` | os dois overlays que não são conteúdo, no `useOverlayParam` |
@@ -192,6 +192,11 @@ Qualquer outro path **normaliza** para `/` em vez de desenhar a home com o ender
 barra. Quem decide o recorte, o chip e o termo é a URL, e não um estado de tela — então cada um
 deles é linkável, sobrevive a um reload e o voltar anda entre eles. O preço aceito: trocar de aba
 vai para o path limpo e esquece o filtro, que o voltar devolve.
+
+O padrão da biblioteca depende da sessão: com conta, `/library` abre em `--acervo`, que é o recorte
+das faixas da pessoa e o que o envio alimenta; sem conta o acervo não existe — o catálogo não traz
+faixa própria nenhuma e o chip nem é desenhado —, então ali ela abre em `--curtidas`, que vive no
+aparelho e não pede servidor.
 
 ### Link de faixa
 

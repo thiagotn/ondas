@@ -3,6 +3,7 @@ import { demoTracks } from '../catalog/demo.js';
 import {
   bufferShortLabel,
   bufferSourceLabel,
+  defaultLibrarySegment,
   emptyText,
   genreOptions,
   LIBRARY_SEGMENTS,
@@ -16,29 +17,43 @@ import {
 const tracks = demoTracks();
 const base = { tracks, q: '', genre: 'tudo', seg: 'liked' as const, liked: {}, cached: {} };
 
+describe('defaultLibrarySegment', () => {
+  it('com conta abre no acervo, que é o que a biblioteca da pessoa tem', () => {
+    expect(defaultLibrarySegment({ name: 'thiago' })).toBe('acervo');
+  });
+
+  it('sem conta volta a `liked`: o chip do acervo nem é desenhado ali', () => {
+    expect(defaultLibrarySegment(null)).toBe('liked');
+  });
+});
+
 describe('parseLibrarySegment', () => {
   it('ida e volta pelos três recortes', () => {
     for (const seg of LIBRARY_SEGMENTS) {
-      expect(parseLibrarySegment(librarySegmentSlug(seg))).toBe(seg);
+      expect(parseLibrarySegment(librarySegmentSlug(seg), 'liked')).toBe(seg);
     }
   });
 
   it('o acervo é `archive` na URL, porque o path é inglês e o id não', () => {
     expect(librarySegmentSlug('acervo')).toBe('archive');
-    expect(parseLibrarySegment('archive')).toBe('acervo');
+    expect(parseLibrarySegment('archive', 'liked')).toBe('acervo');
   });
 
-  it('sem segmento é `--curtidas`, que é o que `/library` significa', () => {
-    expect(parseLibrarySegment(undefined)).toBe('liked');
-    expect(parseLibrarySegment('')).toBe('liked');
+  it('sem segmento é o padrão, que é o que `/library` significa', () => {
+    for (const vazio of [undefined, '']) {
+      expect(parseLibrarySegment(vazio, 'acervo')).toBe('acervo');
+      expect(parseLibrarySegment(vazio, 'liked')).toBe('liked');
+    }
   });
 
   it('o que vem errado na URL não atravessa para dentro do app', () => {
     // Sem a peneira, `promptLine` escreveria `ondas ls --lixo` e a lista
     // mostraria o recorte errado — a URL mandando no prompt. `acervo` entra na
     // lista por ser a palavra velha: ela deixou de existir, não redireciona.
+    // O padrão aqui é `liked` de propósito: com `acervo` a palavra velha
+    // acertaria o recorte por coincidência e o teste não provaria nada.
     for (const lixo of ['lixo', 'LIKED', '../', 'liked ', 'archive/x', 'acervo']) {
-      expect(parseLibrarySegment(lixo)).toBe('liked');
+      expect(parseLibrarySegment(lixo, 'liked')).toBe('liked');
     }
   });
 });

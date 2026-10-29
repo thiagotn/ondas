@@ -360,7 +360,13 @@ test('login libera o catálogo, e a conta sai da biblioteca para `ondas whoami`'
   // Atalho `3` abre a biblioteca.
   await page.keyboard.press('3');
   await expect(page).toHaveURL(/library/);
-  await expect(page.getByText('vazio — pressione [l] ou o coração para curtir.')).toBeVisible();
+  // Com conta, `/library` sem segmento abre no acervo: é o que é da pessoa, e
+  // o recorte que o envio alimenta. A faixa própria do stub já está na lista.
+  await expect(page.getByRole('button', { name: '--acervo' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByRole('button', { name: /Fita Caseira/ })).toBeVisible();
   // A biblioteca é só biblioteca: plano e ocupação não moram mais nela.
   await expect(page.getByText('catálogo completo + offline')).toBeHidden();
   await expect(page.getByText('0 faixas · 0.0 MB')).toBeHidden();
@@ -555,7 +561,11 @@ test('enviar arquivo sobe para o bucket, processa e a faixa entra no acervo', as
   await expect(page.getByText('pronto', { exact: true })).toBeHidden();
 
   // E a biblioteca sabe mostrar o acervo: o segmento vai pela procedência da
-  // faixa, não por curtida nem download — `--curtidas` continua vazia.
+  // faixa, não por curtida nem download. Com conta é onde `/library` abre, daí
+  // a enviada já estar na lista — e `--curtidas` continuar vazia.
+  await expect(page.getByRole('button', { name: /Noite Fria/ })).toBeVisible();
+  await page.getByRole('button', { name: '--curtidas' }).click();
+  await expect(page).toHaveURL('/library/liked');
   await expect(page.getByText(/vazio — pressione \[l\]/)).toBeVisible();
   await page.getByRole('button', { name: '--acervo' }).click();
   // O chip fala português e o endereço fala inglês, de propósito: o id do
@@ -1512,6 +1522,8 @@ test('o segmento da biblioteca é um endereço, e o voltar anda entre eles', asy
 
   await page.keyboard.press('3');
   await expect(page).toHaveURL('/library');
+  // Visitante não tem acervo, então o padrão de `/library` aqui é `--curtidas`
+  // (com conta é `--acervo`, exercitado no teste do login).
   const curtidas = page.getByRole('button', { name: '--curtidas' });
   const offline = page.getByRole('button', { name: '--offline' });
   await expect(curtidas).toHaveAttribute('aria-pressed', 'true');
