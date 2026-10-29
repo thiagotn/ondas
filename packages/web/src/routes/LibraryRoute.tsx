@@ -1,23 +1,42 @@
-import { emptyText, promptLine, visibleTracks, whoAmI, type LibrarySegment } from '@ondas/core';
+import {
+  emptyText,
+  LIBRARY_SEGMENTS,
+  parseLibrarySegment,
+  promptLine,
+  visibleTracks,
+  whoAmI,
+  type LibrarySegment,
+} from '@ondas/core';
 import { useMemo } from 'react';
-import { uiStore, useLibrary, useSession, useUi } from '../app/stores';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useLibrary, useSession } from '../app/stores';
 import { TabScaffold } from '../components/TabScaffold';
 import { UploadPanel } from '../components/UploadPanel';
 import { TrackList } from '../components/TrackList';
 import { useTrackRows } from '../hooks/useTrackRows';
 import { useCatalog } from '../query/catalog';
 import s from '../components/shell.module.css';
+import { librarySegPath } from './paths';
 
-const SEGMENTS: [LibrarySegment, string][] = [
-  ['liked', '--curtidas'],
-  ['offline', '--offline'],
-  ['acervo', '--acervo'],
-];
+/** O rótulo de cada recorte; a ordem é a de `LIBRARY_SEGMENTS`. */
+const ROTULOS: Record<LibrarySegment, string> = {
+  liked: '--curtidas',
+  offline: '--offline',
+  acervo: '--acervo',
+};
 
-/** `~/biblioteca`: envio para o acervo, os três segmentos e a lista. */
+/**
+ * `~/biblioteca`: envio para o acervo, os três segmentos e a lista.
+ *
+ * O segmento é o path (`/library/offline`), e não estado de tela: assim cada
+ * recorte é linkável, sobrevive a um reload e o voltar anda entre eles.
+ * `/library` sem segmento vale `--curtidas`, e um segmento desconhecido cai
+ * nele em vez de dar tela de erro.
+ */
 export function LibraryRoute() {
   const { data, isLoading } = useCatalog();
-  const seg = useUi((st) => st.seg);
+  const navigate = useNavigate();
+  const seg = parseLibrarySegment(useParams().seg);
   const user = useSession((st) => st.user);
   const liked = useLibrary((st) => st.liked);
   const cached = useLibrary((st) => st.cached);
@@ -52,15 +71,15 @@ export function LibraryRoute() {
           lista sempre vazia. Quem sai da conta com ele escolhido cai no texto
           de vazio que explica o login (ver `emptyText`). */}
       <div className={s.segments}>
-        {SEGMENTS.filter(([id]) => id !== 'acervo' || user).map(([id, label]) => (
+        {LIBRARY_SEGMENTS.filter((id) => id !== 'acervo' || user).map((id) => (
           <button
             key={id}
             type="button"
             aria-pressed={seg === id}
             className={seg === id ? `${s.segment} ${s.segmentActive}` : s.segment}
-            onClick={() => uiStore.getState().setSeg(id)}
+            onClick={() => navigate(librarySegPath(id))}
           >
-            {label}
+            {ROTULOS[id]}
           </button>
         ))}
       </div>

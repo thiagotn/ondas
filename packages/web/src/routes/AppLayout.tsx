@@ -15,9 +15,9 @@ import { searchInputRef } from '../hooks/searchInputRef';
 import { useCurrentTrack } from '../hooks/useCurrentTrack';
 import { useAccountOverlay } from '../hooks/useAccountOverlay';
 import { useHelpOverlay } from '../hooks/useHelpOverlay';
-import { usePlayerOverlay } from '../hooks/usePlayerOverlay';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useCatalog } from '../query/catalog';
+import { PATHS } from './paths';
 
 /**
  * Casca do app: barra de abas, conteúdo da aba, rodapé e os overlays.
@@ -29,20 +29,23 @@ export function AppLayout() {
   const restored = useSession((st) => st.restored);
   const guest = useGuestMode((st) => st.guest);
   const gate = useUi((st) => st.gate);
-  const { isPlayerOpen } = usePlayerOverlay();
   const { isHelpOpen } = useHelpOverlay();
   const { isAccountOpen } = useAccountOverlay();
   const { pathname } = useLocation();
 
+  // `/t/...` diz duas coisas ao mesmo tempo, e por isso é um valor só: o
+  // player cheio está aberto (ele é a rota da faixa, ver `usePlayerOverlay`) e
+  // a pessoa pode ter chegado por um link de fora.
+  //
   // Link de faixa não passa pela tela de login: quem recebeu o link quer
   // ouvir a música, não escolher um modo de sessão. O visitante já estava a
   // um clique de distância ali, e `/t/<lixo>` não parseia — esse continua
   // indo para o login como qualquer outra rota desconhecida.
-  const deeplink = parseTrackPath(pathname);
+  const faixaDaRota = parseTrackPath(pathname);
   const entrarComoVisitante = useGuestMode((st) => st.enterAsGuest);
   useEffect(() => {
-    if (deeplink && !user && !guest) entrarComoVisitante();
-  }, [deeplink, user, guest, entrarComoVisitante]);
+    if (faixaDaRota && !user && !guest) entrarComoVisitante();
+  }, [faixaDaRota, user, guest, entrarComoVisitante]);
 
   useShortcuts(searchInputRef);
 
@@ -60,7 +63,7 @@ export function AppLayout() {
   // restaurada, então `guest` já é true quando `restored` vira. Ele existe
   // para o caso em que a sessão cai COM a pessoa parada num `/t/...` — sair
   // da conta ali não pode jogá-la na tela de login e perder a faixa.
-  if (!user && !guest) return deeplink ? null : <Navigate to="/login" replace />;
+  if (!user && !guest) return faixaDaRota ? null : <Navigate to={PATHS.login} replace />;
 
   return (
     <div className={s.app}>
@@ -71,7 +74,11 @@ export function AppLayout() {
         </div>
       </main>
       <BottomBar track={current} />
-      {isPlayerOpen && current && <FullPlayer track={current} />}
+      {/* Rota E faixa: `current` vem do `curId`, que no primeiro quadro de
+          `/t/<outra>` ainda é a faixa anterior. Sem o casamento, o player
+          cheio da faixa velha apareceria sobre o endereço da nova — e cobriria
+          o "resolvendo…" e o aviso de faixa privada do `TrackRoute`. */}
+      {current?.id === faixaDaRota && <FullPlayer track={current} />}
       {/* Depois do player: aberto por cima dele quando os dois estão na URL. */}
       {isAccountOpen && <AccountOverlay />}
       {/* Por cima de tudo: é referência passageira, quem abre quer fechar em

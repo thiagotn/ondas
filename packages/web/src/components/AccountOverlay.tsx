@@ -7,6 +7,7 @@ import { offlineStore } from '../app/services';
 import { libraryStore, useLibrary, useSession } from '../app/stores';
 import { useAccountOverlay } from '../hooks/useAccountOverlay';
 import { useWide } from '../hooks/useWide';
+import { PATHS } from '../routes/paths';
 import o from './overlay.module.css';
 import s from './shell.module.css';
 
@@ -59,13 +60,13 @@ export function AccountOverlay() {
                   onClick={() => {
                     void controller.logout();
                     leaveGuest();
-                    navigate('/login');
+                    navigate(PATHS.login);
                   }}
                 >
                   [sair]
                 </button>
               ) : (
-                <button type="button" className={s.link} onClick={() => navigate('/login')}>
+                <button type="button" className={s.link} onClick={() => navigate(PATHS.login)}>
                   [entrar]
                 </button>
               )}

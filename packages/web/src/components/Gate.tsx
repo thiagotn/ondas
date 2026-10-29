@@ -1,15 +1,14 @@
 import { gateCopy, type Gate as GateModel } from '@ondas/core';
 import { useNavigate } from 'react-router-dom';
 import { uiStore } from '../app/stores';
-import { usePlayerOverlay } from '../hooks/usePlayerOverlay';
 import { useWide } from '../hooks/useWide';
+import { PATHS } from '../routes/paths';
 import s from './overlay.module.css';
 
 /** "permissão negada": faixa [pro] para visitante, ou download sem conta. */
 export function Gate({ gate }: { gate: GateModel }) {
   const navigate = useNavigate();
   const wide = useWide();
-  const { isPlayerOpen, closePlayer } = usePlayerOverlay();
   const copy = gateCopy(gate);
   const close = () => uiStore.getState().closeGate();
 
@@ -32,8 +31,8 @@ export function Gate({ gate }: { gate: GateModel }) {
             autoFocus
             onClick={() => {
               close();
-              if (isPlayerOpen) closePlayer();
-              navigate('/login');
+              // Ir para o login já sai da rota da faixa: o player fecha com ela.
+              navigate(PATHS.login);
             }}
           >
             {wide ? '[enter] entrar' : 'entrar'}

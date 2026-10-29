@@ -84,7 +84,7 @@ identidade **interna**.
 | `player` | `packages/core/src/stores/player.ts` | o que toca, tempo, buffer, shuffle, repeat |
 | `library` | `packages/core/src/stores/library.ts` | curtidas, baixadas, tamanhos, progresso |
 | `session` | `packages/core/src/stores/session.ts` | usuário e se a sessão já foi lida |
-| `ui` | `packages/core/src/stores/ui.ts` | aba, busca, gênero, tema, cursor, toast, fundo |
+| `ui` | `packages/core/src/stores/ui.ts` | tema, cursor, toast, gate, picker, fundo |
 | `avulsas` | `packages/web/src/app/extras.ts` | faixas abertas por link direto |
 | `guest` | `packages/web/src/app/guest.ts` | modo visitante (não persiste) |
 | `uploads` | `packages/web/src/app/uploads.ts` | fila de envio de arquivos |
@@ -130,15 +130,37 @@ E um detalhe que parece pequeno: o fundo personalizado é um dataURL de até ~1 
 cota de 5 MB do `localStorage` (`packages/web/src/app/stores.ts:22-26`). É o mesmo app usando os
 dois armazenamentos por razões opostas — um porque é síncrono, o outro porque é grande.
 
+## O terceiro dono: a URL
+
+O store de interface guardava mais do que devia. Aba, recorte da biblioteca, chip de gênero e termo
+de busca eram campos de `ui` — e nenhum deles sobrevivia a um reload, nenhum era linkável, e a aba
+chegou a ter **dois** donos (o campo `tab` e o pathname), que divergiram até o campo virar código
+morto que ninguém lia.
+
+Hoje a regra é: **o que descreve o conteúdo em foco mora no endereço.** O recorte é path
+(`/library/offline`), o chip e o termo são query (`/?genre=jazz`, `/search?q=mar`), e o player
+cheio é a rota da faixa (`/t/<slug>-<id>`) em vez de um `?player=1` que sabia dizer que havia
+música na tela mas não qual. O que sobra em `ui` é o que não é conteúdo: tema, cursor, toast, gate,
+picker e as preferências de fundo.
+
+Isso teve um custo de zero em `core`, e o motivo vale registrar: `visibleTracks`, `promptLine` e
+`emptyText` (`packages/core/src/view.ts`) sempre receberam o filtro **por argumento**, nunca lendo
+store. Trocar a fonte do filtro não tocou numa linha de `core` nem num teste de `core` — é o
+desenho antigo pagando dividendo.
+
+O que atravessa a fronteira em sentido contrário também é pouco: `parseLibrarySegment`
+(`packages/core/src/view.ts`) é a peneira do que entra pela URL. Sem ela, `/library/lixo` faria o
+prompt escrever `ondas ls --lixo` e a lista mostrar o recorte errado — a URL mandando no app.
+
 ## A fronteira com o cache de consultas
 
 Duas bibliotecas de estado no mesmo app precisam de uma regra, e a do Ondas é:
 
-| | TanStack Query | Zustand |
-|---|---|---|
-| Natureza | dado de fora, que pode ficar velho | dado da sessão, sem versão no servidor |
-| Exemplo | o catálogo | o que toca, curtidas, tema, cursor |
-| Tem revalidação? | sim | não faz sentido |
+| | TanStack Query | Zustand | URL |
+|---|---|---|---|
+| Natureza | dado de fora, que pode ficar velho | dado da sessão, sem versão no servidor | o conteúdo em foco |
+| Exemplo | o catálogo | o que toca, curtidas, tema, cursor | a faixa aberta, o recorte, o filtro |
+| Tem revalidação? | sim | não faz sentido | é o navegador que guarda |
 
 A regra pega bem, e paga uma dívida concreta. A chave do catálogo é **escopada pela sessão**
 (`packages/web/src/query/catalog.ts:12`): `['catalog','trending','com-acervo']` para quem está

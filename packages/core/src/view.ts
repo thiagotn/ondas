@@ -1,6 +1,49 @@
 import { fmtBytes, fmtTime } from './format.js';
 import type { Catalog, LibrarySegment, Session, TabId, Track } from './types.js';
 
+/**
+ * Os três recortes da biblioteca, na ordem em que a tela os mostra.
+ *
+ * Aqui, e não na tela: eles viraram endereço (`/library/offline`), e o que
+ * entra pela URL é texto de fora — precisa de uma peneira testável.
+ */
+export const LIBRARY_SEGMENTS: readonly LibrarySegment[] = ['liked', 'offline', 'acervo'];
+
+/**
+ * A palavra de cada recorte na URL.
+ *
+ * Duas delas são o próprio id; `acervo` vira `archive` porque todo path do app
+ * é inglês. O id NÃO acompanha: ele é o mesmo valor que a API emite em
+ * `Track.source` (`api/internal/httpapi/acervo.go`) e que o chip `--acervo`
+ * anuncia na tela — traduzir o id para casar com a URL exigiria traduzir os
+ * dois, e um deles não é nosso.
+ */
+const SEGMENT_SLUGS: Record<LibrarySegment, string> = {
+  liked: 'liked',
+  offline: 'offline',
+  acervo: 'archive',
+};
+
+/** Recorte → a palavra dele na URL. */
+export function librarySegmentSlug(seg: LibrarySegment): string {
+  return SEGMENT_SLUGS[seg];
+}
+
+/**
+ * Palavra da URL → recorte da biblioteca; o que não é uma das três vale
+ * `liked`, que é também o que `/library` sem segmento significa.
+ *
+ * Normaliza em silêncio em vez de dar tela de erro: `/library/lixo` é um
+ * endereço digitado errado, não uma falha a explicar. O que ele NÃO pode fazer
+ * é atravessar para dentro do app — sem isto, `promptLine` escreveria
+ * `ondas ls --lixo` no prompt e a lista mostraria o recorte errado. Pela mesma
+ * régua, `/library/acervo` (a palavra velha) cai em `liked`: paths em
+ * português não redirecionam, eles simplesmente não existem mais.
+ */
+export function parseLibrarySegment(raw: string | undefined): LibrarySegment {
+  return LIBRARY_SEGMENTS.find((seg) => SEGMENT_SLUGS[seg] === raw) ?? 'liked';
+}
+
 /** `tudo` + até 8 gêneros presentes no catálogo, na ordem em que aparecem. */
 export function genreOptions(tracks: readonly Track[]): string[] {
   return ['tudo', ...[...new Set(tracks.map((t) => t.genre))].slice(0, 8)];

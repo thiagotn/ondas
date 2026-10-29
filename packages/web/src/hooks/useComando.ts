@@ -1,6 +1,8 @@
 import { parseComando } from '@ondas/core';
 import * as controller from '../app/controller';
 import { uiStore } from '../app/stores';
+import { GENRE_PARAM } from '../routes/paths';
+import { useQueryParam } from './useQueryParam';
 import { useTabNavigation } from './useTabNavigation';
 
 /**
@@ -14,6 +16,7 @@ import { useTabNavigation } from './useTabNavigation';
  */
 export function useComando() {
   const { tab, goToTab } = useTabNavigation();
+  const [genre] = useQueryParam(GENRE_PARAM, 'tudo', 'push');
 
   return (texto: string): void => {
     const cmd = parseComando(texto);
@@ -23,9 +26,9 @@ export function useComando() {
     const track = controller.irParaFaixa(cmd.numero);
     if (!track) return;
 
-    const naTela = tab === 'home' && (ui.genre === 'tudo' || track.genre === ui.genre);
+    const naTela = tab === 'home' && (genre === 'tudo' || track.genre === genre);
     if (naTela) return;
-    if (ui.genre !== 'tudo') ui.setGenre('tudo');
+    // `goToTab` vai para o path limpo da aba, o que já zera o chip de gênero.
     goToTab('home');
   };
 }

@@ -145,7 +145,7 @@ describe('parseTrackPath', () => {
   it('só olha caminho de faixa', () => {
     expect(parseTrackPath('/t/slug-abc123')).toBe('abc123');
     expect(parseTrackPath('/')).toBeNull();
-    expect(parseTrackPath('/buscar')).toBeNull();
+    expect(parseTrackPath('/search')).toBeNull();
     expect(parseTrackPath('/track/slug-abc123')).toBeNull();
     expect(parseTrackPath('/tabc123')).toBeNull();
   });

@@ -179,7 +179,7 @@ proxy que termina TLS.
 | `/assets/` | **1 ano** | o nome tem hash do conteúdo |
 | `/icons/` | 7 dias | |
 | `/manifest.webmanifest` | 1 hora | |
-| `/t/` | `expires -1` | senão o edge guarda o 302 do robô e serve a página de prévia para gente |
+| `/t/` | `expires -1` | senão o edge guarda o 302 do robô e serve a página de prévia para gente — e, desde que o path é o do player cheio, é rota quente |
 
 A última linha é uma falha que só aparece com CDN no caminho, e o comentário a nomeia.
 

@@ -18,6 +18,15 @@ async function blockAudius(page: Page) {
 const PICOS_METADE = '_'.repeat(100) + 'A'.repeat(100);
 
 /**
+ * Endereço da faixa — o do link que se manda para alguém E o do player cheio,
+ * que é a mesma coisa desde que ele deixou de ser `?player=1`. Os ids demo são
+ * alfanuméricos, logo parseáveis.
+ */
+const LINK_DEMO = '/t/lia-sombra-mare-baixa-demo0';
+/** `Fio de Cobre`, de `Bruma` — a faixa `lofi`, usada com o chip de gênero. */
+const LINK_LOFI = '/t/bruma-fio-de-cobre-demo3';
+
+/**
  * WAV de silêncio, montado na hora.
  *
  * Existe porque o `/audio` do acervo precisa devolver áudio TOCÁVEL: sem isso
@@ -223,7 +232,7 @@ async function skipSplash(page: Page) {
 async function abrirConta(page: Page, qual: 'prompt' | 'rodape' = 'prompt') {
   const portas = page.getByRole('button', { name: 'Conta e aparelho' });
   await (qual === 'prompt' ? portas.first() : portas.last()).click();
-  await expect(page).toHaveURL(/conta=1/);
+  await expect(page).toHaveURL(/account=1/);
   await expect(page.getByRole('dialog', { name: 'ondas whoami' })).toBeVisible();
 }
 
@@ -267,12 +276,14 @@ test('visitante entra, troca de tema, toca e abre o full player', async ({ page 
   await expect(page.getByText('Maré Baixa — Lia Sombra')).toBeVisible();
   await expect(page.getByText('PLAY', { exact: true })).toBeVisible();
 
-  // Full player via overlay na query string, e o voltar o fecha.
+  // Full player é a rota da faixa — o mesmo endereço que o botão de
+  // compartilhar entrega —, e o voltar o fecha.
   await page.getByRole('button', { name: 'Abrir player' }).click();
-  await expect(page).toHaveURL(/player=1/);
+  await expect(page).toHaveURL(LINK_DEMO);
   await expect(page.getByRole('heading', { name: 'Maré Baixa' })).toBeVisible();
   await expect(page.getByText('agora-tocando — #ambient')).toBeVisible();
   await page.goBack();
+  await expect(page).toHaveURL('/');
   await expect(page.getByRole('heading', { name: 'Maré Baixa' })).toBeHidden();
 });
 
@@ -348,7 +359,7 @@ test('login libera o catálogo, e a conta sai da biblioteca para `ondas whoami`'
 
   // Atalho `3` abre a biblioteca.
   await page.keyboard.press('3');
-  await expect(page).toHaveURL(/biblioteca/);
+  await expect(page).toHaveURL(/library/);
   await expect(page.getByText('vazio — pressione [l] ou o coração para curtir.')).toBeVisible();
   // A biblioteca é só biblioteca: plano e ocupação não moram mais nela.
   await expect(page.getByText('catálogo completo + offline')).toBeHidden();
@@ -363,7 +374,7 @@ test('login libera o catálogo, e a conta sai da biblioteca para `ondas whoami`'
   // Esc fecha uma camada e devolve o endereço.
   await page.keyboard.press('Escape');
   await expect(conta).toBeHidden();
-  await expect(page).not.toHaveURL(/conta=1/);
+  await expect(page).not.toHaveURL(/account=1/);
 });
 
 test('o acervo aparece só logado, marcado como [meu], e some ao sair', async ({ page }) => {
@@ -547,6 +558,9 @@ test('enviar arquivo sobe para o bucket, processa e a faixa entra no acervo', as
   // faixa, não por curtida nem download — `--curtidas` continua vazia.
   await expect(page.getByText(/vazio — pressione \[l\]/)).toBeVisible();
   await page.getByRole('button', { name: '--acervo' }).click();
+  // O chip fala português e o endereço fala inglês, de propósito: o id do
+  // recorte é o mesmo `source` que a API emite, e só a palavra da URL muda.
+  await expect(page).toHaveURL('/library/archive');
   await expect(page.getByRole('button', { name: /Noite Fria/ })).toBeVisible();
 
   await aba(/~\/em-alta/).click();
@@ -1071,10 +1085,10 @@ test('a forma de onda desenha o áudio quando ele é conhecido, e barra lisa qua
   expect(pequeno.menorNoComeco).toBeGreaterThan(pequeno.maiorNoFim * 10);
 });
 
-/** Link de faixa do catálogo demo: os ids demo são alfanuméricos, logo parseáveis. */
-const LINK_DEMO = '/t/lia-sombra-mare-baixa-demo0';
-
 test('link de faixa abre a música sem passar pelo login', async ({ page }) => {
+  // O bloqueio não é detalhe: o teste afirma faixas do catálogo demo, que só
+  // entra quando a API do Audius está fora do alcance.
+  await blockAudius(page);
   await page.goto(LINK_DEMO);
   await skipSplash(page);
 
@@ -1082,19 +1096,24 @@ test('link de faixa abre a música sem passar pelo login', async ({ page }) => {
   await expect(page.getByText('ondas — login')).toBeHidden();
   await expect(page.getByText(/sessão de visitante/)).toBeVisible();
 
-  // O player cheio abre já na faixa certa, e fica na URL.
-  await expect(page).toHaveURL(/player=1/);
+  // O player cheio abre já na faixa certa, e o endereço continua sendo o do
+  // link: ele não ganha param nenhum para dizer que está aberto.
+  await expect(page).toHaveURL(LINK_DEMO);
   await expect(page.getByRole('heading', { name: 'Maré Baixa' })).toBeVisible();
   await expect(page.getByText('Maré Baixa — Lia Sombra')).toBeVisible();
   // Nada de afirmar PLAY/PAUSE: a política de autoplay do Chromium decide
   // isso, e o link promete carregar a faixa, não tocá-la sozinha.
 
   // Fechando o player, quem chegou pelo link já está no app — sem tela morta.
+  // Sem tela de origem no histórico (o link veio de fora), fechar cai no
+  // em-alta em vez de sair do app.
   await page.getByRole('button', { name: /fechar/ }).click();
+  await expect(page).toHaveURL('/');
   await expect(page.getByText('Concreto Molhado')).toBeVisible();
 });
 
 test('link quebrado e link de faixa privada não contam nada', async ({ page }) => {
+  await blockAudius(page);
   await page.goto('/t/nada-ZZZZZZZZ');
   await skipSplash(page);
   await expect(page.getByText(/faixa não encontrada/)).toBeVisible();
@@ -1119,7 +1138,8 @@ test('a mesma faixa privada abre para quem tem a conta', async ({ page }) => {
 
   await page.goto('/t/_11111111111141118111111111111111');
   await expect(page.getByRole('heading', { name: 'Fita Caseira' })).toBeVisible();
-  await expect(page).toHaveURL(/player=1/);
+  // Sem slug e sem param: a URL de faixa própria não conta o que ela é.
+  await expect(page).toHaveURL('/t/_11111111111141118111111111111111');
 });
 
 test('compartilhar entrega o link da faixa', async ({ page, context }) => {
@@ -1135,6 +1155,7 @@ test('compartilhar entrega o link da faixa', async ({ page, context }) => {
     });
   });
 
+  await blockAudius(page);
   await page.goto(LINK_DEMO);
   await skipSplash(page);
   await expect(page.getByRole('heading', { name: 'Maré Baixa' })).toBeVisible();
@@ -1203,11 +1224,11 @@ test('os dígitos abrem as cinco telas, e a janela de atalhos se explica', async
   const conta = page.getByRole('dialog', { name: 'ondas whoami' });
   await page.keyboard.press('5');
   await expect(conta).toBeVisible();
-  await expect(page).toHaveURL(/conta=1/);
+  await expect(page).toHaveURL(/account=1/);
   // Alternar, e não abrir de novo: `show()` empilharia um "voltar" vazio.
   await page.keyboard.press('5');
   await expect(conta).toBeHidden();
-  await expect(page).not.toHaveURL(/conta=1/);
+  await expect(page).not.toHaveURL(/account=1/);
 
   const ajuda = page.getByRole('dialog', { name: 'ondas --help' });
   await page.keyboard.press('?');
@@ -1228,22 +1249,22 @@ test('os dígitos abrem as cinco telas, e a janela de atalhos se explica', async
   await expect(ajuda).toBeHidden();
 
   // Trocar de aba leva o overlay embora; antes ele ficava colado com
-  // `?atalhos=1` no endereço.
+  // `?shortcuts=1` no endereço.
   await page.keyboard.press('?');
   await expect(ajuda).toBeVisible();
   await page.keyboard.press('3');
-  await expect(page).toHaveURL(/biblioteca/);
-  await expect(page).not.toHaveURL(/atalhos=1/);
+  await expect(page).toHaveURL(/library/);
+  await expect(page).not.toHaveURL(/shortcuts=1/);
   await expect(ajuda).toBeHidden();
 
   // `0` são os detalhes do que está tocando — o mesmo que o `f` do handoff.
   await page.keyboard.press('1');
   await page.getByRole('button', { name: /Maré Baixa/ }).click();
   await page.keyboard.press('0');
-  await expect(page).toHaveURL(/player=1/);
+  await expect(page).toHaveURL(LINK_DEMO);
   await expect(page.getByText('agora-tocando — #ambient')).toBeVisible();
   await page.keyboard.press('0');
-  await expect(page).not.toHaveURL(/player=1/);
+  await expect(page).toHaveURL('/');
 });
 
 test('j/k andam o cursor, enter toca e `:nº` salta pela calha', async ({ page }) => {
@@ -1351,18 +1372,20 @@ test('`:nº` digita sem acionar atalho, e traz a faixa para uma lista onde ela a
   await entrarVisitante(page);
 
   await page.keyboard.press('3');
-  await expect(page).toHaveURL(/biblioteca/);
+  await expect(page).toHaveURL(/library/);
 
   // Digitar `1` dentro do comando NÃO troca de aba: o campo é um input de
   // verdade, e o guarda `typing` do useShortcuts desliga os atalhos.
   await page.keyboard.press(':');
   await page.getByLabel('Ir para a faixa pelo número').fill('1');
-  await expect(page).toHaveURL(/biblioteca/);
+  await expect(page).toHaveURL(/library/);
 
   // Confirmar leva para `~/em-alta`: o número é posição no catálogo inteiro, e
   // na biblioteca a faixa 01 pode nem estar na lista.
+  // Exato: o path limpo é o que zera o chip de gênero, então um `?genre=`
+  // pendurado aqui seria a falha que a regex antiga deixava passar.
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/$|\/\?/);
+  await expect(page).toHaveURL('/');
   await expect(cursor(page)).toContainText('Maré Baixa');
 });
 
@@ -1389,4 +1412,133 @@ test('o cursor anda pelas linhas da tela, não pelos vizinhos do catálogo', asy
   await expect(cursor(page)).toContainText('Maré Baixa');
   await page.keyboard.press('j');
   await expect(cursor(page)).toContainText('Último Trem');
+});
+
+/* ── O endereço é contextual ao conteúdo ──────────────────────────────────── */
+
+test('recarregar o player volta na mesma faixa', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+  await page.getByRole('button', { name: /Maré Baixa/ }).click();
+  await page.keyboard.press('0');
+  await expect(page).toHaveURL(LINK_DEMO);
+
+  // O que `?player=1` não conseguia: a identidade da faixa está no path, e o
+  // `playerStore` não é persistido — então o reload reconstrói a música em vez
+  // de abrir um overlay sobre nada.
+  await page.reload();
+  await skipSplash(page);
+  await expect(page).toHaveURL(LINK_DEMO);
+  await expect(page.getByRole('heading', { name: 'Maré Baixa' })).toBeVisible();
+});
+
+test('fechar o player devolve a tela de origem, com o filtro de lá', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+
+  // O chip de gênero também é endereço, então há uma origem que não é a raiz.
+  await page.getByRole('button', { name: 'lofi', exact: true }).click();
+  await expect(page).toHaveURL('/?genre=lofi');
+
+  await page.getByRole('button', { name: /Fio de Cobre/ }).click();
+  await page.keyboard.press('0');
+  await expect(page).toHaveURL(LINK_LOFI);
+
+  // Fechar não é "ir para a home": é voltar para onde se estava, com o recorte
+  // intacto.
+  await page.keyboard.press('Escape');
+  await expect(page).toHaveURL('/?genre=lofi');
+  await expect(page.getByRole('button', { name: '[lofi]', exact: true })).toBeVisible();
+});
+
+test('a conta abre sobre o player, e cada Esc fecha uma camada', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+  await page.getByRole('button', { name: 'lofi', exact: true }).click();
+  await page.getByRole('button', { name: /Fio de Cobre/ }).click();
+  await page.keyboard.press('0');
+
+  await page.keyboard.press('5');
+  await expect(page).toHaveURL(LINK_LOFI + '?account=1');
+  await expect(page.getByRole('dialog', { name: 'ondas whoami' })).toBeVisible();
+
+  // Esc tira a conta e deixa o player; o segundo fecha o player. E a tela de
+  // origem sobrevive ao overlay: `setSearchParams` navega sem `state`, então
+  // sem repassá-lo o fechar cairia na raiz em vez de voltar para `?genre=lofi`.
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'ondas whoami' })).toBeHidden();
+  await expect(page).toHaveURL(LINK_LOFI);
+  await page.keyboard.press('Escape');
+  await expect(page).toHaveURL('/?genre=lofi');
+});
+
+test('o gate [entrar] sai da rota da faixa e vai para o login', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+  await page.getByRole('button', { name: /Maré Baixa/ }).click();
+  await page.keyboard.press('0');
+  await expect(page).toHaveURL(LINK_DEMO);
+
+  // Baixar sem conta abre o gate por cima do player.
+  await page.keyboard.press('d');
+  const gate = page.getByRole('alertdialog', { name: 'permissão negada' });
+  await expect(gate).toBeVisible();
+
+  // Uma navegação só: fechar o player à parte disputaria com esta e devolveria
+  // a faixa depois do login empilhado.
+  await gate.getByRole('button', { name: /entrar/ }).click();
+  await expect(page).toHaveURL(/login/);
+});
+
+test('o Esc fecha o gate sem levar a camada de baixo', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+  await page.getByRole('button', { name: /Maré Baixa/ }).click();
+  await page.keyboard.press('0');
+  await page.keyboard.press('d');
+  const gate = page.getByRole('alertdialog', { name: 'permissão negada' });
+  await expect(gate).toBeVisible();
+
+  // O gate é a camada de cima; fechá-lo não pode fechar o player junto.
+  await page.keyboard.press('Escape');
+  await expect(gate).toBeHidden();
+  await expect(page).toHaveURL(LINK_DEMO);
+  await expect(page.getByText('agora-tocando — #ambient')).toBeVisible();
+});
+
+test('o segmento da biblioteca é um endereço, e o voltar anda entre eles', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+
+  await page.keyboard.press('3');
+  await expect(page).toHaveURL('/library');
+  const curtidas = page.getByRole('button', { name: '--curtidas' });
+  const offline = page.getByRole('button', { name: '--offline' });
+  await expect(curtidas).toHaveAttribute('aria-pressed', 'true');
+
+  await offline.click();
+  await expect(page).toHaveURL('/library/offline');
+  await expect(offline).toHaveAttribute('aria-pressed', 'true');
+
+  // Quem escolhe o recorte é a URL, não um estado de tela: o voltar troca o
+  // chip marcado.
+  await page.goBack();
+  await expect(page).toHaveURL('/library');
+  await expect(curtidas).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('a busca mora no endereço, e o voltar não anda letra por letra', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+
+  await page.keyboard.press('2');
+  await expect(page).toHaveURL('/search');
+  await page.getByLabel('Buscar faixa, artista ou gênero').pressSequentially('bruma');
+  await expect(page).toHaveURL('/search?q=bruma');
+  await expect(page.getByRole('button', { name: /Fio de Cobre/ })).toBeVisible();
+
+  // Cinco teclas, nenhuma entrada de histórico: digitar escreve com `replace`,
+  // senão o voltar desfaria um caractere por vez.
+  await page.goBack();
+  await expect(page).toHaveURL('/');
 });

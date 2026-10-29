@@ -179,7 +179,7 @@ a proxy that terminates TLS.
 | `/assets/` | **1 year** | The filename contains a content hash |
 | `/icons/` | 7 days | |
 | `/manifest.webmanifest` | 1 hour | |
-| `/t/` | `expires -1` | Otherwise the edge caches the bot's 302 and serves the preview page to humans |
+| `/t/` | `expires -1` | Otherwise the edge caches the bot's 302 and serves the preview page to humans — and since the path is the full player's, it is a hot route |
 
 That last row is a failure that only appears with a CDN in the path, and the comment names it.
 

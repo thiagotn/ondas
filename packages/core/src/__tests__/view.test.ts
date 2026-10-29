@@ -5,6 +5,9 @@ import {
   bufferSourceLabel,
   emptyText,
   genreOptions,
+  LIBRARY_SEGMENTS,
+  librarySegmentSlug,
+  parseLibrarySegment,
   promptLine,
   storageLabel,
   visibleTracks,
@@ -12,6 +15,33 @@ import {
 
 const tracks = demoTracks();
 const base = { tracks, q: '', genre: 'tudo', seg: 'liked' as const, liked: {}, cached: {} };
+
+describe('parseLibrarySegment', () => {
+  it('ida e volta pelos três recortes', () => {
+    for (const seg of LIBRARY_SEGMENTS) {
+      expect(parseLibrarySegment(librarySegmentSlug(seg))).toBe(seg);
+    }
+  });
+
+  it('o acervo é `archive` na URL, porque o path é inglês e o id não', () => {
+    expect(librarySegmentSlug('acervo')).toBe('archive');
+    expect(parseLibrarySegment('archive')).toBe('acervo');
+  });
+
+  it('sem segmento é `--curtidas`, que é o que `/library` significa', () => {
+    expect(parseLibrarySegment(undefined)).toBe('liked');
+    expect(parseLibrarySegment('')).toBe('liked');
+  });
+
+  it('o que vem errado na URL não atravessa para dentro do app', () => {
+    // Sem a peneira, `promptLine` escreveria `ondas ls --lixo` e a lista
+    // mostraria o recorte errado — a URL mandando no prompt. `acervo` entra na
+    // lista por ser a palavra velha: ela deixou de existir, não redireciona.
+    for (const lixo of ['lixo', 'LIKED', '../', 'liked ', 'archive/x', 'acervo']) {
+      expect(parseLibrarySegment(lixo)).toBe('liked');
+    }
+  });
+});
 
 describe('genreOptions', () => {
   it('começa em tudo e limita a 8 gêneros', () => {

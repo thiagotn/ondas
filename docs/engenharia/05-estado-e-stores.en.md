@@ -86,7 +86,7 @@ using it as an **internal** identity.
 | `player` | `packages/core/src/stores/player.ts` | what is playing, time, buffer, shuffle, repeat |
 | `library` | `packages/core/src/stores/library.ts` | likes, downloads, sizes, progress |
 | `session` | `packages/core/src/stores/session.ts` | the user, and whether the session was read yet |
-| `ui` | `packages/core/src/stores/ui.ts` | tab, search, genre, theme, cursor, toast, background |
+| `ui` | `packages/core/src/stores/ui.ts` | theme, cursor, toast, gate, picker, background |
 | `avulsas` | `packages/web/src/app/extras.ts` | tracks opened by direct link |
 | `guest` | `packages/web/src/app/guest.ts` | guest mode (not persisted) |
 | `uploads` | `packages/web/src/app/uploads.ts` | the file upload queue |
@@ -132,15 +132,38 @@ And a detail that looks small: the custom background is a data URL of up to ~1 M
 past `localStorage`'s 5 MB quota (`packages/web/src/app/stores.ts:22-26`). It is the same app using
 both stores for opposite reasons — one because it is synchronous, the other because it is large.
 
+## The third owner: the URL
+
+The interface store used to hold more than it should. The tab, the library segment, the genre chip
+and the search term were all fields of `ui` — and none of them survived a reload, none was
+linkable, and the tab even had **two** owners (the `tab` field and the pathname), which diverged
+until the field became dead code nobody read.
+
+The rule now is: **whatever describes the content in focus lives in the address.** The segment is a
+path (`/library/offline`), the chip and the term are query (`/?genre=jazz`, `/search?q=mar`), and
+the full player is the track's own route (`/t/<slug>-<id>`) instead of a `?player=1` that could say
+there was music on screen but not which. What is left in `ui` is what is not content: theme,
+cursor, toast, gate, picker and the background preferences.
+
+This cost exactly nothing in `core`, and the reason is worth recording: `visibleTracks`,
+`promptLine` and `emptyText` (`packages/core/src/view.ts`) always took the filter **as an
+argument**, never reading a store. Changing where the filter comes from touched no line of `core`
+and no test of `core` — the old design paying a dividend.
+
+What crosses the boundary the other way is small too: `parseLibrarySegment`
+(`packages/core/src/view.ts`) is the sieve for whatever arrives through the URL. Without it,
+`/library/garbage` would make the prompt write `ondas ls --garbage` and the list show the wrong
+segment — the URL ruling the app.
+
 ## The boundary with the query cache
 
 Two state libraries in one app need a rule, and Ondas' is:
 
-| | TanStack Query | Zustand |
-|---|---|---|
-| Nature | data from outside, which can go stale | session data, with no server version |
-| Example | the catalogue | what is playing, likes, theme, cursor |
-| Has revalidation? | yes | makes no sense |
+| | TanStack Query | Zustand | URL |
+|---|---|---|---|
+| Nature | data from outside, which can go stale | session data, with no server version | the content in focus |
+| Example | the catalogue | what is playing, likes, theme, cursor | the open track, the segment, the filter |
+| Has revalidation? | yes | makes no sense | the browser keeps it |
 
 The rule holds well, and it pays a concrete debt. The catalogue key is **scoped by session**
 (`packages/web/src/query/catalog.ts:12`): `['catalog','trending','com-acervo']` when signed in,

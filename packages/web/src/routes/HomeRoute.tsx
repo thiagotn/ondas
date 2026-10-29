@@ -1,16 +1,18 @@
 import { emptyText, genreOptions, promptLine, visibleTracks, whoAmI } from '@ondas/core';
 import { useMemo } from 'react';
-import { uiStore, useLibrary, useSession, useUi } from '../app/stores';
+import { useLibrary, useSession } from '../app/stores';
 import { GenreChips } from '../components/GenreChips';
 import { TabScaffold } from '../components/TabScaffold';
 import { TrackList } from '../components/TrackList';
+import { useQueryParam } from '../hooks/useQueryParam';
 import { useTrackRows } from '../hooks/useTrackRows';
 import { useCatalog } from '../query/catalog';
+import { GENRE_PARAM } from './paths';
 
 /** `~/em-alta`: trending filtrado por gênero. */
 export function HomeRoute() {
   const { data, isLoading, isFetching } = useCatalog();
-  const genre = useUi((s) => s.genre);
+  const [genre, setGenre] = useQueryParam(GENRE_PARAM, 'tudo', 'push');
   const user = useSession((s) => s.user);
   const liked = useLibrary((s) => s.liked);
   const cached = useLibrary((s) => s.cached);
@@ -39,11 +41,7 @@ export function HomeRoute() {
 
   return (
     <TabScaffold line={line}>
-      <GenreChips
-        options={genreOptions(tracks)}
-        value={genre}
-        onChange={(g) => uiStore.getState().setGenre(g)}
-      />
+      <GenreChips options={genreOptions(tracks)} value={genre} onChange={setGenre} />
       <TrackList
         rows={rows}
         loading={isLoading}

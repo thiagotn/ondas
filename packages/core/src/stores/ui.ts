@@ -1,6 +1,6 @@
 import { createStore } from 'zustand/vanilla';
 import { DEFAULT_THEME_ID } from '../themes.js';
-import type { Gate, GateKind, LibrarySegment, TabId, ThemeId, WallMode } from '../types.js';
+import type { Gate, GateKind, ThemeId, WallMode } from '../types.js';
 
 export const TOAST_MS = 3200;
 
@@ -22,16 +22,17 @@ export interface BackgroundSettings {
   wallImg: string;
 }
 
+/**
+ * Estado de tela que NÃO está no endereço.
+ *
+ * Aba, recorte da biblioteca, chip de gênero e termo de busca saíram daqui: o
+ * endereço é o dono deles (`/library/offline`, `/?genre=jazz`, `/search?q=mar`),
+ * e dois donos para o mesmo fato é como a aba e o `playerOpen` divergiram.
+ */
 export interface UiState {
-  tab: TabId;
-  /** Busca. */
-  q: string;
-  genre: string;
-  seg: LibrarySegment;
   themeId: ThemeId;
   toast: string;
   gate: Gate | null;
-  playerOpen: boolean;
   pickerOpen: boolean;
   pickIdx: number;
   /** Linha de comando do prompt aberta (`:`). */
@@ -51,17 +52,12 @@ export interface UiState {
   blur: number;
   wall: WallMode;
   wallImg: string;
-  setTab(tab: TabId): void;
-  setQ(q: string): void;
-  setGenre(genre: string): void;
-  setSeg(seg: LibrarySegment): void;
   setThemeId(id: ThemeId): void;
   /** Toast de 3,2 s; uma mensagem nova substitui a anterior. */
   flash(msg: string): void;
   clearToast(): void;
   openGate(kind: GateKind, title: string): void;
   closeGate(): void;
-  setPlayerOpen(open: boolean): void;
   openPicker(index: number): void;
   closePicker(): void;
   setPickIdx(index: number): void;
@@ -78,17 +74,12 @@ export interface UiState {
 
 export type UiStore = ReturnType<typeof createUiStore>;
 
-export function createUiStore(initial?: { themeId?: ThemeId; tab?: TabId; opacity?: number }) {
+export function createUiStore(initial?: { themeId?: ThemeId; opacity?: number }) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   return createStore<UiState>((set) => ({
-    tab: initial?.tab ?? 'home',
-    q: '',
-    genre: 'tudo',
-    seg: 'liked',
     themeId: initial?.themeId ?? DEFAULT_THEME_ID,
     toast: '',
     gate: null,
-    playerOpen: false,
     pickerOpen: false,
     pickIdx: 0,
     cmdOpen: false,
@@ -98,10 +89,6 @@ export function createUiStore(initial?: { themeId?: ThemeId; tab?: TabId; opacit
     blur: 16,
     wall: 'capa',
     wallImg: '',
-    setTab: (tab) => set({ tab }),
-    setQ: (q) => set({ q }),
-    setGenre: (genre) => set({ genre }),
-    setSeg: (seg) => set({ seg }),
     setThemeId: (themeId) => set({ themeId }),
     flash: (toast) => {
       clearTimeout(timer);
@@ -114,7 +101,6 @@ export function createUiStore(initial?: { themeId?: ThemeId; tab?: TabId; opacit
     },
     openGate: (kind, title) => set({ gate: { kind, title } }),
     closeGate: () => set({ gate: null }),
-    setPlayerOpen: (playerOpen) => set({ playerOpen }),
     openPicker: (pickIdx) => set({ pickerOpen: true, pickIdx }),
     closePicker: () => set({ pickerOpen: false }),
     setPickIdx: (pickIdx) => set({ pickIdx }),

@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as controller from '../app/controller';
 import { playerStore, uiStore } from '../app/stores';
+import { PATHS } from '../routes/paths';
 import { applyTheme } from '../theme/applyTheme';
 import { cmdInputRef } from './cmdInputRef';
 import { useAccountOverlay } from './useAccountOverlay';
@@ -52,11 +53,15 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
       if (k === 'Escape') {
         if (typing) target?.blur();
         // Um Esc fecha UMA camada, a de cima: com conta aberta sobre o player,
-        // fechar os dois de uma vez tiraria da tela algo que não se pediu.
-        if (isHelpOpen) closeHelp();
+        // fechar os dois de uma vez tiraria da tela algo que não se pediu. O
+        // gate entrou na cadeia porque é ele que fica por cima de todos
+        // (`AppLayout`), e fechá-lo incondicionalmente levava embora também a
+        // camada de baixo — invisível enquanto o player era um param, visível
+        // agora que fechá-lo é navegar.
+        if (ui.gate) ui.closeGate();
+        else if (isHelpOpen) closeHelp();
         else if (isAccountOpen) closeAccount();
         else if (isPlayerOpen) closePlayer();
-        ui.closeGate();
         return;
       }
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -64,8 +69,8 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
       // Com o gate aberto, Enter leva para o login.
       if (ui.gate && k === 'Enter') {
         ui.closeGate();
-        if (isPlayerOpen) closePlayer();
-        navigate('/login');
+        // Como no Gate: sair para o login já leva a rota da faixa embora.
+        navigate(PATHS.login);
         return;
       }
 
@@ -98,13 +103,12 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
         s: () => playerStore.getState().toggleShuffle(),
         r: () => playerStore.getState().toggleRepeat(),
         t: () => ui.openPicker(themeIndex(ui.themeId)),
-        f: () => (isPlayerOpen ? closePlayer() : playerStore.getState().cur >= 0 && openPlayer()),
+        f: () => (isPlayerOpen ? closePlayer() : openPlayer()),
         j: () => naLista && controller.moverCursor(1),
         k: () => naLista && controller.moverCursor(-1),
         // `0` é "a de agora", os outros dígitos são lugares. Faz o mesmo que o
         // `f` do handoff, que fica valendo sem ser anunciado.
-        '0': () =>
-          isPlayerOpen ? closePlayer() : playerStore.getState().cur >= 0 && openPlayer(),
+        '0': () => (isPlayerOpen ? closePlayer() : openPlayer()),
         '1': () => goToTab('home'),
         '2': () => goToTab('search'),
         '3': () => goToTab('library'),
@@ -115,17 +119,22 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
         '6': janelaDeAtalhos,
         '?': janelaDeAtalhos,
         '/': () => {
+          // Sem `closePlayer`: a troca de aba já sai de `/t/...`, e fechar o
+          // player por cima dela desfaria a navegação que acabou de acontecer.
           goToTab('search');
-          if (isPlayerOpen) closePlayer();
           setTimeout(() => searchInput.current?.focus(), 30);
         },
         // A linha de comando é um input de verdade, então o guarda `typing`
         // desliga todo o resto enquanto se digita — inclusive os dígitos, que
         // senão trocariam de aba no meio do `:12`.
         ':': () => {
-          if (isHelpOpen) closeHelp();
-          if (isAccountOpen) closeAccount();
+          // Com o player aberto basta fechá-lo: a entrada que vai embora é a
+          // que carregava os params dos outros dois overlays.
           if (isPlayerOpen) closePlayer();
+          else {
+            if (isHelpOpen) closeHelp();
+            if (isAccountOpen) closeAccount();
+          }
           ui.setCmdOpen(true);
           setTimeout(() => cmdInputRef.current?.focus(), 30);
         },

@@ -1,36 +1,27 @@
 import type { TabId } from '@ondas/core';
 import { useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-
-export const TAB_PATHS: Record<TabId, string> = {
-  home: '/',
-  search: '/buscar',
-  library: '/biblioteca',
-};
-
-const PATH_TABS: Record<string, TabId> = {
-  '/': 'home',
-  '/buscar': 'search',
-  '/biblioteca': 'library',
-};
+import { TAB_PATHS, tabForPath } from '../routes/paths';
 
 /** Rota ⇄ aba: a aba ativa é derivada da URL, nunca duplicada em estado. */
 export function useTabNavigation() {
   const navigate = useNavigate();
-  const { pathname, search } = useLocation();
-  const tab: TabId = PATH_TABS[pathname] ?? 'home';
+  const { pathname, state } = useLocation();
+  // Em `/t/...` o path é o da faixa, não o de uma aba: a aba vem de onde o
+  // player foi aberto. Sem isto a TabBar marcaria `em-alta` para quem abriu o
+  // player estando na biblioteca.
+  const origem = (state as { from?: unknown } | null)?.from;
+  const daOrigem = typeof origem === 'string' ? tabForPath(origem.split('?')[0]!) : undefined;
+  const tab: TabId = tabForPath(pathname) ?? daOrigem ?? 'home';
 
   const goToTab = useCallback(
     (next: TabId) => {
-      // Trocar de aba fecha os overlays, mantendo o resto da query: sem isto
-      // apertar `1` com a janela de atalhos aberta trocava de aba e deixava o
-      // overlay colado na tela, com `?atalhos=1` no endereço.
-      const params = new URLSearchParams(search);
-      for (const overlay of ['player', 'conta', 'atalhos']) params.delete(overlay);
-      const qs = params.toString();
-      navigate(TAB_PATHS[next] + (qs ? '?' + qs : ''));
+      // O path limpo da aba, sem carregar a query da anterior: cada tela tem os
+      // seus params (o gênero do em-alta, o termo da busca), e os overlays
+      // ficariam colados na tela — antes `?atalhos=1` sobrevivia a um `1`.
+      navigate(TAB_PATHS[next]);
     },
-    [navigate, search],
+    [navigate],
   );
 
   return { tab, goToTab };

@@ -8,6 +8,7 @@ import { auth } from '../app/services';
 import { sessionStore, uiStore, useUi } from '../app/stores';
 import { TrafficLights } from '../components/TrafficLights';
 import s from './login.module.css';
+import { PATHS } from './paths';
 
 /**
  * Login. As credenciais são validadas pelo `AuthService` de `core` — hoje a
@@ -31,7 +32,7 @@ export function LoginRoute() {
       setPassword('');
       uiStore.getState().closeGate();
       uiStore.getState().flash(`autenticado como ${user.name} — catálogo completo liberado`);
-      navigate('/');
+      navigate(PATHS.home);
     } catch (err) {
       setError(err instanceof AuthError ? err.message : 'não foi possível entrar');
     } finally {
@@ -41,7 +42,7 @@ export function LoginRoute() {
 
   const guest = () => {
     enterAsGuest();
-    navigate('/');
+    navigate(PATHS.home);
   };
 
   return (

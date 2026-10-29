@@ -18,7 +18,8 @@ precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
 /**
- * SPA: `/buscar`, `/biblioteca` e `/login` são rotas do React Router, não arquivos.
+ * SPA: `/search`, `/library/<recorte>`, `/t/<faixa>` e `/login` são rotas do React
+ * Router, não arquivos.
  * Sem esta rota, recarregar numa delas offline daria erro de rede — o nginx resolve
  * isso online, mas offline quem responde é o SW.
  */

@@ -171,9 +171,32 @@ Decisões registradas em `docs/adr/0013-ondas-acervo-privado.md` no repo `homela
 vez de JWT, argon2id, migrações sob advisory lock, rate-limit por `CF-Connecting-IP`, bucket R2
 privado com URL assinada e a trava de SSRF do worker.
 
+### Os endereços da PWA
+
+Todo path é inglês; o texto da interface segue em português. `~/biblioteca` continua
+`~/biblioteca` com a URL em `/library`, e o chip `--acervo` continua `--acervo` com a URL em
+`/library/archive` — o id do recorte é o mesmo valor que a API emite em `Track.source`, então
+traduzi a palavra da URL e não o id. Os nomes velhos (`/buscar`, `/biblioteca`, `/library/acervo`)
+não redirecionam: uso pessoal, e um endereço a menos para manter.
+
+| Endereço | O que é |
+| --- | --- |
+| `/` | em-alta; `?genre=<slug>` é o chip, omitido quando é `tudo` |
+| `/search` | busca; `?q=<termo>` escrito com `replace`, para o voltar não andar letra por letra |
+| `/library/<recorte>` | `liked`, `offline` ou `archive`; `/library` vale `liked`, e o que não é um dos três também (`parseLibrarySegment`) |
+| `/t/<slug>-<id>` | a faixa: o link que se manda E o player cheio aberto |
+| `/login` | fora do `AppLayout`, é a única tela sem abas |
+| `?account=1` / `?shortcuts=1` | os dois overlays que não são conteúdo, no `useOverlayParam` |
+
+Qualquer outro path **normaliza** para `/` em vez de desenhar a home com o endereço errado na
+barra. Quem decide o recorte, o chip e o termo é a URL, e não um estado de tela — então cada um
+deles é linkável, sobrevive a um reload e o voltar anda entre eles. O preço aceito: trocar de aba
+vai para o path limpo e esquece o filtro, que o voltar devolve.
+
 ### Link de faixa
 
-Toda música tem um endereço próprio, para mandar para alguém:
+Toda música tem um endereço próprio — o que se manda para alguém, e o que fica na barra quando
+o player cheio está aberto:
 
 ```
 music.thiagotn.com/t/tohaj-long-drive-J72oWO6
@@ -197,6 +220,12 @@ propósito: no cache da query, o próximo refetch do trending a derrubaria no me
 o slug sai de título e artista e estaria contando o que é a faixa para quem só recebeu o link. Sem
 sessão, a rota para num aviso sem consultar nada: um 404 diferenciado já diria a um estranho que
 aquele uuid existe.
+
+Desde que o player cheio passou a ser esta rota, esse endereço aparece **em uso normal**, e não só
+quando se compartilha: abrir o player de uma faixa sua escreve o uuid no histórico do navegador e
+no access log do nginx. Não é vazamento — `/api/acervo/<id>/audio` continua exigindo sessão, e o
+slug continua ausente —, mas é uma pegada nova. Instalada como PWA não há barra de endereços, que
+é o caso de uso de quem tem acervo.
 
 #### A prévia no WhatsApp
 
@@ -349,17 +378,22 @@ Decisões que valem registrar:
   `@media` do projeto, no mesmo ponto de corte do `useWide`; acima dele nada
   muda. Abaixo de ~570px de altura a capa bate no piso de 120px e a tela volta a
   rolar, que é o comportamento honesto.
-- **Full player é uma rota** (`?player=1`), então o botão voltar o fecha. Conta e
-  aparelho (`?conta=1`) e a janela de atalhos (`?atalhos=1`) são o segundo e o
-  terceiro overlay nesse molde; os três saem do mesmo `useOverlayParam`, e
-  trocar de aba limpa os três da query — antes o overlay ficava colado na tela
-  depois de um `1`.
+- **O full player é o endereço da faixa** (`/t/<slug>-<id>`), o mesmo que o
+  botão de compartilhar entrega: uma faixa, um endereço. Era `?player=1`, um
+  booleano que dizia que o player estava aberto sem dizer qual música estava na
+  tela — e que, num reload, abria o overlay sobre nada, porque o `playerStore`
+  não é persistido. Agora compartilhar é copiar a barra de endereços, e
+  recarregar reconstrói a faixa. O botão voltar continua fechando (abrir
+  empilha), e fechar devolve a tela de origem, que viaja no `state` do
+  histórico. Conta e aparelho (`?account=1`) e a janela de atalhos
+  (`?shortcuts=1`) seguem no molde antigo, no `useOverlayParam`, porque nenhum
+  dos dois é conteúdo — e trocar de aba limpa os dois, indo para o path limpo.
 - **A fileira de dígitos cobre as telas, e `0` é "a de agora".** `1`/`2`/`3` são
   as abas, `4` o tema, `5` a conta, `6` (ou `?`) os atalhos, e `0` abre os
   detalhes do que está tocando — o mesmo que o `f` do handoff, que continua
-  valendo sem ser anunciado. Os que abrem overlay **alternam**, porque `show()`
-  empilha histórico e abrir o que já está aberto deixaria um "voltar" que não
-  volta nada.
+  valendo sem ser anunciado. Todos **alternam**, porque abrir empilha histórico
+  — seja um param ou a rota da faixa — e abrir o que já está aberto deixaria um
+  "voltar" que não volta nada.
 - **A lista de atalhos tem um dono só** (`core/src/shortcuts.ts`). Ela estava
   espalhada por quatro lugares que já tinham divergido: a legenda do rodapé
   anunciava `o` em produção, onde a tecla só existe sob `import.meta.env.DEV`, e
