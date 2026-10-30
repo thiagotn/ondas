@@ -85,6 +85,14 @@ func (s *Server) Router() http.Handler {
 			r.Post("/login", s.login)
 			r.Post("/logout", s.logout)
 			r.With(s.exigirSessao).Get("/me", s.me)
+
+			// Preferência de conta: sessão, NUNCA token.
+			//
+			// É a mesma régua que divide os dois grupos do acervo abaixo. O
+			// token de máquina do Hermes existe para entrar com faixa nova;
+			// desligar o catálogo de alguém não é isso. `exigirSessao` nem
+			// olha o header, então o token aqui simplesmente não abre porta.
+			r.With(s.exigirSessao).Patch("/prefs", s.prefs)
 		})
 
 		// Nada aqui é público: o acervo é privado por definição.
@@ -219,6 +227,38 @@ func (s *Server) logout(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	escreverJSON(w, http.StatusOK, usuarioDe(r.Context()))
+}
+
+// prefs muda as preferências da conta. Hoje só `publico`.
+//
+// O campo é um PONTEIRO de propósito: com `bool`, um corpo sem a chave
+// decodificaria para `false` e desligaria o catálogo de quem só queria mandar
+// um JSON errado. Ausente é pedido inválido, não "desliga".
+func (s *Server) prefs(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Publico *bool `json:"publico"`
+	}
+	if !lerJSON(w, r, &req) {
+		return
+	}
+	if req.Publico == nil {
+		escreverErro(w, http.StatusBadRequest, "requisição inválida")
+		return
+	}
+	user, err := s.users.DefinirPublico(r.Context(), usuarioDe(r.Context()).ID, *req.Publico)
+	if err != nil {
+		// Conta apagada com cookie válido na mão: o mesmo tratamento do
+		// middleware, para o cliente cair no fluxo de sessão morta.
+		if errors.Is(err, auth.ErrNaoEncontrado) {
+			s.limparCookie(w)
+			escreverErro(w, http.StatusUnauthorized, "sessão expirada")
+			return
+		}
+		slog.Error("prefs", "erro", err)
+		escreverErro(w, http.StatusInternalServerError, "não foi possível salvar a preferência")
+		return
+	}
+	escreverJSON(w, http.StatusOK, user)
 }
 
 func (s *Server) gravarCookie(w http.ResponseWriter, userID string) {

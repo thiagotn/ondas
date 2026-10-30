@@ -27,8 +27,15 @@ var (
 type User struct {
 	ID    string `json:"-"`
 	Email string `json:"-"`
-	// É o único campo que a PWA conhece hoje (`User { name }` em core).
-	Name string `json:"name"`
+	Name  string `json:"name"`
+	// O catálogo público entra na lista desta conta ou não (migração 0005).
+	//
+	// Sai em TODA resposta de auth — /login, /signup e /me — porque a PWA
+	// decide a fonte do catálogo no boot, antes de qualquer outra chamada.
+	// Do lado de lá o campo é opcional e `undefined` vale `true`, para o
+	// espelho local gravado por uma versão antiga não significar "desligado"
+	// (ver `showsPublicCatalog` em core).
+	Publico bool `json:"publico"`
 }
 
 type Users struct{ pool *pgxpool.Pool }
@@ -53,9 +60,10 @@ func (u *Users) Create(ctx context.Context, email, senha string) (*User, error) 
 
 	var user User
 	err = u.pool.QueryRow(ctx,
-		`INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) RETURNING id, email, name`,
+		`INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3)
+		  RETURNING id, email, name, publico`,
 		email, nome, hash,
-	).Scan(&user.ID, &user.Email, &user.Name)
+	).Scan(&user.ID, &user.Email, &user.Name, &user.Publico)
 	if err != nil {
 		if strings.Contains(err.Error(), "users_email_lower_idx") {
 			return nil, ErrEmailEmUso
@@ -72,9 +80,9 @@ func (u *Users) Authenticate(ctx context.Context, email, senha string) (*User, e
 	var user User
 	var hash string
 	err := u.pool.QueryRow(ctx,
-		`SELECT id, email, name, password_hash FROM users WHERE lower(email) = lower($1)`,
+		`SELECT id, email, name, publico, password_hash FROM users WHERE lower(email) = lower($1)`,
 		strings.TrimSpace(email),
-	).Scan(&user.ID, &user.Email, &user.Name, &hash)
+	).Scan(&user.ID, &user.Email, &user.Name, &user.Publico, &hash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Gasta o mesmo tempo de um hash real, senão a diferença de latência
 		// entrega quais e-mails existem.
@@ -93,8 +101,8 @@ func (u *Users) Authenticate(ctx context.Context, email, senha string) (*User, e
 
 func (u *Users) ByID(ctx context.Context, id string) (*User, error) {
 	var user User
-	err := u.pool.QueryRow(ctx, `SELECT id, email, name FROM users WHERE id = $1`, id).
-		Scan(&user.ID, &user.Email, &user.Name)
+	err := u.pool.QueryRow(ctx, `SELECT id, email, name, publico FROM users WHERE id = $1`, id).
+		Scan(&user.ID, &user.Email, &user.Name, &user.Publico)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNaoEncontrado
 	}
@@ -109,13 +117,33 @@ func (u *Users) ByID(ctx context.Context, id string) (*User, error) {
 func (u *Users) PorEmail(ctx context.Context, email string) (*User, error) {
 	var user User
 	err := u.pool.QueryRow(ctx,
-		`SELECT id, email, name FROM users WHERE lower(email) = lower($1)`, email).
-		Scan(&user.ID, &user.Email, &user.Name)
+		`SELECT id, email, name, publico FROM users WHERE lower(email) = lower($1)`, email).
+		Scan(&user.ID, &user.Email, &user.Name, &user.Publico)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNaoEncontrado
 	}
 	if err != nil {
 		return nil, fmt.Errorf("users: porEmail: %w", err)
+	}
+	return &user, nil
+}
+
+// DefinirPublico liga ou desliga o catálogo público desta conta.
+//
+// Devolve o usuário já atualizado em vez de só `error`: quem chama responde o
+// `User` novo, e assim não há uma segunda leitura que possa discordar da
+// escrita.
+func (u *Users) DefinirPublico(ctx context.Context, id string, on bool) (*User, error) {
+	var user User
+	err := u.pool.QueryRow(ctx,
+		`UPDATE users SET publico = $2 WHERE id = $1 RETURNING id, email, name, publico`,
+		id, on,
+	).Scan(&user.ID, &user.Email, &user.Name, &user.Publico)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNaoEncontrado
+	}
+	if err != nil {
+		return nil, fmt.Errorf("users: definirPublico: %w", err)
 	}
 	return &user, nil
 }
