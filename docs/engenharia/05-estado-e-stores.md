@@ -166,16 +166,39 @@ Duas bibliotecas de estado no mesmo app precisam de uma regra, e a do Ondas é:
 | Exemplo | o catálogo | o que toca, curtidas, tema, cursor | a faixa aberta, o recorte, o filtro |
 | Tem revalidação? | sim | não faz sentido | é o navegador que guarda |
 
-A regra pega bem, e paga uma dívida concreta. A chave do catálogo é **escopada pela sessão**
-(`packages/web/src/query/catalog.ts:12`): `['catalog','trending','com-acervo']` para quem está
-logado, `[...,'visitante']` para quem não está. O comentário em
-`packages/web/src/query/catalog.ts:27-29` explica o ganho: entrar ou sair troca de catálogo em vez
-de reaproveitar o anterior, *"e o cache persistido do visitante nunca guarda faixa do acervo"*.
+A regra pega bem, e paga uma dívida concreta. A chave do catálogo é **escopada pela sessão e pela
+preferência** (`packages/web/src/query/catalog.ts:41`), em três: `[...,'visitante']` para quem não
+tem conta, `[...,'logado','com-publico']` para quem tem e mantém o catálogo público, e
+`[...,'logado','so-acervo']` para quem o desligou. Entrar, sair ou desligar troca de catálogo em
+vez de reaproveitar o anterior, *"e o cache persistido do visitante nunca guarda faixa do acervo"*.
 
-Sair da conta então remove explicitamente as consultas do logado
-(`packages/web/src/app/controller.ts:303`), porque sair sem apagar deixaria os metadados das faixas
-próprias no aparelho esperando o próximo visitante. Se o catálogo morasse num store persistido à
-mão, essa limpeza seria uma linha que alguém teria de lembrar de escrever.
+Os dois escopos do logado ficam sob um prefixo comum (`CATALOG_LOGADO_KEY`,
+`packages/web/src/query/catalog.ts:25`) porque duas operações precisam alcançar **os dois**: sair da
+conta, que remove as consultas do logado (`packages/web/src/app/controller.ts:322`) para não deixar
+metadados de faixa própria no aparelho esperando o próximo visitante, e a invalidação depois de um
+envio (`packages/web/src/app/uploads.ts`), sem a qual a faixa nova não apareceria justamente para
+quem usa o acervo puro. O filtro do TanStack é `exact: false` por padrão, então uma chave cobre os
+dois — e listá-los à mão seria uma lista que alguém esquece no dia em que aparecer um terceiro.
+
+Se o catálogo morasse num store persistido à mão, essa limpeza seria uma linha que alguém teria de
+lembrar de escrever.
+
+### A quarta volta do mesmo bug: trocar de escopo esvazia a lista
+
+A lição do começo deste documento voltou mais uma vez, agora por uma porta que não existia: a
+preferência de catálogo público. Desligá-la troca a chave da consulta, e por **um commit** o `data`
+é `undefined` — o efeito de `AppLayout` chama `setTracks([])`, a reancoragem não acha o `curId` e
+crava `cur: -1`. A barra de baixo desaparece com o áudio ainda tocando.
+
+Para faixa do acervo isso se cura quando a consulta nova resolve. Para a faixa **pública** que
+estava tocando, não se cura nunca: ela não está mais na lista.
+
+A correção não mora em `setTracks` — ele está certo, e reancorar é o trabalho dele. Mora na ordem de
+`controller.togglePublico`: grava no servidor, manda a faixa pública que toca para as `avulsas`
+(que `comFaixasAvulsas` anexa a qualquer catálogo), **semeia** a chave nova com `setQueryData`, e só
+então troca a sessão. Nenhum commit chega a ver a lista vazia, nos dois sentidos — e a semente só
+entra quando a chave nova está vazia, senão religar dentro das 24h de `gcTime` jogaria fora a lista
+misturada que ainda estava boa.
 
 ### A exceção, e por que ela é a melhor parte
 

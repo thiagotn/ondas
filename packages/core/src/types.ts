@@ -39,6 +39,20 @@ export interface Track {
 
 export interface User {
   name: string;
+  /**
+   * O catálogo público entra na lista desta conta ou não. Vem do servidor em
+   * toda resposta de auth (`publico` na API), e mora na conta porque é escolha
+   * sobre o que se quer ouvir — segue para qualquer aparelho, ao contrário do
+   * `buffer`, que é deste navegador.
+   *
+   * OPCIONAL, e `undefined` vale `true`. Não é frouxidão: `restore()` devolve o
+   * espelho local sem validar quando não há rede (`auth/http.ts`), e um espelho
+   * gravado antes desta versão não tem o campo. Se `undefined` valesse
+   * "desligado", o catálogo público desapareceria sozinho para quem nunca pediu
+   * isso — offline, onde não há como corrigir. A leitura é uma só e mora em
+   * `showsPublicCatalog` (`view.ts`), escrita como `!== false`.
+   */
+  publico?: boolean;
 }
 
 export type Session = User | null;
@@ -76,12 +90,23 @@ export interface Gate {
   title: string;
 }
 
-/** Rótulo da origem dos metadados, exibido no comentário do prompt. */
+/**
+ * Rótulo da origem dos metadados, exibido no comentário do prompt.
+ *
+ * São frases inteiras, impressas cruas depois de `fonte: `, e o conjunto é
+ * fechado — daí nenhum id pelado entrar aqui.
+ *
+ * `'só o acervo'` é o único membro que NÃO descreve procedência de metadado
+ * público: ele diz que não houve busca pública nenhuma, porque a conta desligou
+ * o catálogo (`showsPublicCatalog`). Ele cabe no tipo por ser a mesma coisa do
+ * ponto de vista de quem lê a linha — a resposta a "de onde veio esta lista".
+ */
 export type CatalogSource =
   | 'audius api (ao vivo)'
   | 'metadados em cache local'
   | 'catálogo demo — api inacessível'
-  | 'catálogo demo';
+  | 'catálogo demo'
+  | 'só o acervo';
 
 export interface Catalog {
   tracks: Track[];

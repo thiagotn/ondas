@@ -4,6 +4,8 @@ import {
   bufferShortLabel,
   bufferSourceLabel,
   defaultLibrarySegment,
+  hiddenInSegment,
+  showsPublicCatalog,
   emptyText,
   genreOptions,
   LIBRARY_SEGMENTS,
@@ -24,6 +26,44 @@ describe('defaultLibrarySegment', () => {
 
   it('sem conta volta a `liked`: o chip do acervo nem é desenhado ali', () => {
     expect(defaultLibrarySegment(null)).toBe('liked');
+  });
+});
+
+describe('showsPublicCatalog', () => {
+  it('visitante vê sempre: é a única fonte que ele tem', () => {
+    expect(showsPublicCatalog(null)).toBe(true);
+  });
+
+  it('com conta, quem decide é o campo da conta', () => {
+    expect(showsPublicCatalog({ name: 'thiago', publico: true })).toBe(true);
+    expect(showsPublicCatalog({ name: 'thiago', publico: false })).toBe(false);
+  });
+
+  it('espelho velho, sem o campo, significa MOSTRA e não desligado', () => {
+    // É o caso real: `restore()` devolve o espelho do IndexedDB sem validar
+    // quando não há rede, e um espelho gravado antes deste campo existir não o
+    // tem. Lendo como `=== true`, o catálogo público desapareceria sozinho
+    // justamente offline, onde não há como religar.
+    expect(showsPublicCatalog({ name: 'thiago' })).toBe(true);
+  });
+});
+
+describe('hiddenInSegment', () => {
+  const marks = { liked: { demo0: true, saiu: true }, cached: { saiu: true } };
+  const naLista = [tracks[0]!];
+
+  it('conta o que o recorte guarda e a lista não mostra', () => {
+    expect(naLista[0]!.id).toBe('demo0');
+    expect(hiddenInSegment('liked', marks, naLista)).toBe(1);
+    expect(hiddenInSegment('offline', marks, naLista)).toBe(1);
+  });
+
+  it('nada escondido quando a lista tem tudo', () => {
+    expect(hiddenInSegment('liked', { liked: { demo0: true }, cached: {} }, naLista)).toBe(0);
+  });
+
+  it('o acervo não entra na conta: ele não depende de marca local', () => {
+    expect(hiddenInSegment('acervo', marks, [])).toBe(0);
   });
 });
 
@@ -125,6 +165,23 @@ describe('promptLine', () => {
     });
   });
 
+  it('com só o acervo, a contagem não é dita duas vezes', () => {
+    // `13 faixas · fonte: só o acervo (13)` seria a mesma conta repetida: o
+    // `+ acervo (N)` existe para dizer quanto da lista MISTURADA é próprio.
+    expect(
+      promptLine({
+        tab: 'home',
+        who: 'thiago',
+        genre: 'tudo',
+        q: '',
+        seg: 'liked',
+        count: 13,
+        source: 'só o acervo',
+        acervo: 13,
+      }).comment,
+    ).toBe('13 faixas · fonte: só o acervo');
+  });
+
   it('avisa quando o que está na tela ainda é o dado anterior', () => {
     expect(
       promptLine({
@@ -192,6 +249,39 @@ describe('emptyText', () => {
     ).toBe('vazio — envie um arquivo com [+ arquivo].');
     expect(emptyText({ tab: 'library', seg: 'acervo', q: '', loading: false, user: null })).toBe(
       'o acervo exige login.',
+    );
+  });
+});
+
+describe('emptyText com o catálogo público desligado', () => {
+  const base = { q: '', loading: false, user: { name: 'a', publico: false }, publicOff: true };
+
+  it('em-alta vazia diz que é o acervo que está vazio, não "nenhuma faixa"', () => {
+    // A frase genérica mandaria procurar o que não existe. Esta diz o caminho.
+    expect(emptyText({ ...base, tab: 'home', seg: 'liked' })).toBe(
+      'o acervo está vazio — envie um arquivo em ~/biblioteca.',
+    );
+  });
+
+  it('recorte com download escondido não mente "vazio — baixe faixas"', () => {
+    // `ondas whoami`, a um overlay de distância, continua dizendo "7 faixas ·
+    // 54 MB": ele conta o estado do aparelho, não o catálogo. A lista vazia
+    // tem de explicar a diferença em vez de contradizê-la.
+    expect(emptyText({ ...base, tab: 'library', seg: 'offline', hidden: 7 })).toBe(
+      '7 faixas aqui vêm do catálogo público, que está desligado — religue em [ondas whoami].',
+    );
+    expect(emptyText({ ...base, tab: 'library', seg: 'liked', hidden: 1 })).toBe(
+      '1 faixa aqui vem do catálogo público, que está desligado — religue em [ondas whoami].',
+    );
+  });
+
+  it('sem nada escondido, o texto de sempre volta', () => {
+    expect(emptyText({ ...base, tab: 'library', seg: 'offline', hidden: 0 })).toBe(
+      'vazio — baixe faixas [d] ou ative o buffer para ouvir sem rede.',
+    );
+    // E o acervo vazio continua falando de envio, que é o que o alimenta.
+    expect(emptyText({ ...base, tab: 'library', seg: 'acervo' })).toBe(
+      'vazio — envie um arquivo com [+ arquivo].',
     );
   });
 });

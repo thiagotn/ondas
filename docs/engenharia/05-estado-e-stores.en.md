@@ -170,17 +170,40 @@ Two state libraries in one app need a rule, and Ondas' is:
 | Example | the catalogue | what is playing, likes, theme, cursor | the open track, the segment, the filter |
 | Has revalidation? | yes | makes no sense | the browser keeps it |
 
-The rule holds well, and it pays a concrete debt. The catalogue key is **scoped by session**
-(`packages/web/src/query/catalog.ts:12`): `['catalog','trending','com-acervo']` when signed in,
-`[...,'visitante']` when not. The comment at `packages/web/src/query/catalog.ts:27-29` explains the
-gain: signing in or out switches catalogues instead of reusing the previous one, *"e o cache
-persistido do visitante nunca guarda faixa do acervo"* — the guest's persisted cache never holds a
-private-library track.
+The rule holds well, and it pays a concrete debt. The catalogue key is **scoped by session and by
+preference** (`packages/web/src/query/catalog.ts:41`), three ways: `[...,'visitante']` for no
+account, `[...,'logado','com-publico']` for an account that keeps the public catalogue, and
+`[...,'logado','so-acervo']` for one that turned it off. Signing in, signing out or toggling
+switches catalogues instead of reusing the previous one, *"e o cache persistido do visitante nunca
+guarda faixa do acervo"* — the guest's persisted cache never holds a private-library track.
 
-Signing out then explicitly removes the signed-in queries
-(`packages/web/src/app/controller.ts:303`), because signing out without erasing would leave the
-user's own track metadata on the device waiting for the next guest. If the catalogue lived in a
-hand-persisted store, that cleanup would be a line somebody had to remember to write.
+Both signed-in scopes sit under a shared prefix (`CATALOG_LOGADO_KEY`,
+`packages/web/src/query/catalog.ts:25`) because two operations must reach **both**: signing out,
+which removes the signed-in queries (`packages/web/src/app/controller.ts:322`) so no own-track
+metadata is left on the device waiting for the next guest, and the invalidation after an upload
+(`packages/web/src/app/uploads.ts`), without which a new track would fail to appear for exactly the
+person using the library on its own. TanStack filters are `exact: false` by default, so one key
+covers both — and listing them by hand would be a list somebody forgets the day a third appears.
+
+If the catalogue lived in a hand-persisted store, that cleanup would be a line somebody had to
+remember to write.
+
+### The same bug's fourth turn: switching scope empties the list
+
+This document's opening lesson came back once more, through a door that did not exist before: the
+public-catalogue preference. Turning it off switches the query key, and for **one commit** `data` is
+`undefined` — `AppLayout`'s effect calls `setTracks([])`, the re-anchoring fails to find `curId` and
+sets `cur: -1`. The bottom bar disappears with the audio still playing.
+
+For a library track this heals once the new query resolves. For the **public** track that was
+playing, it never heals: it is no longer in the list.
+
+The fix does not belong in `setTracks` — that function is right, and re-anchoring is its job. It
+belongs in the ordering of `controller.togglePublico`: write to the server, send the playing public
+track to `avulsas` (which `comFaixasAvulsas` appends to whatever catalogue resolves), **seed** the
+new key with `setQueryData`, and only then switch the session. No commit ever sees the empty list,
+in either direction — and the seed is only written when the new key is empty, otherwise toggling
+back within the 24h `gcTime` would discard the mixed list that was still good.
 
 ### The exception, and why it is the best part
 

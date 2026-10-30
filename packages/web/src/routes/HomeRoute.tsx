@@ -1,4 +1,11 @@
-import { emptyText, genreOptions, promptLine, visibleTracks, whoAmI } from '@ondas/core';
+import {
+  emptyText,
+  genreOptions,
+  promptLine,
+  showsPublicCatalog,
+  visibleTracks,
+  whoAmI,
+} from '@ondas/core';
 import { useMemo } from 'react';
 import { useLibrary, useSession } from '../app/stores';
 import { GenreChips } from '../components/GenreChips';
@@ -45,7 +52,14 @@ export function HomeRoute() {
       <TrackList
         rows={rows}
         loading={isLoading}
-        emptyText={emptyText({ tab: 'home', seg: 'liked', q: '', loading: isLoading, user })}
+        emptyText={emptyText({
+          tab: 'home',
+          seg: 'liked',
+          q: '',
+          loading: isLoading,
+          user,
+          publicOff: !showsPublicCatalog(user),
+        })}
       />
     </TabScaffold>
   );

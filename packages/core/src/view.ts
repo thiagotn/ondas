@@ -46,6 +46,46 @@ export function defaultLibrarySegment(user: Session): LibrarySegment {
 }
 
 /**
+ * Se o catálogo público entra na lista.
+ *
+ * Visitante: sempre. Ele não tem conta onde guardar a escolha, e o catálogo
+ * público é a única fonte que existe para ele.
+ *
+ * Com conta, é o campo `publico` do usuário — lido como `!== false`, e não como
+ * `=== true`. A diferença é o caso que importa: `restore()` devolve o espelho
+ * local sem validar quando não há rede, e um espelho gravado antes deste campo
+ * existir não o tem. Com `=== true`, esse `undefined` apagaria o catálogo
+ * público de quem nunca pediu isso, justamente offline, onde não há como
+ * corrigir. Um `true` errado custa um toque; um `false` errado esconde o
+ * catálogo E as faixas públicas curtidas e baixadas, sem causa visível.
+ *
+ * Aqui, e não na tela, porque é o único lugar que decide: a chave da consulta,
+ * a fonte do catálogo, a linha do prompt e os textos de vazio leem desta função.
+ */
+export function showsPublicCatalog(user: Session): boolean {
+  return user ? user.publico !== false : true;
+}
+
+/**
+ * Quantos itens o recorte guarda no aparelho mas a lista não mostra.
+ *
+ * `--curtidas` e `--offline` filtram o catálogo carregado, então uma faixa
+ * pública curtida ou baixada sai da tela quando a conta desliga o catálogo
+ * público — o estado continua salvo, e os bytes também. Este número é o que
+ * deixa o texto de vazio dizer isso em vez de mentir "vazio — baixe faixas".
+ */
+export function hiddenInSegment(
+  seg: LibrarySegment,
+  marks: Pick<ListQuery, 'liked' | 'cached'>,
+  tracks: readonly Track[],
+): number {
+  if (seg === 'acervo') return 0;
+  const naLista = new Set(tracks.map((t) => t.id));
+  const ids = Object.keys(seg === 'liked' ? marks.liked : marks.cached);
+  return ids.filter((id) => !naLista.has(id)).length;
+}
+
+/**
  * Palavra da URL → recorte da biblioteca; o que não é uma das três vale
  * `padrao` — na tela, o de `defaultLibrarySegment`.
  *
@@ -141,24 +181,47 @@ export function promptLine(args: {
     // Enquanto o refetch não volta, a lista na tela é a da sessão anterior:
     // dizer "ao vivo" sem ressalva seria mentira. E quando o acervo entra, a
     // fonte deixa de ser uma só — dizer apenas "audius" esconderia metade.
+    //
+    // Com `só o acervo` a contagem NÃO é anexada: ela já é o número à esquerda,
+    // e `fonte: só o acervo (13)` em `13 faixas` seria a mesma conta duas
+    // vezes. O `+ acervo (N)` existe para dizer quanto da lista misturada é
+    // próprio, e aqui não há mistura.
     comment:
       `${count} faixas · fonte: ${source || '…'}` +
-      (acervo ? ` + acervo (${acervo})` : '') +
+      (acervo && source !== 'só o acervo' ? ` + acervo (${acervo})` : '') +
       (refreshing ? ' · atualizando' : ''),
   };
 }
 
-/** Texto de lista vazia, por aba e contexto de sessão. */
+/**
+ * Texto de lista vazia, por aba e contexto de sessão.
+ *
+ * `hidden` e `publicOff` existem para a lista vazia não contradizer o resto da
+ * tela: com o catálogo público desligado, `ondas whoami` continua dizendo
+ * "7 faixas · 54 MB" (ele conta o estado do aparelho, não o catálogo) enquanto
+ * `--offline` mostraria "vazio — baixe faixas [d]". A frase tem de dizer o que
+ * aconteceu de verdade.
+ */
 export function emptyText(args: {
   tab: TabId;
   seg: LibrarySegment;
   q: string;
   loading: boolean;
   user: Session;
+  /** O catálogo público está desligado nesta conta (`showsPublicCatalog`). */
+  publicOff?: boolean;
+  /** Itens do recorte que estão no aparelho mas fora da lista (`hiddenInSegment`). */
+  hidden?: number;
 }): string {
-  const { tab, seg, q, loading, user } = args;
+  const { tab, seg, q, loading, user, publicOff, hidden } = args;
   if (tab === 'search') return `grep: nenhum resultado para "${q}"`;
   if (tab === 'library') {
+    // O recorte tem coisa guardada, e ela está fora da lista porque o catálogo
+    // público saiu — não porque não há nada.
+    if (publicOff && hidden) {
+      const quantas = hidden === 1 ? '1 faixa aqui vem' : `${hidden} faixas aqui vêm`;
+      return `${quantas} do catálogo público, que está desligado — religue em [ondas whoami].`;
+    }
     if (seg === 'liked') return 'vazio — pressione [l] ou o coração para curtir.';
     if (seg === 'acervo') {
       return user ? 'vazio — envie um arquivo com [+ arquivo].' : 'o acervo exige login.';
@@ -167,7 +230,12 @@ export function emptyText(args: {
       ? 'vazio — baixe faixas [d] ou ative o buffer para ouvir sem rede.'
       : 'downloads offline exigem login.';
   }
-  return loading ? '' : 'nenhuma faixa.';
+  if (loading) return '';
+  // em-alta vazia com o catálogo público desligado não é "nenhuma faixa": é o
+  // acervo ainda vazio. A frase genérica mandaria a pessoa procurar o que não
+  // existe, em vez de dizer os dois caminhos que ela tem.
+  if (publicOff) return 'o acervo está vazio — envie um arquivo em ~/biblioteca.';
+  return 'nenhuma faixa.';
 }
 
 /** Linha `fonte:` do painel de buffer do full player. */

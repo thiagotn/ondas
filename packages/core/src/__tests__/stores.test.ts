@@ -21,6 +21,9 @@ describe('session store', () => {
     expect(whoAmI(null)).toBe('visitante');
     expect(planLabel(null)).toBe('somente faixas grátis');
     expect(planLabel({ name: 'thiago' })).toBe('catálogo completo + offline');
+    // Com o catálogo público desligado, a linha `plano` fica duas acima do
+    // botão que o desligou: "catálogo completo" ali seria contradição na tela.
+    expect(planLabel({ name: 'thiago', publico: false })).toBe('acervo + offline');
   });
 });
 

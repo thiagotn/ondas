@@ -1,4 +1,12 @@
-import { fmtMB, offlineBytes, planLabel, storageLabel, whoAmI, type OfflineUsage } from '@ondas/core';
+import {
+  fmtMB,
+  offlineBytes,
+  planLabel,
+  showsPublicCatalog,
+  storageLabel,
+  whoAmI,
+  type OfflineUsage,
+} from '@ondas/core';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as controller from '../app/controller';
@@ -27,6 +35,7 @@ export function AccountOverlay() {
   const user = useSession((st) => st.user);
   const leaveGuest = useGuestMode((st) => st.leaveGuest);
   const prefetch = useLibrary((st) => st.prefetch);
+  const publico = showsPublicCatalog(user);
   const cached = useLibrary((st) => st.cached);
   const sizes = useLibrary((st) => st.sizes);
   const [confirmando, setConfirmando] = useState(false);
@@ -75,6 +84,27 @@ export function AccountOverlay() {
               <span className={s.panelLabel}>plano</span>
               <span className={s.panelValue}>{planLabel(user)}</span>
             </div>
+
+            {/* Fica NESTE painel, acima do divisor, porque é um campo da conta:
+                desligar aqui vale no celular também. O `buffer`, logo abaixo do
+                divisor, é do navegador — e é essa a diferença que o rótulo
+                `# aparelho` existe para não deixar implícita. */}
+            {user && (
+              <button
+                type="button"
+                className={`${s.panelRow} ${s.panelButton}`}
+                aria-pressed={publico}
+                onClick={() => void controller.togglePublico()}
+              >
+                <span className={s.panelLabel}>catálogo</span>
+                <span className={publico ? s.checkOn : s.checkOff}>
+                  {publico ? '[x]' : '[ ]'}
+                </span>
+                <span className={s.panelValue}>
+                  incluir o catálogo público (audius) na lista
+                </span>
+              </button>
+            )}
           </div>
 
           {/* O rótulo não é enfeite: é o que diz que nada abaixo dele viaja

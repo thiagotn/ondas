@@ -10,11 +10,13 @@ const ROTAS = {
   login: '/api/auth/login',
   logout: '/api/auth/logout',
   me: '/api/auth/me',
+  prefs: '/api/auth/prefs',
 } as const;
 
 interface RespostaUsuario {
   name?: unknown;
   email?: unknown;
+  publico?: unknown;
 }
 
 interface RespostaErro {
@@ -96,6 +98,34 @@ export class HttpAuthService implements AuthService {
     }
   }
 
+  /**
+   * Liga ou desliga o catálogo público da conta.
+   *
+   * Regravar o espelho é metade do trabalho, não um detalhe: é o espelho que
+   * `restore()` devolve quando não há rede, então sem esta linha o próximo boot
+   * offline voltaria à preferência velha e a lista mudaria sozinha.
+   *
+   * O 401 entra pela mesma porta do 401 do `restore()` — a sessão morreu com a
+   * pessoa olhando o painel, e tratar isso como "falhou, tente de novo"
+   * deixaria o botão parecendo instável em vez de mandá-la para o login.
+   */
+  async setPublico(on: boolean): Promise<User> {
+    const res = await this.pedir(ROTAS.prefs, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ publico: on }),
+    });
+    if (res.status === 401) {
+      await this.store.remove(SESSION_KEY);
+      throw new AuthError('sessão expirada');
+    }
+    if (!res.ok) throw new AuthError(await mensagemDeErro(res));
+    const user = leUsuario(await res.json());
+    if (!user) throw new AuthError('resposta inesperada do servidor');
+    await this.store.set(SESSION_KEY, user);
+    return user;
+  }
+
   private pedir(rota: string, init?: RequestInit): Promise<Response> {
     return this.fetchImpl(rota, {
       // Mesma origem: o cookie vai sozinho. Explícito para não depender do
@@ -110,9 +140,16 @@ export class HttpAuthService implements AuthService {
 function leUsuario(bruto: unknown): User | null {
   if (!bruto || typeof bruto !== 'object') return null;
   const u = bruto as RespostaUsuario;
-  if (typeof u.name === 'string' && u.name) return { name: u.name };
+  // `publico` entra SÓ quando o servidor manda um booleano. Omitir em vez de
+  // preencher um padrão aqui mantém o padrão num lugar só
+  // (`showsPublicCatalog`), e é o que deixa um servidor antigo — ou um corpo
+  // estranho — significar o estado de hoje em vez de "desligado".
+  const pref = typeof u.publico === 'boolean' ? { publico: u.publico } : {};
+  if (typeof u.name === 'string' && u.name) return { name: u.name, ...pref };
   // Resposta sem `name` mas com e-mail ainda dá um nome exibível.
-  if (typeof u.email === 'string' && u.email) return { name: u.email.split('@')[0]! };
+  if (typeof u.email === 'string' && u.email) {
+    return { name: u.email.split('@')[0]!, ...pref };
+  }
   return null;
 }
 

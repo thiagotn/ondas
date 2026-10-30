@@ -7,10 +7,12 @@ import {
   onEnded,
   playability,
   prefetchTarget,
+  showsPublicCatalog,
   stepIndex,
   type QueueContext,
   type ThemeId,
   type Track,
+  type User,
 } from '@ondas/core';
 import {
   bindMediaSessionActions,
@@ -21,8 +23,9 @@ import {
 import { compartilhar } from '../platform/share';
 import { applyTheme, storeTheme } from '../theme/applyTheme';
 import { queryClient } from '../query/client';
-import { catalogKey } from '../query/catalog';
+import { CATALOG_LOGADO_KEY, catalogKey } from '../query/catalog';
 import { ehCotaExcedida } from '../platform/CacheOfflineStore';
+import { useAvulsas } from './extras';
 import { auth, connectivity, engine, offlineStore } from './services';
 import { libraryStore, playerStore, sessionStore, uiStore } from './stores';
 
@@ -314,7 +317,72 @@ export async function logout(): Promise<void> {
   // O catálogo do logado tem as faixas do acervo, e ele fica persistido em
   // IndexedDB. Sair sem apagar deixaria os metadados das faixas próprias no
   // aparelho à espera do próximo visitante.
-  queryClient.removeQueries({ queryKey: catalogKey(true) });
+  //
+  // Pelo prefixo: são dois escopos do logado (com e sem catálogo público), e os
+  // dois têm faixa do acervo dentro.
+  queryClient.removeQueries({ queryKey: CATALOG_LOGADO_KEY });
+}
+
+/**
+ * Liga ou desliga o catálogo público desta conta.
+ *
+ * A ordem dos passos é o que impede o pior bug possível aqui. Trocar a sessão
+ * primeiro trocaria a chave da consulta, e por um commit o `data` seria
+ * `undefined`: o efeito de `AppLayout` chamaria `setTracks([])`, a reancoragem
+ * não acharia o `curId` e cravaria `cur: -1` — a barra de baixo DESAPARECE com
+ * o áudio ainda tocando, `c`/`d`/`l` viram no-op e `n`/`p` saltam para o começo
+ * da lista. É o mesmo bug que `extras.ts` descreve, e para uma faixa pública
+ * que acabou de sair da lista ele nunca se curaria sozinho.
+ *
+ * Então: grava no servidor, salva a faixa que toca, SEMEIA a chave nova, e só
+ * aí troca a sessão. Nenhum commit vê a lista vazia.
+ */
+export async function togglePublico(): Promise<void> {
+  const ui = uiStore.getState();
+  const user = sessionStore.getState().user;
+  if (!user) return;
+  const ligado = showsPublicCatalog(user);
+
+  let novo: User;
+  try {
+    // Primeiro o servidor: um PATCH que falha não muda nada na tela.
+    novo = await auth.setPublico(!ligado);
+  } catch (err) {
+    console.warn('[ondas] não foi possível salvar a preferência:', err);
+    ui.flash('não foi possível mudar o catálogo');
+    return;
+  }
+
+  // A faixa pública que está tocando vira avulsa antes de sair da lista.
+  // `comFaixasAvulsas` a anexa a qualquer catálogo que a chave nova resolva, e
+  // é assim que a barra de baixo, `--curtidas` e `--offline` a mantêm. Avulsas
+  // não persistem, e um reload já para o áudio — nada escapa da sessão.
+  const tocando = currentTrack();
+  if (tocando && !tocando.source) useAvulsas.getState().add(tocando);
+
+  // Semeia a chave nova para que o primeiro commit depois da troca já tenha
+  // dado — nos DOIS sentidos, porque o commit vazio não tem lado preferido.
+  //
+  // Só semeia quando não há nada ali: religando dentro das 24h de `gcTime`, o
+  // escopo público ainda tem a lista misturada da sessão anterior, e substituí-la
+  // por uma só do acervo seria jogar fora dado bom para pôr dado pior.
+  //
+  // A semente é o acervo, e o rótulo `só o acervo` é verdade no instante em que
+  // ela aparece: é só isso que está na tela. O `invalidateQueries` abaixo busca a
+  // versão autoritativa por baixo, e o prompt diz `· atualizando` enquanto isso.
+  const chaveNova = catalogKey(true, !ligado);
+  if (!queryClient.getQueryData(chaveNova)) {
+    const proprias = tracks.filter((t) => t.source === 'acervo');
+    queryClient.setQueryData(chaveNova, {
+      tracks: [...proprias],
+      source: 'só o acervo',
+      acervo: proprias.length,
+    });
+  }
+
+  sessionStore.getState().setUser(novo);
+  void queryClient.invalidateQueries({ queryKey: CATALOG_LOGADO_KEY });
+  ui.flash('catálogo público → ' + (ligado ? 'desligado' : 'ligado'));
 }
 
 /**

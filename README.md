@@ -155,7 +155,7 @@ As faixas próprias entram **na frente**, marcadas com `[meu]`, e o gênero `ace
 de graça nos chips. A linha do prompt admite as duas:
 `# 13 faixas · fonte: audius api (ao vivo) + acervo (1)`.
 
-Três armadilhas tratadas aqui, todas com teste:
+Quatro armadilhas tratadas aqui, todas com teste:
 
 - **`cur` é índice**, e a lista muda de tamanho ao entrar e ao sair. O `controller.setTracks`
   reancora pelo `curId`, senão o player mostraria uma faixa e tocaria outra.
@@ -163,9 +163,46 @@ Três armadilhas tratadas aqui, todas com teste:
   (`index % 3`) marcaria música própria como `[pro]`.
 - **`restore()` não derruba a sessão sem rede.** A PWA é instalada e abre offline; só um **401**
   invalida, porque só ele significa "o servidor disse que não".
+- **Desligar o catálogo público não pode esvaziar a lista nem por um quadro.** Trocar o escopo da
+  consulta dá um commit com `data` indefinido, e aí `setTracks([])` crava `cur: -1`: a barra de
+  baixo desaparece com o áudio tocando. O `controller.togglePublico` semeia a chave nova **antes**
+  de trocar a sessão, e manda a faixa pública que está tocando para as `avulsas` — é a mesma
+  armadilha do primeiro item, por uma porta nova.
 
 Ao sair, o catálogo do logado é removido do cache persistido: os metadados das faixas próprias não
 ficam no aparelho esperando o próximo visitante.
+
+### Só o acervo, quando é isso que se quer
+
+Quem tem acervo normalmente quer ouvir o acervo, e a soma das duas fontes passa a ser ruído. Então
+a conta tem um interruptor em `ondas whoami`: **`catálogo [x] incluir o catálogo público (audius)
+na lista`**. Desligado, `loadCatalog` nem pede o trending — a lista é o acervo, e o prompt diz
+`# 13 faixas · fonte: só o acervo`.
+
+Ele mora na **conta** (coluna `users.publico`, migração `0005`), e não no aparelho: é escolha sobre
+o que se quer ouvir, então segue para o celular. Por isso fica no painel de cima do `ondas whoami`,
+acima do rótulo `# aparelho`, enquanto o `buffer` continua embaixo.
+
+**O padrão é decidido uma vez, pela própria migração**: `UPDATE ... WHERE publico IS NULL` desliga
+para toda conta que já tem faixa no acervo e deixa ligado para as vazias, e só então a coluna ganha
+`DEFAULT true`. A ordem é a regra — um `ADD COLUMN ... DEFAULT true` num comando só materializaria
+`true` em toda linha existente e o backfill não casaria com nada. Congelar assim também evita o
+pior: derivando a preferência da contagem do acervo ao vivo, o primeiro envio faria as 24 faixas do
+trending desaparecerem sem ninguém pedir.
+
+Do lado da PWA o campo é **opcional**, e `undefined` vale "mostra" (`showsPublicCatalog`, lido como
+`!== false`). É o caso do espelho local gravado por uma versão anterior: `restore()` o devolve sem
+validar quando não há rede, e lendo como `=== true` o catálogo público desapareceria sozinho para
+quem nunca pediu isso — offline, sem como religar. Um `true` errado custa um toque; um `false`
+errado esconde o catálogo **e** as faixas públicas curtidas e baixadas, sem causa visível.
+
+Duas consequências assumidas. Faixa pública curtida ou baixada **sai de `--curtidas` e
+`--offline`** enquanto está desligado, porque os dois recortes filtram a lista — a marca e os bytes
+ficam, e `ondas whoami` continua contando os downloads, que ele lê do aparelho e não do catálogo;
+é o texto de vazio que explica a diferença em vez de mandar baixar o que já está lá. E **link de
+faixa pública continua abrindo**: ele é resolvido por id, fora do catálogo, porque abrir um link é
+um ato explícito — a preferência decide o que a tela lista por conta própria, não o que se pede
+pelo nome.
 
 Decisões registradas em `docs/adr/0013-ondas-acervo-privado.md` no repo `homelab`: cookie HMAC em
 vez de JWT, argon2id, migrações sob advisory lock, rate-limit por `CF-Connecting-IP`, bucket R2

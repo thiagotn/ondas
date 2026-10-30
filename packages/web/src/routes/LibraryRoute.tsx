@@ -1,9 +1,11 @@
 import {
   defaultLibrarySegment,
   emptyText,
+  hiddenInSegment,
   LIBRARY_SEGMENTS,
   parseLibrarySegment,
   promptLine,
+  showsPublicCatalog,
   visibleTracks,
   whoAmI,
   type LibrarySegment,
@@ -52,6 +54,16 @@ export function LibraryRoute() {
   );
   const rows = useTrackRows(visible, tracks);
 
+  // Com o catálogo público desligado, faixa pública curtida ou baixada sai da
+  // lista — a marca e os bytes ficam, só a linha não aparece. `hidden` é o que
+  // deixa o texto de vazio dizer isso em vez de mandar baixar o que já está no
+  // aparelho.
+  const publicOff = !showsPublicCatalog(user);
+  const hidden = useMemo(
+    () => (publicOff ? hiddenInSegment(seg, { liked, cached }, tracks) : 0),
+    [publicOff, seg, liked, cached, tracks],
+  );
+
   const line = promptLine({
     tab: 'library',
     who: whoAmI(user),
@@ -90,7 +102,15 @@ export function LibraryRoute() {
       <TrackList
         rows={rows}
         loading={isLoading}
-        emptyText={emptyText({ tab: 'library', seg, q: '', loading: isLoading, user })}
+        emptyText={emptyText({
+          tab: 'library',
+          seg,
+          q: '',
+          loading: isLoading,
+          user,
+          publicOff,
+          hidden,
+        })}
       />
     </TabScaffold>
   );

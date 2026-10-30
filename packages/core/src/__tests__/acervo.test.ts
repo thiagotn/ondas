@@ -214,6 +214,70 @@ describe('loadCatalog com as duas fontes', () => {
     expect(cat.tracks[0]!.id).toBe('acervo:1');
   });
 
+  it('soAcervo devolve só as faixas próprias, e a fonte diz isso', async () => {
+    const cat = await loadCatalog({
+      remote: remoto(publicas),
+      readCache: semCache,
+      writeCache: nadaAGravar,
+      soAcervo: true,
+      acervo: async () => proprias,
+    });
+    expect(cat.tracks.map((t) => t.id)).toEqual(['acervo:1']);
+    expect(cat.source).toBe('só o acervo');
+    expect(cat.acervo).toBe(1);
+  });
+
+  it('soAcervo não toca no catálogo público: nem rede, nem cache, nem demo', async () => {
+    const trending = vi.fn(async () => publicas);
+    const readCache = vi.fn(async () => undefined);
+    const writeCache = vi.fn(async () => {});
+    const cat = await loadCatalog({
+      remote: { trending },
+      readCache,
+      writeCache,
+      soAcervo: true,
+      acervo: async () => proprias,
+    });
+    // Pedir o trending e jogar fora gastaria rede de graça; e gravar o nível 2
+    // misturaria metadado público num cache que esta lista não usa.
+    expect(trending).not.toHaveBeenCalled();
+    expect(readCache).not.toHaveBeenCalled();
+    expect(writeCache).not.toHaveBeenCalled();
+    // E nenhuma faixa do demo entrou para "preencher" a lista.
+    expect(cat.tracks).toEqual(proprias);
+  });
+
+  it('soAcervo vence forceDemo: quem pediu só o acervo não quer o demo no lugar', async () => {
+    const cat = await loadCatalog({
+      remote: remoto(publicas),
+      readCache: semCache,
+      writeCache: nadaAGravar,
+      forceDemo: true,
+      soAcervo: true,
+      acervo: async () => proprias,
+    });
+    expect(cat.source).toBe('só o acervo');
+    expect(cat.tracks).toEqual(proprias);
+  });
+
+  it('com soAcervo, acervo fora do ar REJEITA em vez de resolver vazio', async () => {
+    // O inverso da regra das duas fontes, de propósito: resolvendo vazio, a
+    // consulta sobrescreveria o cache persistido com lista vazia e o boot sem
+    // rede viraria app em branco — com as faixas baixadas desaparecendo de
+    // `--offline` e os bytes ainda no aparelho.
+    await expect(
+      loadCatalog({
+        remote: remoto(publicas),
+        readCache: semCache,
+        writeCache: nadaAGravar,
+        soAcervo: true,
+        acervo: async () => {
+          throw new Error('acervo fora do ar');
+        },
+      }),
+    ).rejects.toThrow('acervo fora do ar');
+  });
+
   it('busca as duas fontes em paralelo, não uma depois da outra', async () => {
     const ordem: string[] = [];
     const lenta = (nome: string, ms: number) => async () => {

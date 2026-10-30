@@ -96,6 +96,34 @@ describe('HttpAuthService.logout', () => {
   });
 });
 
+describe('HttpAuthService.setPublico', () => {
+  it('manda o PATCH e regrava o espelho com o valor novo', async () => {
+    const store = memoria({ user: { name: 'thiagotn', publico: true } });
+    const fetchImpl = vi.fn(async () => resposta(200, { name: 'thiagotn', publico: false }));
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    expect(await auth.setPublico(false)).toEqual({ name: 'thiagotn', publico: false });
+
+    const [rota, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(rota).toBe('/api/auth/prefs');
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(String(init.body))).toEqual({ publico: false });
+
+    // Regravar é metade do trabalho: é o espelho que `restore()` devolve sem
+    // rede, então sem isto o próximo boot offline voltaria à preferência velha.
+    expect(store.dados.get('user')).toEqual({ name: 'thiagotn', publico: false });
+  });
+
+  it('401 derruba a sessão em vez de parecer um botão instável', async () => {
+    const store = memoria({ user: { name: 'thiagotn' } });
+    const fetchImpl = vi.fn(async () => resposta(401, { error: 'sessão expirada' }));
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    await expect(auth.setPublico(false)).rejects.toThrow('sessão expirada');
+    expect(store.dados.has('user')).toBe(false);
+  });
+});
+
 describe('HttpAuthService.restore', () => {
   it('confirma a sessão pelo servidor', async () => {
     const store = memoria({ user: { name: 'antigo' } });
@@ -104,6 +132,34 @@ describe('HttpAuthService.restore', () => {
 
     expect(await auth.restore()).toEqual({ name: 'thiagotn' });
     expect(store.dados.get('user')).toEqual({ name: 'thiagotn' });
+  });
+
+  it('lê o `publico` do servidor quando ele vem', async () => {
+    const store = memoria({});
+    const fetchImpl = vi.fn(async () => resposta(200, { name: 'thiagotn', publico: false }));
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    expect(await auth.restore()).toEqual({ name: 'thiagotn', publico: false });
+  });
+
+  it('espelho de versão antiga NÃO ganha o campo, e ausente vale mostrar', async () => {
+    // Regressão do pior caso: um espelho gravado antes deste campo existir,
+    // mais servidor velho ou sem rede. Se qualquer um destes caminhos
+    // preenchesse `publico: false`, o catálogo público desapareceria sozinho
+    // para quem nunca pediu isso — e offline, sem como religar. O padrão mora
+    // em `showsPublicCatalog`, e só lá.
+    const store = memoria({ user: { name: 'thiagotn' } });
+    const semCampo = vi.fn(async () => resposta(200, { name: 'thiagotn' }));
+    expect(await new HttpAuthService(store, semCampo as unknown as typeof fetch).restore()).toEqual(
+      { name: 'thiagotn' },
+    );
+
+    const semRede = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    expect(await new HttpAuthService(store, semRede as unknown as typeof fetch).restore()).toEqual({
+      name: 'thiagotn',
+    });
   });
 
   it('401 derruba a sessão: foi o servidor que disse não', async () => {

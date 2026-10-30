@@ -1,4 +1,10 @@
-import { comFaixasAvulsas, loadCatalog, type CachedCatalog, type Catalog } from '@ondas/core';
+import {
+  comFaixasAvulsas,
+  loadCatalog,
+  showsPublicCatalog,
+  type CachedCatalog,
+  type Catalog,
+} from '@ondas/core';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useAvulsas } from '../app/extras';
@@ -8,9 +14,34 @@ import { useSession } from '../app/stores';
 export const CATALOG_QUERY_KEY = ['catalog', 'trending'] as const;
 const META_KEY = 'meta';
 
-/** Chave por escopo de sessão: o catálogo do logado tem faixas que o do visitante não pode ter. */
-export const catalogKey = (logado: boolean) =>
-  [...CATALOG_QUERY_KEY, logado ? 'com-acervo' : 'visitante'] as const;
+/**
+ * Prefixo dos escopos de quem tem conta.
+ *
+ * Os dois escopos do logado ficam sob ele para que `logout()` e a invalidação
+ * do envio alcancem ambos com UMA chave — filtro do TanStack é `exact: false`
+ * por padrão. Listar os dois à mão seria uma lista que alguém esquece de
+ * atualizar no dia em que aparecer um terceiro.
+ */
+export const CATALOG_LOGADO_KEY = [...CATALOG_QUERY_KEY, 'logado'] as const;
+
+/**
+ * Chave por escopo de sessão E de preferência.
+ *
+ * Três escopos, não dois: o catálogo do logado tem faixas que o do visitante
+ * não pode ter, e o de quem desligou o catálogo público não é o mesmo que o de
+ * quem o mantém. Sem o terceiro, desligar serviria a lista misturada anterior
+ * do cache até o refetch chegar.
+ *
+ * Trocar `com-acervo` por `logado/com-publico` deixa a entrada antiga órfã no
+ * cache persistido: ela é reidratada, nunca lida e coletada pelo `gcTime` de
+ * 24h. O custo é UM boot frio para quem está logado, uma vez, depois do deploy
+ * — menos do que bombar o `buster` do persister, que jogaria fora o cache
+ * inteiro de todo mundo.
+ */
+export const catalogKey = (logado: boolean, publico = true) => {
+  if (!logado) return [...CATALOG_QUERY_KEY, 'visitante'] as const;
+  return [...CATALOG_LOGADO_KEY, publico ? 'com-publico' : 'so-acervo'] as const;
+};
 
 /**
  * Catálogo com a cadeia de 3 níveis do handoff (API → metadados locais → demo),
@@ -22,12 +53,13 @@ export function useCatalog() {
   const restored = useSession((s) => s.restored);
   const avulsas = useAvulsas((s) => s.list);
   const logado = !!user;
+  const publico = showsPublicCatalog(user);
 
   const query = useQuery<Catalog>({
     // A chave inclui o escopo: entrar ou sair troca de catálogo em vez de
     // reaproveitar o anterior — e o cache persistido do visitante nunca
     // guarda faixa do acervo.
-    queryKey: catalogKey(logado),
+    queryKey: catalogKey(logado, publico),
     // Esperar a sessão ser restaurada evita buscar o catálogo de visitante e
     // logo depois o de logado, no boot de quem já tem conta.
     enabled: restored,
@@ -40,6 +72,9 @@ export function useCatalog() {
           // guarda, e nó sai da rede — metadados velhos viram capa quebrada.
           writeCache: (tracks) => kv.set<CachedCatalog>(META_KEY, { tracks, savedAt: Date.now() }),
           forceDemo: FORCE_DEMO,
+          // A conta desligou o catálogo público: a lista é o acervo e nada
+          // mais, e `loadCatalog` nem chega a pedir o trending.
+          soAcervo: !publico,
           // Sem sessão não há acervo, e nem vale pedir: a API responderia 401.
           ...(logado ? { acervo: (s?: AbortSignal) => acervoClient.tracks(s) } : {}),
           onError: (err) => console.warn('[ondas] fonte do catálogo indisponível:', err),

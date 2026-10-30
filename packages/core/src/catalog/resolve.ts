@@ -35,6 +35,14 @@ export interface LoadCatalogDeps {
    * público continua valendo sozinha, exatamente como antes.
    */
   acervo?: (signal?: AbortSignal) => Promise<Track[]>;
+  /**
+   * A conta desligou o catálogo público: a lista é o acervo e nada mais.
+   *
+   * Irmão de posição do `forceDemo`, não de significado — aquele troca a fonte
+   * pública por outra, este a remove. Quando está ligado, VENCE o `forceDemo`:
+   * quem pediu só o acervo não quer catálogo demo no lugar do Audius.
+   */
+  soAcervo?: boolean;
 }
 
 /**
@@ -51,6 +59,10 @@ export interface LoadCatalogDeps {
  * vez de virar erro de tela.
  */
 export async function loadCatalog(deps: LoadCatalogDeps, options?: TrendingOptions): Promise<Catalog> {
+  // O corte vem ANTES de `resolvePublico`, senão o fetch no Audius sai de todo
+  // jeito e só o resultado é jogado fora.
+  if (deps.soAcervo) return soAcervo(deps, options);
+
   // Dispara as duas antes de esperar qualquer uma: sequencial somaria as
   // latências sem necessidade.
   const doAcervo = deps.acervo?.(options?.signal);
@@ -69,6 +81,27 @@ export async function loadCatalog(deps: LoadCatalogDeps, options?: TrendingOptio
 
   if (!proprias.length) return catalogo;
   return { ...catalogo, tracks: [...proprias, ...catalogo.tracks], acervo: proprias.length };
+}
+
+/**
+ * A lista quando a conta desligou o catálogo público.
+ *
+ * Nada de `readCache`, `writeCache` nem catálogo demo: não houve falha nenhuma,
+ * e cair no demo aqui seria inventar faixa para quem pediu só a dela. O nível 2
+ * também não entra — ele guarda metadado público, que é justamente o que esta
+ * lista não tem.
+ *
+ * E aqui a falha do acervo **rejeita**, ao contrário da regra de cima, onde
+ * quem falha some da lista. O inverso vale porque o número de fontes mudou: com
+ * duas, sumir é degradação e a tela continua útil; com uma, resolver vazio
+ * faria a consulta sobrescrever o cache persistido com lista vazia — boot sem
+ * rede viraria app em branco, e as faixas baixadas desapareceriam de
+ * `--offline` com os bytes ainda no aparelho. Rejeitando, quem chama mantém o
+ * dado anterior e pode dizer que falhou.
+ */
+async function soAcervo(deps: LoadCatalogDeps, options?: TrendingOptions): Promise<Catalog> {
+  const proprias = (await deps.acervo?.(options?.signal)) ?? [];
+  return { tracks: proprias, source: 'só o acervo', acervo: proprias.length };
 }
 
 /** A cadeia de 3 níveis do catálogo público, intacta. */

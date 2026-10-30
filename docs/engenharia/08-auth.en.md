@@ -261,6 +261,19 @@ The answer is in the router's shape, not in a permission field.
 | Public | no credential | `healthz`, `readyz`, `og/t/{seg}`, `signup`, `login`, `logout` |
 | Session **or** token | bringing in a new track | `POST ingest`, `GET ingest/{id}`, `POST upload`, `POST upload/{id}/finalizar` |
 | Session only | touching what already exists | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}` |
+| Session only | touching one's own account | `GET /auth/me`, `PATCH /auth/prefs` |
+
+The last row is the same ruler applied to a new case. `PATCH /auth/prefs` turns the account's public
+catalogue on and off (`users.publico`), and the machine token does **not** reach it: the token exists
+to bring in a new track, and changing what somebody sees is not that. The guarantee is geometric
+like the others — `exigirSessao` never reads the token header — and
+`TestPrefsExigeSessaoENaoAceitaToken` pins it, for the same reason
+`TestEscopoDoTokenNoAcervo` exists.
+
+The body is `{"publico": bool}` read into a **pointer**: with a `bool`, a body missing the key would
+decode to `false` and turn off the catalogue of someone who merely sent bad JSON. Absent is a 400.
+And the field ships in **every** auth response — `signup`, `login` and `me` — because the PWA decides
+the catalogue's source at boot, before any other call.
 
 And `api/internal/httpapi/server.go:122-127` names the threat model:
 

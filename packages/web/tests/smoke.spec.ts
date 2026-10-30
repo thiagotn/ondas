@@ -86,6 +86,15 @@ const ACERVO = [
  */
 async function stubApi(page: Page) {
   let logado = false;
+  // `true` de propósito, e não "realista".
+  //
+  // O usuário de teste TEM faixa no acervo, então um servidor de verdade
+  // congelaria a preferência em `false` na migração — e aí o catálogo demo
+  // desapareceria de todo teste logado, levando uns oito consigo (o do envio,
+  // o do chip `lofi`, o do `+ acervo (1)`). Mantendo ligado, a suíte continua
+  // falando do que ela sempre falou, e quem exercita o desligamento é o teste
+  // que o liga explicitamente.
+  let publico = true;
   // O acervo cresce durante o teste de envio: é assim que se prova que a
   // faixa nova aparece na lista depois da ingestão.
   const acervo = ACERVO.map((t) => ({ ...t }));
@@ -100,7 +109,7 @@ async function stubApi(page: Page) {
       return route.fulfill({ status: 400, json: { error: 'senha precisa de 8+ caracteres' } });
     }
     logado = true;
-    return route.fulfill({ status: 200, json: { name: email.split('@')[0], email } });
+    return route.fulfill({ status: 200, json: { name: email.split('@')[0], email, publico } });
   });
 
   await page.route('**/api/auth/logout', async (route) => {
@@ -110,9 +119,31 @@ async function stubApi(page: Page) {
 
   await page.route('**/api/auth/me', async (route) =>
     logado
-      ? route.fulfill({ status: 200, json: { name: 'thiago', email: 'thiago@ondas.app' } })
+      ? route.fulfill({
+          status: 200,
+          json: { name: 'thiago', email: 'thiago@ondas.app', publico },
+        })
       : route.fulfill({ status: 401, json: { error: 'sessão expirada' } }),
   );
+
+  // A preferência guarda estado no closure, como `logado` e `acervo`: é o que
+  // faz o `/me` do reload concordar com o que foi clicado.
+  //
+  // A rota é OBRIGATÓRIA, não um capricho: sem ela o PATCH escapa para o
+  // `vite preview`, cujo fallback de SPA só serve GET/HEAD, e o teste falharia
+  // com 405 por um motivo que não tem nada a ver com a feature.
+  await page.route('**/api/auth/prefs', async (route) => {
+    if (!logado) return route.fulfill({ status: 401, json: { error: 'sessão expirada' } });
+    const corpo = JSON.parse(route.request().postData() ?? '{}');
+    if (typeof corpo.publico !== 'boolean') {
+      return route.fulfill({ status: 400, json: { error: 'requisição inválida' } });
+    }
+    publico = corpo.publico;
+    return route.fulfill({
+      status: 200,
+      json: { name: 'thiago', email: 'thiago@ondas.app', publico },
+    });
+  });
 
   await page.route('**/api/acervo', async (route) =>
     logado
@@ -437,6 +468,65 @@ test('o acervo aparece só logado, marcado como [meu], e some ao sair', async ({
   await expect(linha('Fita Caseira')).toBeHidden();
   await expect(page.getByText('[meu]')).toBeHidden();
   await expect(page.getByText(/\+ acervo/)).toBeHidden();
+});
+
+test('desligar o catálogo público deixa só o acervo — e o player não vira fantasma', async ({
+  page,
+}) => {
+  const linha = (titulo: string) => page.getByRole('button', { name: new RegExp(titulo) });
+
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
+  await page.getByPlaceholder('••••').fill('senha-forte');
+  await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
+  await expect(page.getByRole('button', { name: /^01 Fita Caseira/ })).toBeVisible();
+
+  // Toca uma faixa PÚBLICA, e é esse o ponto do teste: ela está prestes a sair
+  // da lista. Se a troca de escopo da consulta deixar um commit com a lista
+  // vazia, a reancoragem crava `cur: -1` e a barra de baixo desaparece com o
+  // áudio tocando — o pior estado possível de um player, e o que
+  // `controller.togglePublico` semeia a chave nova para evitar.
+  await linha('Maré Baixa').click();
+  const barra = page.getByText('Maré Baixa');
+  await expect(barra.first()).toBeVisible();
+
+  await abrirConta(page);
+  const conta = page.getByRole('dialog', { name: 'ondas whoami' });
+  const chave = conta.getByRole('button', { name: /catálogo/ });
+  await expect(chave).toHaveAttribute('aria-pressed', 'true');
+  await chave.click();
+  await expect(chave).toHaveAttribute('aria-pressed', 'false');
+
+  // A linha `plano` acompanha: "catálogo completo" encostado em "desligado"
+  // seria contradição na mesma tela.
+  await expect(conta.getByText('acervo + offline')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(conta).toBeHidden();
+
+  // (a) A FAIXA QUE TOCA CONTINUA NA TELA, apesar de ter saído do catálogo.
+  await expect(barra.first()).toBeVisible();
+
+  // (b) A lista é o acervo e nada mais.
+  await expect(linha('Fita Caseira')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^01 Fita Caseira/ })).toBeVisible();
+
+  // (c) A fonte diz só o acervo, sem repetir a contagem que já está à esquerda.
+  await expect(page.getByText('fonte: só o acervo')).toBeVisible();
+  await expect(page.getByText(/só o acervo \(/)).toBeHidden();
+
+  // (d) Sobrevive ao reload: a preferência é da conta, e vem pelo `/me`.
+  await page.goto('/');
+  await skipSplash(page);
+  await expect(linha('Fita Caseira')).toBeVisible();
+  await expect(page.getByText('fonte: só o acervo')).toBeVisible();
+
+  // (e) Religar traz o catálogo público de volta.
+  await abrirConta(page);
+  await conta.getByRole('button', { name: /catálogo/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(linha('Maré Baixa')).toBeVisible();
+  await expect(page.getByText(/\+ acervo \(1\)/)).toBeVisible();
 });
 
 test('conta e aparelho: as duas portas, o buffer e limpar downloads', async ({ page }) => {

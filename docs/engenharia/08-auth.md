@@ -258,6 +258,18 @@ A resposta está na forma do roteador, e não num campo de permissão.
 | Pública | sem credencial | `healthz`, `readyz`, `og/t/{seg}`, `signup`, `login`, `logout` |
 | Sessão **ou** token | entrar com faixa nova | `POST ingest`, `GET ingest/{id}`, `POST upload`, `POST upload/{id}/finalizar` |
 | Só sessão | mexer no que já existe | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}` |
+| Só sessão | mexer na própria conta | `GET /auth/me`, `PATCH /auth/prefs` |
+
+A última linha é a mesma régua aplicada a um caso novo. `PATCH /auth/prefs` liga e desliga o
+catálogo público da conta (`users.publico`), e o token de máquina **não** a alcança: ele existe para
+entrar com faixa nova, e mudar o que alguém vê não é isso. A garantia é geométrica como as outras —
+`exigirSessao` nem lê o header do token —, e `TestPrefsExigeSessaoENaoAceitaToken` a fixa, pelo
+mesmo motivo que `TestEscopoDoTokenNoAcervo` existe.
+
+O corpo é `{"publico": bool}` lido num **ponteiro**: com um `bool`, um corpo sem a chave
+decodificaria para `false` e desligaria o catálogo de quem só mandou um JSON errado. Ausente é 400.
+E o campo sai em **toda** resposta de auth — `signup`, `login` e `me` —, porque é no boot que a PWA
+decide a fonte do catálogo, antes de qualquer outra chamada.
 
 E `api/internal/httpapi/server.go:122-127` nomeia o modelo de ameaça:
 

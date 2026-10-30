@@ -14,4 +14,12 @@ export interface AuthService {
   logout(): Promise<void>;
   /** Sessão persistida, se houver. */
   restore(): Promise<Session>;
+  /**
+   * Liga ou desliga o catálogo público desta conta, devolvendo o usuário novo.
+   *
+   * Fica no serviço de auth, e não num store, porque a preferência é um campo
+   * da conta: quem a grava é o servidor, e o espelho local tem de acompanhar —
+   * é ele que `restore()` devolve sem rede.
+   */
+  setPublico(on: boolean): Promise<User>;
 }

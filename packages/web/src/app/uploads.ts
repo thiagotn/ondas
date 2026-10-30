@@ -1,6 +1,6 @@
 import { AcervoError, tituloDoArquivo, type EstadoEnvio } from '@ondas/core';
 import { create } from 'zustand';
-import { catalogKey } from '../query/catalog';
+import { CATALOG_LOGADO_KEY } from '../query/catalog';
 import { queryClient } from '../query/client';
 import { acervoUploader } from './services';
 
@@ -61,7 +61,11 @@ export const useUploads = create<Uploads>((set) => ({
         });
         // A faixa nova só aparece na lista se o catálogo do logado for
         // relido: o cache dele tem 5 minutos de frescor.
-        await queryClient.invalidateQueries({ queryKey: catalogKey(true) });
+        //
+        // Pelo PREFIXO, não por um dos dois escopos: quem desligou o catálogo
+        // público está no outro, e invalidar só um faria o envio não aparecer
+        // justamente para quem usa o acervo puro.
+        await queryClient.invalidateQueries({ queryKey: CATALOG_LOGADO_KEY });
       } catch (err) {
         const acervo = err instanceof AcervoError ? err : null;
         mudar(item.id, {
