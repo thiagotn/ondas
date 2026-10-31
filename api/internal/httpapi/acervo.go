@@ -224,6 +224,16 @@ func (s *Server) removerFaixa(w http.ResponseWriter, r *http.Request) {
 		escreverErro(w, http.StatusInternalServerError, "não foi possível remover")
 		return
 	}
+	// A curtida da faixa sai junto. Sem FK (ver a migração 0006), ninguém faz
+	// isso por nós, e a linha ficaria apontando para o nada. O id aqui é o
+	// PREFIXADO, porque é assim que ele chega ao navegador e é assim que foi
+	// curtido — `idDaRota` acabou de tirar o prefixo para falar com o banco.
+	//
+	// Melhor-esforço, como a limpeza do R2 logo abaixo: a faixa já foi
+	// removida, e uma curtida órfã não é motivo para a resposta acusar erro.
+	if err := s.likes.RemoverFaixa(r.Context(), prefixoID+id); err != nil {
+		slog.Error("curtida órfã", "faixa", id, "erro", err)
+	}
 	// A linha já foi apagada; se a limpeza do R2 falhar, o objeto fica órfão
 	// mas o acervo do usuário já está correto. Erro vai para o log, não para a
 	// resposta.

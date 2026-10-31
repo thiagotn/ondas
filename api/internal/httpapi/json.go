@@ -32,8 +32,21 @@ func escreverErro(w http.ResponseWriter, status int, msg string) {
 }
 
 func lerJSON(w http.ResponseWriter, r *http.Request, destino any) bool {
+	return lerJSONAte(w, r, destino, 4<<10)
+}
+
+// lerJSONAte é lerJSON com outro teto de corpo.
+//
+// Existe por causa das curtidas: a primeira sincronização de um aparelho manda
+// TODAS as curtidas que já estavam nele de uma vez, e algumas centenas de ids
+// passam folgado dos 4 KiB do padrão. O 400 que sairia dali diria "requisição
+// inválida" para um pedido perfeitamente válido, e ninguém acharia o motivo.
+//
+// O teto continua existindo, só que maior: `MaxBytesReader` é o que impede um
+// corpo infinito de virar memória nossa.
+func lerJSONAte(w http.ResponseWriter, r *http.Request, destino any, limite int64) bool {
 	defer r.Body.Close()
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10))
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, limite))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(destino); err != nil {
 		escreverErro(w, http.StatusBadRequest, "requisição inválida")
