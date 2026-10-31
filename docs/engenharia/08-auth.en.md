@@ -262,8 +262,9 @@ The answer is in the router's shape, not in a permission field.
 | Session **or** token | bringing in a new track | `POST ingest`, `GET ingest/{id}`, `POST upload`, `POST upload/{id}/finalizar` |
 | Session only | touching what already exists | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}` |
 | Session only | touching one's own account | `GET /auth/me`, `PATCH /auth/prefs` |
+| Session only | touching one's own taste | `GET /likes`, `PATCH /likes` |
 
-The last row is the same ruler applied to a new case. `PATCH /auth/prefs` turns the account's public
+The last two rows are the same ruler applied to new cases. `PATCH /auth/prefs` turns the account's public
 catalogue on and off (`users.publico`), and the machine token does **not** reach it: the token exists
 to bring in a new track, and changing what somebody sees is not that. The guarantee is geometric
 like the others — `exigirSessao` never reads the token header — and
@@ -274,6 +275,22 @@ The body is `{"publico": bool}` read into a **pointer**: with a `bool`, a body m
 decode to `false` and turn off the catalogue of someone who merely sent bad JSON. Absent is a 400.
 And the field ships in **every** auth response — `signup`, `login` and `me` — because the PWA decides
 the catalogue's source at boot, before any other call.
+
+`/likes` follows the same ruler and sits **outside** the `/acervo` group: a like depends on no R2
+credential, and `exigirAcervo`'s `503 acervo não configurado` would be a lie to someone who only
+wants to like an Audius track. `TestCurtidasExigemSessaoENaoAceitamToken` pins both routes.
+
+A single route, `PATCH /likes` with `{"add": [...], "remove": [...]}`, covers all three client
+uses: the tap on the heart, the queue that piled up offline, and the adoption of the likes a device
+held from before. It answers with the **whole collection**, not the delta — the same contract as
+`DefinirPublico`: the caller applies the result directly, with no second read that could disagree
+with the write.
+
+Two ceilings, protecting different things. The body goes to 64 KiB via `lerJSONAte` rather than
+`lerJSON`'s default 4 KiB, because adoption uploads the whole collection at once — a few hundred
+ids comfortably exceed 4 KiB, and the `400 requisição inválida` that would come out of there would
+be for a perfectly valid request. That ceiling protects our memory; the other one,
+`maxIDsPorPedido`, protects the database from an `unnest` of arbitrary size.
 
 And `api/internal/httpapi/server.go:122-127` names the threat model:
 

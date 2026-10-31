@@ -23,10 +23,13 @@ import s from './shell.module.css';
  * `ondas whoami` — conta e aparelho, fora da biblioteca.
  *
  * Os dois blocos estão separados porque são coisas diferentes de verdade: a
- * conta vive no servidor e te segue para qualquer aparelho; `buffer`, as
- * curtidas e os downloads vivem no IndexedDB **deste navegador** e não seguem
- * ninguém. Juntá-los num painel só, como estava na biblioteca, insinuava uma
- * sincronia que não existe.
+ * conta vive no servidor e te segue para qualquer aparelho; `buffer` e os
+ * downloads vivem no IndexedDB **deste navegador** e não seguem ninguém.
+ * Juntá-los num painel só, como estava na biblioteca, insinuava uma sincronia
+ * que não existe.
+ *
+ * A curtida já esteve na lista de baixo e mudou de lado (migração 0006): ela
+ * segue a conta, e o que fica no aparelho é só o espelho dela.
  */
 export function AccountOverlay() {
   const navigate = useNavigate();
@@ -166,12 +169,12 @@ export function AccountOverlay() {
             </div>
           </div>
 
-          {/* Sair não leva a metade local embora — e isso tem de estar escrito,
-              porque o áudio do acervo é privado e fica no aparelho. */}
+          {/* Sair não leva os downloads embora — e isso tem de estar escrito,
+              porque o áudio do acervo é privado e fica no aparelho. As
+              curtidas saíram desta frase quando viraram da conta: sair APAGA
+              as deste navegador, e entrar de novo as traz de volta. */}
           {user && count > 0 && (
-            <span className={o.contaSecao}>
-              sair não apaga downloads nem curtidas deste aparelho.
-            </span>
+            <span className={o.contaSecao}>sair não apaga os downloads deste aparelho.</span>
           )}
         </div>
       </div>

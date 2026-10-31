@@ -259,6 +259,7 @@ A resposta está na forma do roteador, e não num campo de permissão.
 | Sessão **ou** token | entrar com faixa nova | `POST ingest`, `GET ingest/{id}`, `POST upload`, `POST upload/{id}/finalizar` |
 | Só sessão | mexer no que já existe | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}` |
 | Só sessão | mexer na própria conta | `GET /auth/me`, `PATCH /auth/prefs` |
+| Só sessão | mexer no próprio gosto | `GET /likes`, `PATCH /likes` |
 
 A última linha é a mesma régua aplicada a um caso novo. `PATCH /auth/prefs` liga e desliga o
 catálogo público da conta (`users.publico`), e o token de máquina **não** a alcança: ele existe para
@@ -270,6 +271,21 @@ O corpo é `{"publico": bool}` lido num **ponteiro**: com um `bool`, um corpo se
 decodificaria para `false` e desligaria o catálogo de quem só mandou um JSON errado. Ausente é 400.
 E o campo sai em **toda** resposta de auth — `signup`, `login` e `me` —, porque é no boot que a PWA
 decide a fonte do catálogo, antes de qualquer outra chamada.
+
+`/likes` segue a mesma régua e fica **fora** do grupo `/acervo`: curtida não depende de credencial
+de R2, e o `503 acervo não configurado` de `exigirAcervo` seria uma mentira para quem só quer
+curtir uma faixa do Audius. `TestCurtidasExigemSessaoENaoAceitamToken` trava as duas rotas.
+
+Uma rota só, `PATCH /likes` com `{"add": [...], "remove": [...]}`, cobre os três usos do cliente:
+o toque no coração, a fila que acumulou sem rede e a adoção das curtidas que um aparelho guardava
+de antes. Ela responde a **coleção inteira**, e não o delta — mesmo contrato de `DefinirPublico`:
+quem chama aplica o resultado direto, sem uma segunda leitura que possa discordar da escrita.
+
+Dois tetos, e eles protegem coisas diferentes. O corpo vai a 64 KiB por `lerJSONAte`, e não aos
+4 KiB do `lerJSON` padrão, porque a adoção sobe a coleção inteira de uma vez — algumas centenas de
+ids passam folgado dos 4 KiB, e o `400 requisição inválida` que sairia dali seria para um pedido
+perfeitamente válido. Esse teto protege a nossa memória; o outro, `maxIDsPorPedido`, protege o
+banco de um `unnest` de tamanho arbitrário.
 
 E `api/internal/httpapi/server.go:122-127` nomeia o modelo de ameaça:
 

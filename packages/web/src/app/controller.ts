@@ -26,6 +26,7 @@ import { queryClient } from '../query/client';
 import { CATALOG_LOGADO_KEY, catalogKey } from '../query/catalog';
 import { ehCotaExcedida } from '../platform/CacheOfflineStore';
 import { useAvulsas } from './extras';
+import { esquecerCurtidas, registrar, sincronizar } from './likes';
 import { auth, connectivity, engine, offlineStore } from './services';
 import { libraryStore, playerStore, sessionStore, uiStore } from './stores';
 
@@ -210,8 +211,26 @@ export function seekBy(seconds: number): void {
   engine.seek(Math.min(dur, Math.max(0, t + seconds)));
 }
 
+/**
+ * Curte ou descurte, otimista.
+ *
+ * A curtida é da CONTA desde a migração 0006, então sem sessão não há onde
+ * guardá-la — e dizer isso é melhor que um coração que acende e some no
+ * próximo boot. O mesmo caminho atende o clique na lista, o botão do player e
+ * a tecla `l`.
+ *
+ * A tela muda ANTES da rede, ao contrário de `togglePublico`: lá um erro
+ * deixaria a lista inteira mudando sozinha, aqui o pior caso é um coração que
+ * a fila sobe depois. É a fila que torna isso honesto.
+ */
 export function toggleLike(id: string): void {
+  if (!sessionStore.getState().user) {
+    uiStore.getState().flash('curtir exige entrar na conta');
+    return;
+  }
+  const curtir = !libraryStore.getState().liked[id];
   libraryStore.getState().toggleLike(id);
+  void registrar(id, curtir);
 }
 
 export function likeCurrent(): void {
@@ -312,6 +331,10 @@ export function setTheme(id: ThemeId): void {
 }
 
 export async function logout(): Promise<void> {
+  // A fila sobe ANTES de o cookie morrer. Curtir e sair em seguida é um gesto
+  // só, e o debounce de `registrar` pode nem ter disparado ainda: depois do
+  // `auth.logout()` o PATCH só levaria 401, e a curtida morreria no caminho.
+  await sincronizar();
   await auth.logout();
   sessionStore.getState().setUser(null);
   // O catálogo do logado tem as faixas do acervo, e ele fica persistido em
@@ -321,6 +344,9 @@ export async function logout(): Promise<void> {
   // Pelo prefixo: são dois escopos do logado (com e sem catálogo público), e os
   // dois têm faixa do acervo dentro.
   queryClient.removeQueries({ queryKey: CATALOG_LOGADO_KEY });
+  // Pelo mesmo motivo, e com um risco a mais: curtida que fica no store depois
+  // de sair seria ADOTADA pela próxima conta que entrasse neste navegador.
+  await esquecerCurtidas();
 }
 
 /**
@@ -461,6 +487,8 @@ export function bootstrap(): () => void {
     connectivity.subscribe((value) => {
       setOnline(value);
       ui.flash(value ? 'rede conectada' : 'rede desconectada — apenas faixas [off]');
+      // A rede voltou: é a hora de subir o que foi curtido sem ela.
+      if (value) void sincronizar();
     }),
   ];
   setOnline(connectivity.isOnline());

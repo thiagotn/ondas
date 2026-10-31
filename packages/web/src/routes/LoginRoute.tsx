@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGuestMode } from '../app/guest';
 import { CassetteLogo } from '../components/CassetteLogo';
+import { sincronizar } from '../app/likes';
 import { auth } from '../app/services';
 import { sessionStore, uiStore, useUi } from '../app/stores';
 import { TrafficLights } from '../components/TrafficLights';
@@ -29,6 +30,9 @@ export function LoginRoute() {
     try {
       const user = await auth.login({ email, password });
       sessionStore.getState().setUser(user);
+      // Traz as curtidas da conta — e sobe as que este aparelho guardava de
+      // antes de elas serem da conta (`app/likes.ts`).
+      void sincronizar();
       setPassword('');
       uiStore.getState().closeGate();
       uiStore.getState().flash(`autenticado como ${user.name} — catálogo completo liberado`);

@@ -4,10 +4,15 @@ import type { Catalog, LibrarySegment, Session, TabId, Track } from './types.js'
 /**
  * Os três recortes da biblioteca, na ordem em que a tela os mostra.
  *
+ * `acervo` fica no MEIO, entre as curtidas e os downloads, e não no fim: ele é
+ * o padrão de quem tem conta (`defaultLibrarySegment`), e o padrão no canto
+ * direito faz a tela abrir com o chip mais distante marcado.
+ *
  * Aqui, e não na tela: eles viraram endereço (`/library/offline`), e o que
- * entra pela URL é texto de fora — precisa de uma peneira testável.
+ * entra pela URL é texto de fora — precisa de uma peneira testável. A tela só
+ * mapeia esta lista (`LibraryRoute`), então mudar a ordem é mudar esta linha.
  */
-export const LIBRARY_SEGMENTS: readonly LibrarySegment[] = ['liked', 'offline', 'acervo'];
+export const LIBRARY_SEGMENTS: readonly LibrarySegment[] = ['liked', 'acervo', 'offline'];
 
 /**
  * A palavra de cada recorte na URL.
@@ -36,7 +41,12 @@ export function librarySegmentSlug(seg: LibrarySegment): string {
  * e é o recorte que o envio alimenta — abrir em `--curtidas` pedia um clique
  * antes de mostrar o que ela tem. Sem conta o acervo não existe: o catálogo não
  * traz faixa própria nenhuma e o chip nem é desenhado (`LibraryRoute`), então
- * ali o padrão volta a ser `liked`, que vive no aparelho e não pede servidor.
+ * ali o padrão volta a ser `liked`.
+ *
+ * Desde que a curtida passou a morar na conta, `liked` sem sessão não é mais
+ * "o que vive no aparelho e não pede servidor" — os TRÊS recortes pedem conta,
+ * e `~/biblioteca` inteira é uma porta fechada para quem não entrou. `liked`
+ * continua sendo o padrão por ser o primeiro chip, não por ser o que funciona.
  *
  * Aqui, e não na tela, porque é a mesma regra que decide duas coisas: onde
  * `/library` abre e onde cai um segmento que não existe.
@@ -222,7 +232,13 @@ export function emptyText(args: {
       const quantas = hidden === 1 ? '1 faixa aqui vem' : `${hidden} faixas aqui vêm`;
       return `${quantas} do catálogo público, que está desligado — religue em [ondas whoami].`;
     }
-    if (seg === 'liked') return 'vazio — pressione [l] ou o coração para curtir.';
+    // Sem conta a frase não pode mandar apertar [l]: o coração não liga mais
+    // para quem não entrou, porque a curtida é da conta e não do aparelho.
+    if (seg === 'liked') {
+      return user
+        ? 'vazio — pressione [l] ou o coração para curtir.'
+        : 'curtidas exigem login.';
+    }
     if (seg === 'acervo') {
       return user ? 'vazio — envie um arquivo com [+ arquivo].' : 'o acervo exige login.';
     }

@@ -67,6 +67,15 @@ describe('hiddenInSegment', () => {
   });
 });
 
+describe('LIBRARY_SEGMENTS', () => {
+  it('a ordem é a da tela, e o acervo fica no meio', () => {
+    // Esta lista É a ordem dos chips (`LibraryRoute` só a mapeia). O acervo no
+    // meio e não no fim porque ele é o padrão de quem tem conta, e o padrão no
+    // canto direito faria a tela abrir com o chip mais distante marcado.
+    expect([...LIBRARY_SEGMENTS]).toEqual(['liked', 'acervo', 'offline']);
+  });
+});
+
 describe('parseLibrarySegment', () => {
   it('ida e volta pelos três recortes', () => {
     for (const seg of LIBRARY_SEGMENTS) {
@@ -235,8 +244,13 @@ describe('emptyText', () => {
     expect(emptyText({ tab: 'search', seg: 'liked', q: 'zzz', loading: false, user: null })).toBe(
       'grep: nenhum resultado para "zzz"',
     );
+    expect(
+      emptyText({ tab: 'library', seg: 'liked', q: '', loading: false, user: { name: 'a' } }),
+    ).toBe('vazio — pressione [l] ou o coração para curtir.');
+    // Sem conta os TRÊS recortes pedem login: a curtida virou da conta, e
+    // mandar apertar [l] seria mandar apertar um botão que não liga.
     expect(emptyText({ tab: 'library', seg: 'liked', q: '', loading: false, user: null })).toBe(
-      'vazio — pressione [l] ou o coração para curtir.',
+      'curtidas exigem login.',
     );
     expect(
       emptyText({ tab: 'library', seg: 'offline', q: '', loading: false, user: { name: 'a' } }),

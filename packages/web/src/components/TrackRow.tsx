@@ -119,7 +119,11 @@ export function TrackRow({
 
       <button
         type="button"
-        aria-label={row.liked ? 'Descurtir' : 'Curtir'}
+        // Sem sessão o rótulo diz por quê, e o botão continua CLICÁVEL: quem
+        // recusa é o `controller`, com uma mensagem na tela. `aria-disabled`
+        // aqui seria pior que o silêncio — um coração inerte não explica nada,
+        // e nem leitor de tela nem teclado chegariam ao aviso.
+        aria-label={rotuloDeCurtir(row)}
         aria-pressed={row.liked}
         className={row.liked ? `${s.action} ${s.actionLiked}` : s.action}
         onClick={() => onLike(track.id)}
@@ -158,4 +162,9 @@ export function TrackRow({
       )}
     </div>
   );
+}
+
+function rotuloDeCurtir(row: RowModel): string {
+  if (!row.canLike) return 'Curtir — exige entrar na conta';
+  return row.liked ? 'Descurtir' : 'Curtir';
 }

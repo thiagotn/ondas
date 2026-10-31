@@ -84,7 +84,7 @@ using it as an **internal** identity.
 | Store | Where | Holds |
 |---|---|---|
 | `player` | `packages/core/src/stores/player.ts` | what is playing, time, buffer, shuffle, repeat |
-| `library` | `packages/core/src/stores/library.ts` | likes, downloads, sizes, progress |
+| `library` | `packages/core/src/stores/library.ts` | likes (mirror of the account), downloads, sizes, progress |
 | `session` | `packages/core/src/stores/session.ts` | the user, and whether the session was read yet |
 | `ui` | `packages/core/src/stores/ui.ts` | theme, cursor, toast, gate, picker, background |
 | `avulsas` | `packages/web/src/app/extras.ts` | tracks opened by direct link |
@@ -112,6 +112,12 @@ two types by construction (`packages/core/src/stores/library.ts:4-9`):
 preference;
 - **`LibraryState`** — the snapshot plus `dl: Record<string, number>`, download progress, which does
 **not** persist.
+
+The snapshot's four fields do not share an **owner**, and that difference matters more than the
+previous one. `cached`, `sizes` and `prefetch` belong to this device — the bytes are on it. `liked`
+belongs to the **account**: since migration `0006` the server owns it, and what sits on disk is a
+mirror. That is why logging out zeroes `liked` and touches nothing else (`controller.logout`): the
+likes come back on the next login, the bytes come back from nowhere.
 
 The mechanism is a closure called `commit` (`packages/core/src/stores/library.ts:44-47`): it applies
 the change and calls `persist?.(snapshotOf(get()))`. And `setDl`
@@ -167,8 +173,57 @@ Two state libraries in one app need a rule, and Ondas' is:
 | | TanStack Query | Zustand | URL |
 |---|---|---|---|
 | Nature | data from outside, which can go stale | session data, with no server version | the content in focus |
-| Example | the catalogue | what is playing, likes, theme, cursor | the open track, the segment, the filter |
+| Example | the catalogue | what is playing, theme, cursor | the open track, the segment, the filter |
 | Has revalidation? | yes | makes no sense | the browser keeps it |
+
+### The case the table does not hold: the like
+
+The like sat in the middle column until migration `0006`, and "with no server version" was true. It
+stopped being true. But it did not move to the left column either, and that is not laziness:
+
+**TanStack Query is for data the screen READS from outside. The like the screen also WRITES — and
+writes offline.** The PWA is installed and plays without a network; liking on a plane has to count
+immediately and go up later. A query has nowhere to keep that.
+
+The right mould already existed in the repo, and it is the session itself
+(`packages/core/src/auth/http.ts:76-99`): the server owns it, IndexedDB mirrors it, and with no
+network the screen reads the mirror instead of pretending there is nothing. The like copies the
+session, not the catalogue. What it adds is the **queue**
+(`packages/core/src/likes/fila.ts`, `packages/web/src/app/likes.ts`), because the session only has
+to be read offline and the like has to be written.
+
+Three details of the queue that are rule, not implementation:
+
+- **The two lists are disjoint.** `enfileirar` removes the id from the opposite list before pushing
+  it onto its own, so like–unlike–like with no network becomes **one** `add`. That is what spares
+  the server from deciding an order between deleting and inserting.
+- **The queue only shrinks after the server confirms, and only loses what went up.** Between
+  sending and the answer arriving the person may tap one more heart; clearing the queue on the way
+  back would erase that last one. Hence `semOQueSubiu` and `aplicarFila` existing as pure
+  functions.
+- **Only a 401 invalidates.** No network leaves the queue intact and the mirror on screen — the
+  same criterion as `restore()`. A 401 is the server saying no, and then the device forgets what
+  belonged to the account that left (below).
+
+And adopting the likes a device already held before all this is **not separate code**: it is the
+queue pre-loaded on the first boot with a session. With that it inherits the retry, the debounce
+and the error handling for free.
+
+### Logging out has to forget the likes
+
+This is the dangerous part, and the two possible failures are the same one: `liked` surviving a
+change of owner. Without clearing, the likes of whoever left would be **adopted by the next
+account** to log in on that browser, and would go up to *their* server rows.
+
+The rule is single and lives in `esquecerCurtidas` (`packages/web/src/app/likes.ts`): everything
+that drops the session — the `[sair]` click and a 401 — zeroes the likes, the queue and the
+adoption marker. With one exception written there: a device that has **never** synced holds likes
+from before this change, which belong to no account yet; erasing them would destroy exactly what
+adoption exists to save.
+
+And the queue goes up **before** `auth.logout()`. Liking and leaving right after is one gesture,
+and `registrar`'s debounce may not even have fired — once the cookie dies, the PATCH would only
+earn a 401. The e2e that logs out and back in is what pins this.
 
 The rule holds well, and it pays a concrete debt. The catalogue key is **scoped by session and by
 preference** (`packages/web/src/query/catalog.ts:41`), three ways: `[...,'visitante']` for no

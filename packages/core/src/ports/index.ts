@@ -9,3 +9,5 @@ export type { KeyValueStore } from './key-value-store.js';
 export type { Connectivity } from './connectivity.js';
 export type { AuthService, Credentials } from './auth.js';
 export { AuthError } from './auth.js';
+export type { LikesService } from './likes.js';
+export { LikesError } from './likes.js';

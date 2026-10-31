@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 
 /**
  * Smoke da PWA. Roda contra o build de produção (ver `webServer` no config) e
@@ -84,6 +84,17 @@ const ACERVO = [
  * pelos testes Go (status e mensagem de cada rota); aqui o que se testa é a
  * PWA reagindo a ele.
  */
+/**
+ * As curtidas do servidor de mentira, por página — para um teste poder semear
+ * uma curtida antes do login e provar que o coração veio de lá, e não do
+ * espelho local.
+ */
+const curtidasSemeadas = new WeakMap<Page, Set<string>>();
+
+function semearCurtida(page: Page, id: string) {
+  curtidasSemeadas.get(page)?.add(id);
+}
+
 async function stubApi(page: Page) {
   let logado = false;
   // `true` de propósito, e não "realista".
@@ -99,6 +110,10 @@ async function stubApi(page: Page) {
   // faixa nova aparece na lista depois da ingestão.
   const acervo = ACERVO.map((t) => ({ ...t }));
   let enviosRecebidos = 0;
+  // As curtidas da conta, no servidor de mentira. Começa vazio; quem quiser
+  // uma curtida pré-existente a semeia com `semearCurtida`.
+  const curtidas = new Set<string>();
+  curtidasSemeadas.set(page, curtidas);
 
   await page.route('**/api/auth/login', async (route) => {
     const { email, password } = JSON.parse(route.request().postData() ?? '{}');
@@ -143,6 +158,23 @@ async function stubApi(page: Page) {
       status: 200,
       json: { name: 'thiago', email: 'thiago@ondas.app', publico },
     });
+  });
+
+  // A rota é OBRIGATÓRIA pelo mesmo motivo da de `prefs`: um PATCH sem rota
+  // escapa para o `vite preview`, cujo fallback de SPA só serve GET/HEAD, e o
+  // teste falharia com 405 por um motivo que não tem nada a ver com a feature.
+  //
+  // O `Set` guarda estado no closure, como `logado` e `acervo`: é o que faz a
+  // curtida sobreviver a um reload, e é o que deixa um teste semear uma
+  // curtida ANTES do login para provar que ela veio do servidor.
+  await page.route('**/api/likes', async (route) => {
+    if (!logado) return route.fulfill({ status: 401, json: { error: 'sessão expirada' } });
+    if (route.request().method() === 'PATCH') {
+      const corpo = JSON.parse(route.request().postData() ?? '{}');
+      for (const id of corpo.remove ?? []) curtidas.delete(id);
+      for (const id of corpo.add ?? []) curtidas.add(id);
+    }
+    return route.fulfill({ status: 200, json: { ids: [...curtidas] } });
   });
 
   await page.route('**/api/acervo', async (route) =>
@@ -750,15 +782,20 @@ test('toque longo: casca não seleciona, o que se copia continua copiável', asy
 });
 
 /** Entra com a conta de teste e deixa a primeira faixa do acervo tocando. */
-async function logarEtocarAcervo(page: Page) {
+async function logar(page: Page) {
   await page.goto('/login');
   await skipSplash(page);
   await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
   await page.getByPlaceholder('••••').fill('senha-forte');
   await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
-  const linha = page.getByRole('button', { name: /^01 Fita Caseira/ });
-  await expect(linha).toBeVisible({ timeout: 30000 });
-  await linha.click();
+  await expect(page.getByRole('button', { name: /^01 Fita Caseira/ })).toBeVisible({
+    timeout: 30000,
+  });
+}
+
+async function logarEtocarAcervo(page: Page) {
+  await logar(page);
+  await page.getByRole('button', { name: /^01 Fita Caseira/ }).click();
 }
 
 test('baixar não faz o arquivo inteiro passar pela memória', async ({ page }) => {
@@ -1491,9 +1528,10 @@ test('`:nº` digita sem acionar atalho, e traz a faixa para uma lista onde ela a
 
 test('o cursor anda pelas linhas da tela, não pelos vizinhos do catálogo', async ({ page }) => {
   await blockAudius(page);
-  await entrarVisitante(page);
+  // Com conta, e não como visitante: curtir virou coisa da conta.
+  await logar(page);
 
-  // Curte a 01 e a 05 — números de propósito não vizinhos.
+  // Curte duas faixas de propósito não vizinhas.
   await page
     .getByRole('button', { name: /Maré Baixa/ })
     .locator('xpath=../button[@aria-label="Curtir"]')
@@ -1504,6 +1542,8 @@ test('o cursor anda pelas linhas da tela, não pelos vizinhos do catálogo', asy
     .click();
 
   await page.keyboard.press('3');
+  // Com conta `/library` abre no acervo; o recorte deste teste é o das curtidas.
+  await page.getByRole('button', { name: '--curtidas' }).click();
   await expect(page.getByRole('button', { name: /Último Trem/ })).toBeVisible();
 
   // Na biblioteca a tela tem duas linhas, `01` e `05`. Se o cursor andasse na
@@ -1604,6 +1644,116 @@ test('o Esc fecha o gate sem levar a camada de baixo', async ({ page }) => {
   await expect(gate).toBeHidden();
   await expect(page).toHaveURL(LINK_DEMO);
   await expect(page.getByText('agora-tocando — #ambient')).toBeVisible();
+});
+
+/* ── A curtida é da conta ─────────────────────────────────────────────────── */
+
+const coracao = (page: Page, faixa: RegExp) =>
+  page.getByRole('button', { name: faixa }).locator('xpath=../button[@aria-pressed]').first();
+
+test('a curtida vem do servidor, não do espelho deste navegador', async ({ page }) => {
+  await blockAudius(page);
+  // Semeada ANTES do login: não existe jeito de ela estar no IndexedDB desta
+  // página, então um coração cheio só pode ter vindo do `/api/likes`. É isso
+  // que separa este teste de um que passaria mesmo se nada subisse.
+  semearCurtida(page, 'demo0');
+  await logar(page);
+
+  await expect(
+    page.getByRole('button', { name: /Maré Baixa/ }).locator('xpath=../button[@aria-pressed]'),
+  ).toHaveAttribute('aria-pressed', 'true');
+
+  await page.keyboard.press('3');
+  await page.getByRole('button', { name: '--curtidas' }).click();
+  await expect(page.getByRole('button', { name: /Maré Baixa/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Último Trem/ })).toBeHidden();
+});
+
+test('sair leva as curtidas, e entrar de novo as traz de volta', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+
+  await coracao(page, /Maré Baixa/).click();
+  await expect(
+    page.getByRole('button', { name: /Maré Baixa/ }).locator('xpath=../button[@aria-pressed]'),
+  ).toHaveAttribute('aria-pressed', 'true');
+
+  // Sair tem de limpar: curtida que ficasse no aparelho seria adotada pela
+  // PRÓXIMA conta que entrasse neste navegador.
+  await page.keyboard.press('5');
+  await page.getByRole('button', { name: /sair/ }).click();
+  await expect(page).toHaveURL(/login/);
+
+  await logar(page);
+  await expect(
+    page.getByRole('button', { name: /Maré Baixa/ }).locator('xpath=../button[@aria-pressed]'),
+  ).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('sem conta o coração não liga, e a biblioteca diz por quê', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+
+  // O rótulo já diz por quê antes de qualquer clique — o botão não fica
+  // inerte, senão nem leitor de tela nem teclado chegariam ao aviso.
+  await expect(coracao(page, /Maré Baixa/)).toHaveAttribute(
+    'aria-label',
+    'Curtir — exige entrar na conta',
+  );
+
+  await coracao(page, /Maré Baixa/).click();
+  await expect(page.getByText('curtir exige entrar na conta')).toBeVisible();
+  await expect(coracao(page, /Maré Baixa/)).toHaveAttribute('aria-pressed', 'false');
+
+  await page.keyboard.press('3');
+  await expect(page.getByText('curtidas exigem login.')).toBeVisible();
+});
+
+test('curtida feita sem rede fica na fila e sobe quando a rede volta', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+
+  // Sem este caminho a curtida sumiria em silêncio: o boot seguinte traz a
+  // lista do servidor e sobrescreve o que ficou só aqui.
+  // O handler fica numa variável porque `unroute` sem ele removeria TODAS as
+  // rotas do padrão — inclusive a do `stubApi`, e aí o PATCH escaparia para o
+  // `vite preview` e a fila nunca subiria. É a armadilha do 405 outra vez.
+  const semRede = (route: Route) => route.abort();
+  await page.route('**/api/likes', semRede);
+  await coracao(page, /Maré Baixa/).click();
+  await expect(coracao(page, /Maré Baixa/)).toHaveAttribute('aria-pressed', 'true');
+
+  // Fechar e reabrir sem rede: a fila está no disco, não na memória.
+  await page.reload();
+  await skipSplash(page);
+  await expect(coracao(page, /Maré Baixa/)).toHaveAttribute('aria-pressed', 'true', {
+    timeout: 10000,
+  });
+
+  // A rede volta e a fila sobe. O reload sozinho NÃO provaria isso: o espelho
+  // local desenharia o mesmo coração. Quem prova é sair e entrar de novo, que
+  // apaga o espelho e deixa só o que o servidor tiver.
+  await page.unroute('**/api/likes', semRede);
+  await page.reload();
+  await skipSplash(page);
+  await expect(coracao(page, /Maré Baixa/)).toHaveAttribute('aria-pressed', 'true', {
+    timeout: 10000,
+  });
+
+  await page.keyboard.press('5');
+  await page.getByRole('button', { name: /sair/ }).click();
+  await expect(page).toHaveURL(/login/);
+  await logar(page);
+  await expect(coracao(page, /Maré Baixa/)).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('os recortes da biblioteca aparecem na ordem curtidas, acervo, offline', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+  await page.keyboard.press('3');
+
+  const chips = page.getByRole('button', { name: /^--(curtidas|acervo|offline)$/ });
+  await expect(chips).toHaveText(['--curtidas', '--acervo', '--offline']);
 });
 
 test('o segmento da biblioteca é um endereço, e o voltar anda entre eles', async ({ page }) => {

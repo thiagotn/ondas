@@ -208,6 +208,29 @@ Decisões registradas em `docs/adr/0013-ondas-acervo-privado.md` no repo `homela
 vez de JWT, argon2id, migrações sob advisory lock, rate-limit por `CF-Connecting-IP`, bucket R2
 privado com URL assinada e a trava de SSRF do worker.
 
+### A curtida é da conta
+
+Até a migração `0006` a curtida era um mapa no IndexedDB do navegador. Não seguia ninguém: entrar
+na mesma conta no celular trazia o acervo e não trazia as curtidas, e limpar os dados do site
+apagava tudo. Hoje ela mora em `likes(user_id, track_id)` e o servidor é o dono.
+
+Três coisas que valem saber porque mudam o que a tela faz:
+
+**Curtir exige conta.** Sem sessão o coração não liga — o rótulo dele diz isso antes do clique, e
+clicar mostra o aviso. A consequência é maior que o coração: os três recortes de `~/biblioteca`
+passam a pedir conta, porque `--offline` e `--acervo` já pediam.
+
+**A linha guarda só o id.** `--curtidas` continua sendo um filtro sobre o catálogo carregado, não
+uma lista que se basta — então curtida de faixa do Audius só aparece se a faixa estiver na lista
+daquele momento, e com o catálogo público desligado nenhuma aparece. É o que o texto de vazio
+explica, em vez de mentir "vazio".
+
+**Curtir sem rede vale na hora e sobe depois.** A mudança entra numa fila no IndexedDB e sobe
+quando a rede volta, no próximo boot, ou na saída da conta — nessa ordem de prioridade, e a última
+importa: curtir e clicar em `[sair]` é um gesto só, e depois que o cookie morre o PATCH só levaria
+401. Sair apaga as curtidas deste navegador de propósito: elas estão no servidor e voltam no
+próximo login, e deixá-las aqui faria a próxima conta a entrar adotar o gosto da anterior.
+
 ### Os endereços da PWA
 
 Todo path é inglês; o texto da interface segue em português. `~/biblioteca` continua
@@ -220,7 +243,7 @@ não redirecionam: uso pessoal, e um endereço a menos para manter.
 | --- | --- |
 | `/` | em-alta; `?genre=<slug>` é o chip, omitido quando é `tudo` |
 | `/search` | busca; `?q=<termo>` escrito com `replace`, para o voltar não andar letra por letra |
-| `/library/<recorte>` | `liked`, `offline` ou `archive`; `/library` vale `archive` com conta e `liked` sem ela — e o que não é um dos três cai no mesmo padrão (`defaultLibrarySegment`, `parseLibrarySegment`) |
+| `/library/<recorte>` | `liked`, `archive` ou `offline` — nessa ordem na tela; `/library` vale `archive` com conta e `liked` sem ela — e o que não é um dos três cai no mesmo padrão (`defaultLibrarySegment`, `parseLibrarySegment`) |
 | `/t/<slug>-<id>` | a faixa: o link que se manda E o player cheio aberto |
 | `/login` | fora do `AppLayout`, é a única tela sem abas |
 | `?account=1` / `?shortcuts=1` | os dois overlays que não são conteúdo, no `useOverlayParam` |
@@ -463,8 +486,10 @@ Decisões que valem registrar:
   que ninguém viu. A marca é uma barra à esquerda, e não um `▸` na calha, que
   tem `3ch` e já mostra o número.
 - **Conta e biblioteca são telas diferentes porque são coisas diferentes.** A
-  conta vive no servidor e te segue para qualquer aparelho; `buffer`, curtidas e
-  downloads vivem no IndexedDB **deste navegador** e não seguem ninguém. Os dois
+  conta vive no servidor e te segue para qualquer aparelho; `buffer` e os
+  downloads vivem no IndexedDB **deste navegador** e não seguem ninguém. A
+  curtida mudou de lado na migração `0006` e hoje segue a conta — o que fica no
+  aparelho é só o espelho dela, e sair apaga esse espelho. Os dois
   moravam no mesmo painel dentro de `~/biblioteca`, o que insinuava uma sincronia
   que não existe — e, de quebra, empurrava a primeira faixa para o meio da tela
   do celular. Agora a biblioteca é só biblioteca, e `ondas whoami` abre pelo seu
@@ -487,7 +512,8 @@ Decisões que valem registrar:
   clique direito do desktop junto; as capas resolvem isso com
   `pointer-events: none`, que já são decorativas (`alt=""`).
 - **Sessão de visitante é efêmera**, como no protótipo: recarregar volta ao login
-  (só o login persiste). Tema, curtidas e downloads sobrevivem.
+  (só o login persiste). Tema e downloads sobrevivem; curtida é da conta e
+  visitante não tem onde guardar uma.
 - **Simulação de queda de rede** (`o` e o clique no `●`) existe apenas no build de
   dev; em produção o indicador só reflete `navigator.onLine`.
 - **Faixas sem `stream`** (catálogo demo) tocam em modo simulado, para a UI

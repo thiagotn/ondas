@@ -82,7 +82,7 @@ identidade **interna**.
 | Store | Onde | Guarda |
 |---|---|---|
 | `player` | `packages/core/src/stores/player.ts` | o que toca, tempo, buffer, shuffle, repeat |
-| `library` | `packages/core/src/stores/library.ts` | curtidas, baixadas, tamanhos, progresso |
+| `library` | `packages/core/src/stores/library.ts` | curtidas (espelho da conta), baixadas, tamanhos, progresso |
 | `session` | `packages/core/src/stores/session.ts` | usuário e se a sessão já foi lida |
 | `ui` | `packages/core/src/stores/ui.ts` | tema, cursor, toast, gate, picker, fundo |
 | `avulsas` | `packages/web/src/app/extras.ts` | faixas abertas por link direto |
@@ -111,6 +111,12 @@ dois tipos por construção (`packages/core/src/stores/library.ts:4-9`):
 de *prefetch*;
 - **`LibraryState`** — o snapshot mais `dl: Record<string, number>`, o progresso de download, que
 **não** persiste.
+
+Os quatro campos do snapshot não têm o mesmo **dono**, e essa diferença é mais importante que a
+anterior. `cached`, `sizes` e `prefetch` são deste aparelho — os bytes estão nele. `liked` é da
+**conta**: desde a migração `0006` o servidor é o dono, e o que fica no disco é espelho. É por isso
+que sair da conta zera `liked` e não encosta no resto (`controller.logout`): as curtidas voltam no
+próximo login, os bytes não voltam de lugar nenhum.
 
 O mecanismo é um closure chamado `commit` (`packages/core/src/stores/library.ts:44-47`): ele aplica
 a mudança e chama `persist?.(snapshotOf(get()))`. E `setDl`
@@ -163,8 +169,54 @@ Duas bibliotecas de estado no mesmo app precisam de uma regra, e a do Ondas é:
 | | TanStack Query | Zustand | URL |
 |---|---|---|---|
 | Natureza | dado de fora, que pode ficar velho | dado da sessão, sem versão no servidor | o conteúdo em foco |
-| Exemplo | o catálogo | o que toca, curtidas, tema, cursor | a faixa aberta, o recorte, o filtro |
+| Exemplo | o catálogo | o que toca, tema, cursor | a faixa aberta, o recorte, o filtro |
 | Tem revalidação? | sim | não faz sentido | é o navegador que guarda |
+
+### O caso que não cabe na tabela: a curtida
+
+A curtida esteve na coluna do meio até a migração `0006`, e a frase "sem versão no servidor" era
+verdade. Deixou de ser. Mas ela também não foi para a coluna da esquerda, e isso não é preguiça:
+
+**O TanStack Query é para dado que a tela LÊ de fora. A curtida a tela também ESCREVE — e escreve
+offline.** A PWA é instalada e toca sem rede; curtir no avião tem de valer na hora e subir depois.
+Uma consulta não tem onde guardar isso.
+
+O molde certo já existia no repo, e é a própria sessão (`packages/core/src/auth/http.ts:76-99`): o
+servidor é o dono, o IndexedDB é espelho, e sem rede a tela lê o espelho em vez de fingir que não
+há nada. A curtida copia a sessão, não o catálogo. O que ela acrescenta é a **fila**
+(`packages/core/src/likes/fila.ts`, `packages/web/src/app/likes.ts`), porque a sessão só precisa
+ser lida offline e a curtida precisa ser escrita.
+
+Três detalhes da fila que são regra e não implementação:
+
+- **As duas listas são disjuntas.** `enfileirar` tira o id da lista contrária antes de pôr na sua,
+  então curtir–descurtir–curtir sem rede vira **um** `add`. É isso que dispensa o servidor de
+  decidir uma ordem entre apagar e inserir.
+- **A fila só diminui depois do servidor confirmar, e só perde o que subiu.** Entre mandar e a
+  resposta chegar a pessoa pode tocar em mais um coração; zerar a fila na volta apagaria essa
+  última. Daí `semOQueSubiu` e `aplicarFila` existirem como funções puras.
+- **Só o 401 invalida.** Falta de rede deixa a fila intacta e o espelho na tela — o mesmo critério
+  do `restore()`. Um 401 é o servidor dizendo não, e aí o aparelho esquece o que era da conta que
+  saiu (ver abaixo).
+
+E a adoção das curtidas que já estavam num aparelho antes de tudo isso **não é um código à parte**:
+é a fila pré-carregada no primeiro boot com sessão. Com isso ela herda o retry, o debounce e o
+tratamento de erro de graça.
+
+### Sair da conta tem de esquecer a curtida
+
+Essa é a parte perigosa, e as duas falhas possíveis são a mesma: `liked` sobreviver a uma troca de
+dono. Sem limpar, as curtidas de quem saiu seriam **adotadas pela próxima conta** que entrasse
+naquele navegador, e subiriam para o servidor dela.
+
+A regra é única e mora em `esquecerCurtidas` (`packages/web/src/app/likes.ts`): tudo que derruba a
+sessão — o clique em `[sair]` e um 401 — zera as curtidas, a fila e o marcador de adoção. Com uma
+exceção escrita lá: o aparelho que **nunca** sincronizou guarda curtidas de antes desta mudança,
+que ainda não são de conta nenhuma; apagá-las seria destruir o que a adoção existe para salvar.
+
+E a fila sobe **antes** de `auth.logout()`. Curtir e sair em seguida é um gesto só, e o debounce de
+`registrar` pode nem ter disparado — depois que o cookie morre, o PATCH só levaria 401. O e2e que
+sai e entra de novo é o que trava isso.
 
 A regra pega bem, e paga uma dívida concreta. A chave do catálogo é **escopada pela sessão e pela
 preferência** (`packages/web/src/query/catalog.ts:41`), em três: `[...,'visitante']` para quem não

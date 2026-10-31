@@ -76,6 +76,33 @@ describe('library store', () => {
     expect(lib.getState().liked).toEqual({});
   });
 
+  it('setLiked troca o mapa inteiro e grava no disco', () => {
+    const persist = vi.fn();
+    const lib = createLibraryStore({ initial: { liked: { velha: true } }, persist });
+
+    lib.getState().setLiked(['a', 'b']);
+    expect(lib.getState().liked).toEqual({ a: true, b: true });
+    // Pelo `commit`, e não por `set` cru: isto não é "li o disco", é "o dono
+    // falou", e o espelho tem de concordar antes do próximo boot offline.
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist.mock.calls[0]?.[0]).toMatchObject({ liked: { a: true, b: true } });
+
+    // Lista vazia é o que o logout usa.
+    lib.getState().setLiked([]);
+    expect(lib.getState().liked).toEqual({});
+  });
+
+  it('setLiked não encosta no que é do aparelho', () => {
+    // Sair da conta zera as curtidas e NÃO os downloads: as curtidas estão no
+    // servidor e voltam no próximo login; os bytes só estão aqui.
+    const lib = createLibraryStore({
+      initial: { liked: { a: true }, cached: { x: true }, sizes: { x: 10 } },
+    });
+    lib.getState().setLiked([]);
+    expect(lib.getState().cached).toEqual({ x: true });
+    expect(lib.getState().sizes).toEqual({ x: 10 });
+  });
+
   it('remover do aparelho limpa índice e tamanho', () => {
     const lib = createLibraryStore();
     lib.getState().markCached('demo1', 100);

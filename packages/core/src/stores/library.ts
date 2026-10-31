@@ -1,7 +1,20 @@
 import { createStore } from 'zustand/vanilla';
 
-/** O que é persistido da biblioteca entre sessões. */
+/**
+ * O que é persistido da biblioteca entre sessões.
+ *
+ * Os quatro campos NÃO têm o mesmo dono, e a diferença virou importante:
+ * `cached`, `sizes` e `prefetch` são deste aparelho (os bytes estão nele), mas
+ * `liked` é da CONTA — o servidor é o dono, e o que fica aqui é espelho, pelo
+ * mesmo motivo do espelho de sessão em `auth/http.ts`: a PWA abre offline e
+ * precisa desenhar o coração antes de falar com alguém.
+ *
+ * Daí sair da conta zerar `liked` e não tocar no resto (`controller.logout`):
+ * as curtidas estão no servidor e voltam no próximo login; os bytes não
+ * estão em lugar nenhum além daqui.
+ */
 export interface LibrarySnapshot {
+  /** Espelho das curtidas da conta; o dono é o servidor (`/api/likes`). */
   liked: Record<string, boolean>;
   cached: Record<string, boolean>;
   sizes: Record<string, number>;
@@ -12,6 +25,14 @@ export interface LibraryState extends LibrarySnapshot {
   /** Downloads em andamento: id → progresso 0..1. */
   dl: Record<string, number>;
   toggleLike(id: string): void;
+  /**
+   * Troca o mapa inteiro pela lista que o servidor mandou.
+   *
+   * Passa pelo `commit`, ao contrário de `hydrate`: isto NÃO é "li o disco", é
+   * "o dono falou", e o espelho no disco tem de concordar com a tela antes do
+   * próximo boot offline. É também o que o logout usa, com lista vazia.
+   */
+  setLiked(ids: readonly string[]): void;
   markCached(id: string, size: number): void;
   unmarkCached(id: string): void;
   /** `null` encerra o acompanhamento do download. */
@@ -51,6 +72,8 @@ export function createLibraryStore(options: LibraryStoreOptions = {}) {
       sizes: options.initial?.sizes ?? {},
       prefetch: options.initial?.prefetch ?? true,
       dl: {},
+      setLiked: (ids) =>
+        commit(() => ({ liked: Object.fromEntries(ids.map((id) => [id, true])) })),
       toggleLike: (id) =>
         commit((s) => {
           const liked = { ...s.liked };

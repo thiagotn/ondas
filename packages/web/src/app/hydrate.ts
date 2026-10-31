@@ -1,4 +1,5 @@
 import type { BackgroundSettings, LibrarySnapshot } from '@ondas/core';
+import { sincronizar } from './likes';
 import { auth, kv, offlineStore } from './services';
 import { BACKGROUND_KEY, libraryStore, LIBRARY_KEY, sessionStore, uiStore } from './stores';
 
@@ -20,4 +21,9 @@ export async function hydrate(): Promise<void> {
 
   const present = await offlineStore.keys();
   libraryStore.getState().reconcile(present);
+
+  // As curtidas são da conta; o que foi lido acima é espelho. Sem `await` de
+  // propósito: o boot não pode ficar preso na rede, e a tela já desenhou os
+  // corações do espelho — é exatamente para isso que ele existe.
+  void sincronizar();
 }

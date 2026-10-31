@@ -132,7 +132,9 @@ export function FullPlayer({ track }: { track: Track }) {
               <Keycap
                 keyLabel={dica('l')}
                 active={liked}
-                ariaLabel={liked ? 'Descurtir' : 'Curtir'}
+                ariaLabel={
+                  user ? (liked ? 'Descurtir' : 'Curtir') : 'Curtir — exige entrar na conta'
+                }
                 onClick={() => controller.toggleLike(track.id)}
               >
                 <Heart size={19} weight={liked ? 'fill' : 'regular'} />

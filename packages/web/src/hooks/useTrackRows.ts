@@ -23,6 +23,8 @@ export interface RowModel {
   locked: boolean;
   cached: boolean;
   liked: boolean;
+  /** A curtida é da conta: sem sessão o coração não liga. */
+  canLike: boolean;
   /** ` 42%` enquanto baixa, vazio fora disso. */
   dlLabel: string;
   unavailable: boolean;
@@ -64,6 +66,7 @@ export function useTrackRows(visible: readonly Track[], all: readonly Track[]): 
         locked: isLocked(track, index, session),
         cached: isCached,
         liked: !!liked[track.id],
+        canLike: !!session,
         dlLabel: progress != null ? dlPct(progress) : '',
         unavailable: offline && !isCached,
         genreColor: genreAnsiVar(track.genre),

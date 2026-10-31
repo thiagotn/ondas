@@ -3,6 +3,7 @@ import {
   AcervoUploader,
   AudiusCatalogClient,
   HttpAuthService,
+  HttpLikesService,
 } from '@ondas/core';
 import { BrowserConnectivity } from '../platform/BrowserConnectivity';
 import { CacheOfflineStore } from '../platform/CacheOfflineStore';
@@ -19,6 +20,11 @@ export const kv = new IdbKeyValueStore();
  * que este código não consegue ler.
  */
 export const auth = new HttpAuthService(kv);
+/**
+ * As curtidas da conta. Não guarda espelho: quem guarda é o `libraryStore`,
+ * que já é a fonte do render e já persiste (ver `app/likes.ts`).
+ */
+export const likesClient = new HttpLikesService();
 export const offlineStore = new CacheOfflineStore();
 export const connectivity = new BrowserConnectivity();
 export const catalogClient = new AudiusCatalogClient();
