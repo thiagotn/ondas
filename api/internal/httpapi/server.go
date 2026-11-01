@@ -149,11 +149,18 @@ func (s *Server) Router() http.Handler {
 			// ou destruição (apagar), e não em criar um objeto na própria área
 			// de espera. `TestEscopoDoTokenNoAcervo` trava esta divisão: mover
 			// uma rota de grupo sem querer compila, e só o teste denuncia.
+			//
+			// `compartilhamento` entra aqui, e não no grupo de cima, embora o
+			// bot também saiba publicar para alguém: o bot escolhe o destino de
+			// faixa que ele mesmo está trazendo, e isso é "entrar com faixa
+			// nova". Mudar com quem uma faixa JÁ EXISTENTE é dividida é mexer
+			// no acervo, e para isso só sessão serve.
 			r.Group(func(r chi.Router) {
 				r.Use(s.exigirSessao)
 				r.Get("/", s.listarAcervo)
 				r.Get("/{id}/audio", s.audio)
 				r.Get("/{id}/art", s.arte)
+				r.Patch("/{id}/compartilhamento", s.compartilhar)
 				r.Delete("/{id}", s.removerFaixa)
 			})
 		})

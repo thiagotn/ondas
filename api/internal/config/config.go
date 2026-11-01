@@ -55,6 +55,17 @@ type Config struct {
 	IngestTokenSHA256 string `envconfig:"INGEST_TOKEN_SHA256"`
 	// Dono das faixas que entram por token (o bot não tem sessão).
 	IngestUserEmail string `envconfig:"INGEST_USER_EMAIL"`
+	// E-mails para os quais o TOKEN pode publicar faixa (migração 0007).
+	//
+	// É o teto do poder novo. Antes da 0007, uma faixa que entrava por token era
+	// sempre do `IngestUserEmail` e o token não alcançava conta nenhuma além
+	// dela; agora o pedido pode nomear um destino, e sem esta lista o token
+	// poderia pôr arquivo em QUALQUER conta cadastrada.
+	//
+	// Vazio (o padrão) = nenhum destino além do dono, que é exatamente o
+	// comportamento anterior. É o que deixa a API nova subir antes do ConfigMap
+	// sem mudar nada.
+	IngestDestinos string `envconfig:"INGEST_DESTINOS"`
 
 	// Tetos da ingestão. O worker baixa de uma URL arbitrária: sem teto, um
 	// arquivo enorme enche o emptyDir e derruba o pod.
@@ -87,8 +98,33 @@ func (c *Config) AllowedSignup(email string) bool {
 	if c.SignupOpen {
 		return true
 	}
-	for _, e := range strings.Split(c.SignupAllowlist, ",") {
-		if e = strings.TrimSpace(strings.ToLower(e)); e != "" && e == strings.ToLower(email) {
+	return naLista(c.SignupAllowlist, email)
+}
+
+// DestinoPermitidoPorToken diz se o token de máquina pode publicar faixa para
+// este e-mail.
+//
+// Só vale para o token. Sessão não passa por aqui: pessoa logada escolhendo
+// para quem manda a própria faixa é ato normal, e submetê-la a uma lista do
+// ConfigMap seria confundir "limitar um robô" com "limitar gente".
+//
+// QUEM CHAMA NÃO PODE DIFERENCIAR, NA RESPOSTA, "fora da lista" de "não
+// cadastrado": a recusa tem de ser a mesma, senão um token vazado vira
+// enumerador de contas — tenta e-mail por e-mail e lê a diferença entre o
+// aceite e a recusa.
+func (c *Config) DestinoPermitidoPorToken(email string) bool {
+	return naLista(c.IngestDestinos, email)
+}
+
+// naLista compara e-mail contra uma lista separada por vírgula, sem diferenciar
+// maiúsculas — o mesmo critério do índice único de `users` (migração 0001).
+func naLista(lista, email string) bool {
+	alvo := strings.TrimSpace(strings.ToLower(email))
+	if alvo == "" {
+		return false
+	}
+	for _, e := range strings.Split(lista, ",") {
+		if e = strings.TrimSpace(strings.ToLower(e)); e != "" && e == alvo {
 			return true
 		}
 	}

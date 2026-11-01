@@ -110,7 +110,7 @@ func TestFormaDeOndaVaiEVoltaInteira(t *testing.T) {
 	// E sobrevive à listagem, que é por onde a PWA recebe.
 	lista, err := tracks.Listar(ctx, eu)
 	require.NoError(t, err)
-	porID := map[string]acervo.Track{}
+	porID := map[string]acervo.Visivel{}
 	for _, t := range lista {
 		porID[t.ID] = t
 	}
@@ -157,11 +157,11 @@ func TestMesmaURLDuasVezesNaoEnfileiraDuasIngestoes(t *testing.T) {
 	jobs := acervo.NewJobs(pool)
 	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
 
-	primeiro, novo, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "Título", "")
+	primeiro, novo, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "Título", "", acervo.Destino{})
 	require.NoError(t, err)
 	require.True(t, novo)
 
-	segundo, novo, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "Outro", "")
+	segundo, novo, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "Outro", "", acervo.Destino{})
 	require.NoError(t, err)
 	require.False(t, novo, "o segundo pedido não é uma ingestão nova")
 	require.Equal(t, primeiro.ID, segundo.ID)
@@ -178,7 +178,7 @@ func TestURLPodeSerIngeridaDeNovoDepoisDeTerminar(t *testing.T) {
 	tracks := acervo.NewTracks(pool)
 	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
 
-	primeiro, _, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "", "")
+	primeiro, _, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 	_, err = jobs.Reivindicar(ctx)
 	require.NoError(t, err)
@@ -186,7 +186,7 @@ func TestURLPodeSerIngeridaDeNovoDepoisDeTerminar(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, jobs.Concluir(ctx, primeiro.ID, faixa.ID))
 
-	segundo, novo, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "", "")
+	segundo, novo, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 	require.True(t, novo)
 	require.NotEqual(t, primeiro.ID, segundo.ID)
@@ -199,9 +199,9 @@ func TestMesmaURLDeDonosDiferentesSaoIngestoesSeparadas(t *testing.T) {
 	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
 	outro := dbtest.CriarUsuario(t, pool, "outro@exemplo.test")
 
-	a, _, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "", "")
+	a, _, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
-	b, novo, err := jobs.Enfileirar(ctx, outro, "https://exemplo.test/a.mp3", "", "")
+	b, novo, err := jobs.Enfileirar(ctx, outro, "https://exemplo.test/a.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 	require.True(t, novo)
 	require.NotEqual(t, a.ID, b.ID)
@@ -217,7 +217,7 @@ func TestDoisReivindicadoresNaoPegamOMesmoJob(t *testing.T) {
 
 	const n = 5
 	for i := 0; i < n; i++ {
-		_, _, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/"+uuidDeTeste(string(rune('a'+i)))+".mp3", "", "")
+		_, _, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/"+uuidDeTeste(string(rune('a'+i)))+".mp3", "", "", acervo.Destino{})
 		require.NoError(t, err)
 	}
 
@@ -254,7 +254,7 @@ func TestJobDesisteDepoisDasTentativas(t *testing.T) {
 	jobs := acervo.NewJobs(pool)
 	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
 
-	criado, _, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/morta.mp3", "", "")
+	criado, _, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/morta.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 
 	// Falhar devolve para a fila enquanto houver tentativa sobrando.
@@ -290,7 +290,7 @@ func TestJobTravadoVoltaParaAFila(t *testing.T) {
 	jobs := acervo.NewJobs(pool)
 	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
 
-	criado, _, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "", "")
+	criado, _, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 	_, err = jobs.Reivindicar(ctx)
 	require.NoError(t, err)
@@ -318,7 +318,7 @@ func TestStatusDeOutroDonoNaoEhVisivel(t *testing.T) {
 	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
 	outro := dbtest.CriarUsuario(t, pool, "outro@exemplo.test")
 
-	meu, _, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "", "")
+	meu, _, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 
 	_, err = jobs.PorID(ctx, outro, meu.ID)
@@ -332,7 +332,7 @@ func TestConcluirApontaParaAFaixa(t *testing.T) {
 	tracks := acervo.NewTracks(pool)
 	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
 
-	job, _, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "", "")
+	job, _, err := jobs.Enfileirar(ctx, eu, "https://exemplo.test/a.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 	faixa, err := tracks.Criar(ctx, nova(eu, "pronta"))
 	require.NoError(t, err)

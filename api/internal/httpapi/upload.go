@@ -34,10 +34,21 @@ import (
 // (cliente→homelab→R2) e seria mais lento que o caminho direto. No caso do
 // node é pior ainda: os bytes sairiam de casa para voltar para casa.
 //
-// Sessão OU `X-Ondas-Token` entram aqui. O que limita o token não é o
-// middleware e sim a key, derivada do usuário autenticado: o pior que um token
-// vazado faz por aqui é pôr um arquivo no acervo do próprio dono dele —
-// exatamente o que `POST /ingest` já permitia, por URL.
+// Sessão OU `X-Ondas-Token` entram aqui, e desde a migração 0007 o pedido pode
+// dizer PARA QUEM a faixa vai. Isso ampliou o alcance do token, e a frase que
+// estava escrita aqui — "o pior que um token vazado faz é pôr um arquivo no
+// acervo do próprio dono dele" — deixou de ser verdade.
+//
+// O teto novo tem dois limites, e nenhum deles é o middleware:
+//
+//   - a KEY da área de espera continua derivada do usuário autenticado, então
+//     ninguém finaliza o envio de outra pessoa;
+//   - o DESTINO, quando o pedido entra por token, tem de estar em
+//     `INGEST_DESTINOS` (ConfigMap). Fora dela, a recusa é idêntica à de um
+//     e-mail que não existe, para o token não servir de enumerador de contas.
+//
+// O que o token continua NÃO fazendo: listar, baixar, apagar, e mudar com quem
+// uma faixa que já existe é dividida.
 const (
 	// Prazo do PUT assinado. Tem de cobrir o envio inteiro: 15 minutos para
 	// 60MB ainda funciona num upload de ~70kB/s.
@@ -102,8 +113,15 @@ func (s *Server) finalizarUpload(w http.ResponseWriter, r *http.Request) {
 		// Nome do arquivo, já limpo pelo cliente. Vai para o título de
 		// RESERVA, não para `title`: as tags do arquivo têm de ganhar dele.
 		Nome string `json:"nome"`
+		// Para quem a faixa vai: vazio, `todos`, ou um e-mail cadastrado. É o
+		// mesmo campo e o mesmo helper do `POST /ingest`.
+		Para string `json:"para"`
 	}
 	if !lerJSON(w, r, &req) {
+		return
+	}
+	destino, ok := s.resolverDestino(w, r, req.Para)
+	if !ok {
 		return
 	}
 
@@ -111,6 +129,11 @@ func (s *Server) finalizarUpload(w http.ResponseWriter, r *http.Request) {
 	// que o cliente mandou: não existe pedido capaz de finalizar o envio de
 	// outra pessoa. Dois clientes com o mesmo id de envio em mãos apontam para
 	// duas keys diferentes, uma na área de cada um.
+	//
+	// E É O AUTENTICADO MESMO QUANDO EXISTE DESTINO. O arquivo foi gravado na
+	// área de espera de quem pediu, sob o prefixo dele; trocar isto pelo destino
+	// faria procurar o objeto na área da outra pessoa, onde ele nunca esteve, e
+	// toda publicação com destino morreria num "o arquivo não chegou ao bucket".
 	key := storage.KeyUploadStage(user.ID, id)
 	tamanho, err := s.r2.Tamanho(r.Context(), key)
 	if errors.Is(err, storage.ErrObjetoAusente) {
@@ -140,7 +163,7 @@ func (s *Server) finalizarUpload(w http.ResponseWriter, r *http.Request) {
 	artista := cortar(req.Artist, maxNomeArquivo)
 
 	job, novo, err := s.jobs.EnfileirarEnvio(r.Context(), user.ID, acervo.FonteUpload(id),
-		titulo, artista, cortar(req.Nome, maxNomeArquivo))
+		titulo, artista, cortar(req.Nome, maxNomeArquivo), destino)
 	if err != nil {
 		slog.Error("enfileirar upload", "erro", err)
 		escreverErro(w, http.StatusInternalServerError, "não foi possível enfileirar")

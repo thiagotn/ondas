@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 
 	"github.com/thiagotn/ondas/api/internal/acervo"
@@ -245,6 +246,15 @@ func montar(t *testing.T, bx worker.Baixador) (*worker.Worker, *acervo.Jobs, *ac
 }
 
 func montarComTeto(t *testing.T, bx worker.Baixador, teto int64) (*worker.Worker, *acervo.Jobs, *acervo.Tracks, *s3Gravador, string) {
+	w, j, tr, g, dono, _ := montarComPool(t, bx, teto)
+	return w, j, tr, g, dono
+}
+
+// montarComPool é o `montarComTeto` para quem precisa do pool — hoje só os
+// testes de destino, que criam uma SEGUNDA conta. Irmão em vez de uma
+// devolução a mais em `montar` para não mexer nas quinze chamadas que não
+// precisam dele.
+func montarComPool(t *testing.T, bx worker.Baixador, teto int64) (*worker.Worker, *acervo.Jobs, *acervo.Tracks, *s3Gravador, string, *pgxpool.Pool) {
 	t.Helper()
 	pool := dbtest.Pool(t)
 	g := &s3Gravador{objetos: map[string]objetoFalso{}}
@@ -259,7 +269,7 @@ func montarComTeto(t *testing.T, bx worker.Baixador, teto int64) (*worker.Worker
 	tracks := acervo.NewTracks(pool)
 	w := worker.New(jobs, tracks, r2, bx, t.TempDir(), 30*time.Second, teto)
 	dono := dbtest.CriarUsuario(t, pool, "dono@exemplo.test")
-	return w, jobs, tracks, g, dono
+	return w, jobs, tracks, g, dono, pool
 }
 
 // --- testes ---
@@ -271,7 +281,7 @@ func TestIngestaoCompletaGravaFaixaESobeObjetos(t *testing.T) {
 	w, jobs, tracks, s3, dono := montar(t, bx)
 	ctx := context.Background()
 
-	job, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/noite.mp3", "", "")
+	job, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/noite.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 
 	feitos, err := w.Rodar(ctx)
@@ -318,7 +328,7 @@ func TestFaixaSemCapaEhIngeridaNormalmente(t *testing.T) {
 	w, jobs, tracks, s3, dono := montar(t, bx)
 	ctx := context.Background()
 
-	job, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/a.mp3", "", "")
+	job, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/a.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 	_, err = w.Rodar(ctx)
 	require.NoError(t, err)
@@ -342,7 +352,7 @@ func TestTituloDoPedidoGanhaDaTagDoArquivo(t *testing.T) {
 	w, jobs, tracks, _, dono := montar(t, bx)
 	ctx := context.Background()
 
-	_, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/a.mp3", "Nome Certo", "")
+	_, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/a.mp3", "Nome Certo", "", acervo.Destino{})
 	require.NoError(t, err)
 	_, err = w.Rodar(ctx)
 	require.NoError(t, err)
@@ -360,7 +370,7 @@ func TestArquivoSemTagGanhaPadrao(t *testing.T) {
 	w, jobs, tracks, _, dono := montar(t, bx)
 	ctx := context.Background()
 
-	_, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/a.mp3", "", "")
+	_, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/a.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 	_, err = w.Rodar(ctx)
 	require.NoError(t, err)
@@ -378,7 +388,7 @@ func TestErroDeDestinoVetadoChegaLegivelAoDono(t *testing.T) {
 	w, jobs, _, _, dono := montar(t, bx)
 	ctx := context.Background()
 
-	job, _, err := jobs.Enfileirar(ctx, dono, "http://10.43.0.1/a.mp3", "", "")
+	job, _, err := jobs.Enfileirar(ctx, dono, "http://10.43.0.1/a.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 	_, err = w.Rodar(ctx)
 	require.NoError(t, err)
@@ -394,7 +404,7 @@ func TestErroCruNaoVazaDetalheNaMensagem(t *testing.T) {
 	w, jobs, _, _, dono := montar(t, bx)
 	ctx := context.Background()
 
-	job, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/a.mp3", "", "")
+	job, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/a.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 	_, err = w.Rodar(ctx)
 	require.NoError(t, err)
@@ -410,7 +420,7 @@ func TestJobVoltaParaFilaEDesisteDepoisDasTentativas(t *testing.T) {
 	w, jobs, _, _, dono := montar(t, bx)
 	ctx := context.Background()
 
-	job, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/morta.mp3", "", "")
+	job, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/morta.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 
 	for i := 0; i < acervo.MaxTentativas; i++ {
@@ -439,7 +449,7 @@ func TestArquivoQueNaoEhAudioNaoSobeNada(t *testing.T) {
 	w, jobs, tracks, s3, dono := montar(t, bx)
 	ctx := context.Background()
 
-	job, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/lixo.mp3", "", "")
+	job, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/lixo.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 	_, err = w.Rodar(ctx)
 	require.NoError(t, err)
@@ -462,7 +472,7 @@ func TestUmaRodadaEsvaziaAFila(t *testing.T) {
 	ctx := context.Background()
 
 	for _, u := range []string{"a", "b", "c"} {
-		_, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/"+u+".mp3", "", "")
+		_, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/"+u+".mp3", "", "", acervo.Destino{})
 		require.NoError(t, err)
 	}
 	feitos, err := w.Rodar(ctx)
@@ -516,7 +526,7 @@ func TestTagDoArquivoGanhaDoNomeEnviadoMasONomeSalvaOSemTag(t *testing.T) {
 	}
 	for _, c := range casos {
 		s3.semear(storage.KeyUploadStage(dono, c.envio), "audio/mpeg", c.bytes, time.Now())
-		_, _, err := jobs.EnfileirarEnvio(ctx, dono, acervo.FonteUpload(c.envio), "", "", "01 - Faixa Sem Tag")
+		_, _, err := jobs.EnfileirarEnvio(ctx, dono, acervo.FonteUpload(c.envio), "", "", "01 - Faixa Sem Tag", acervo.Destino{})
 		require.NoError(t, err)
 	}
 	_, err = w.Rodar(ctx)
@@ -541,7 +551,7 @@ func TestTituloEscolhidoGanhaDaTagEDaReserva(t *testing.T) {
 	envio := "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
 	s3.semear(storage.KeyUploadStage(dono, envio), "audio/mpeg", bytesMP3, time.Now())
 
-	_, _, err = jobs.EnfileirarEnvio(ctx, dono, acervo.FonteUpload(envio), "Eu Escolhi", "", "nome-do-arquivo")
+	_, _, err = jobs.EnfileirarEnvio(ctx, dono, acervo.FonteUpload(envio), "Eu Escolhi", "", "nome-do-arquivo", acervo.Destino{})
 	require.NoError(t, err)
 	_, err = w.Rodar(ctx)
 	require.NoError(t, err)
@@ -563,7 +573,7 @@ func TestEnvioPelaPWAEhLidoDoBucketEDepoisApagado(t *testing.T) {
 	stage := storage.KeyUploadStage(dono, envio)
 	s3.semear(stage, "application/octet-stream", bytesMP3, time.Now())
 
-	job, _, err := jobs.Enfileirar(ctx, dono, acervo.FonteUpload(envio), "", "")
+	job, _, err := jobs.Enfileirar(ctx, dono, acervo.FonteUpload(envio), "", "", acervo.Destino{})
 	require.NoError(t, err)
 	_, err = w.Rodar(ctx)
 	require.NoError(t, err)
@@ -588,7 +598,7 @@ func TestEnvioQueNaoChegouAoBucketFalhaComMensagemClara(t *testing.T) {
 	w, jobs, _, _, dono := montar(t, &baixadorQueNaoDeveriaSerChamado{t: t})
 	ctx := context.Background()
 
-	job, _, err := jobs.Enfileirar(ctx, dono, acervo.FonteUpload("22222222-2222-4222-8222-222222222222"), "", "")
+	job, _, err := jobs.Enfileirar(ctx, dono, acervo.FonteUpload("22222222-2222-4222-8222-222222222222"), "", "", acervo.Destino{})
 	require.NoError(t, err)
 	for i := 0; i < acervo.MaxTentativas; i++ {
 		_, err = w.Rodar(ctx)
@@ -616,7 +626,7 @@ func TestWorkerSoLeDaAreaDoDonoDoJob(t *testing.T) {
 	require.NoError(t, err)
 	s3.semear(storage.KeyUploadStage(outro, envio), "audio/mpeg", bytesMP3, time.Now())
 
-	job, _, err := jobs.Enfileirar(ctx, dono, acervo.FonteUpload(envio), "", "")
+	job, _, err := jobs.Enfileirar(ctx, dono, acervo.FonteUpload(envio), "", "", acervo.Destino{})
 	require.NoError(t, err)
 	_, err = w.Rodar(ctx)
 	require.NoError(t, err)
@@ -641,7 +651,7 @@ func TestEnvioTrocadoPorArquivoMaiorEhRecusadoPeloWorker(t *testing.T) {
 	envio := "44444444-4444-4444-8444-444444444444"
 	s3.semear(storage.KeyUploadStage(dono, envio), "audio/mpeg", make([]byte, 4<<10), time.Now())
 
-	job, _, err := jobs.Enfileirar(ctx, dono, acervo.FonteUpload(envio), "", "")
+	job, _, err := jobs.Enfileirar(ctx, dono, acervo.FonteUpload(envio), "", "", acervo.Destino{})
 	require.NoError(t, err)
 	for i := 0; i < acervo.MaxTentativas; i++ {
 		_, err = w.Rodar(ctx)
@@ -673,4 +683,130 @@ func TestVarreduraApagaAbandonadoEPoupaORecenteEOAcervo(t *testing.T) {
 	require.False(t, s3.tem(velho), "o abandonado deveria ter saído")
 	require.True(t, s3.tem(recente), "envio recente pode estar em andamento")
 	require.True(t, s3.tem(faixa), "a varredura não deve tocar no acervo")
+}
+
+// --- destino: de quem a faixa nasce (migração 0007) ---
+
+// A decisão central do compartilhamento pelo bot: com destino, a faixa nasce NA
+// CONTA DO DESTINO, e não na de quem pediu. O teste assere as duas metades —
+// aparece para quem recebeu, e NÃO aparece para quem mandou —, porque só a
+// segunda pega uma implementação que compartilhasse em vez de transferir.
+func TestComDestinoAFaixaNasceNaContaDoDestinoENaoNaDeQuemPediu(t *testing.T) {
+	exigirFFmpeg(t)
+	bx := &baixadorDeArquivo{caminho: mp3DeTeste(t, "Para Ela", "Alguém", true)}
+	w, jobs, tracks, s3, quemPediu, pool := montarComPool(t, bx, tetoDeTeste)
+	ctx := context.Background()
+	destino := dbtest.CriarUsuario(t, pool, "destino@exemplo.test")
+
+	job, _, err := jobs.Enfileirar(ctx, quemPediu, "https://exemplo.test/ela.mp3", "", "",
+		acervo.Destino{UserID: destino})
+	require.NoError(t, err)
+	_, err = w.Rodar(ctx)
+	require.NoError(t, err)
+
+	depois, err := jobs.PorID(ctx, quemPediu, job.ID)
+	require.NoError(t, err)
+	require.Equal(t, "ready", depois.Status, "erro: %s", depois.Error)
+
+	dela, err := tracks.Listar(ctx, destino)
+	require.NoError(t, err)
+	require.Len(t, dela, 1)
+	require.Equal(t, "Para Ela", dela[0].Title)
+	require.Equal(t, destino, dela[0].UserID)
+	require.True(t, dela[0].Minha, "para o destino, a faixa é dela")
+
+	minhas, err := tracks.Listar(ctx, quemPediu)
+	require.NoError(t, err)
+	require.Empty(t, minhas, "publicar PARA alguém entrega a faixa: quem pediu não fica com ela")
+
+	// A key leva o DONO na frente, não quem pediu: uma varredura por dono no
+	// bucket precisa achar o objeto onde a faixa diz que ele está.
+	require.Contains(t, dela[0].AudioKey, "u/"+destino+"/")
+	require.True(t, s3.tem(dela[0].AudioKey))
+}
+
+// A armadilha do passo: o arquivo foi gravado na área de espera de QUEM PEDIU.
+// Se o worker passasse a derivar a key do destino, toda publicação por arquivo
+// morreria com "não está mais no bucket" — e este teste é o que denuncia.
+func TestComDestinoOWorkerAindaLeDaAreaDeEsperaDeQuemPediu(t *testing.T) {
+	exigirFFmpeg(t)
+	w, jobs, tracks, s3, quemPediu, pool := montarComPool(t,
+		&baixadorQueNaoDeveriaSerChamado{t: t}, tetoDeTeste)
+	ctx := context.Background()
+	destino := dbtest.CriarUsuario(t, pool, "destino@exemplo.test")
+
+	bytesMP3, err := os.ReadFile(mp3DeTeste(t, "Subida e Entregue", "Eu", false))
+	require.NoError(t, err)
+	envio := "44444444-4444-4444-8444-444444444444"
+	// Gravado sob o prefixo de QUEM PEDIU, que é o que o PUT assinado faz.
+	stage := storage.KeyUploadStage(quemPediu, envio)
+	s3.semear(stage, "audio/mpeg", bytesMP3, time.Now())
+
+	job, _, err := jobs.EnfileirarEnvio(ctx, quemPediu, acervo.FonteUpload(envio), "", "", "",
+		acervo.Destino{UserID: destino})
+	require.NoError(t, err)
+	_, err = w.Rodar(ctx)
+	require.NoError(t, err)
+
+	depois, err := jobs.PorID(ctx, quemPediu, job.ID)
+	require.NoError(t, err)
+	require.Equal(t, "ready", depois.Status, "erro: %s", depois.Error)
+
+	dela, err := tracks.Listar(ctx, destino)
+	require.NoError(t, err)
+	require.Len(t, dela, 1, "o worker tinha de achar o arquivo na área de quem pediu")
+	require.False(t, s3.tem(stage), "a área de espera foi limpa")
+}
+
+// `todos` não transfere nada: a faixa continua de quem pediu, e é a coluna de
+// visibilidade que a abre para as outras contas.
+func TestParaTodosAFaixaFicaComQuemPediuEMarcadaTodos(t *testing.T) {
+	exigirFFmpeg(t)
+	bx := &baixadorDeArquivo{caminho: mp3DeTeste(t, "Para a Casa", "Nós", true)}
+	w, jobs, tracks, _, quemPediu, pool := montarComPool(t, bx, tetoDeTeste)
+	ctx := context.Background()
+	outra := dbtest.CriarUsuario(t, pool, "outra@exemplo.test")
+
+	_, _, err := jobs.Enfileirar(ctx, quemPediu, "https://exemplo.test/casa.mp3", "", "",
+		acervo.Destino{Visibilidade: acervo.VisibilidadeTodos})
+	require.NoError(t, err)
+	_, err = w.Rodar(ctx)
+	require.NoError(t, err)
+
+	minhas, err := tracks.Listar(ctx, quemPediu)
+	require.NoError(t, err)
+	require.Len(t, minhas, 1)
+	require.Equal(t, quemPediu, minhas[0].UserID)
+	require.Equal(t, acervo.VisibilidadeTodos, minhas[0].Visibilidade)
+
+	// E chega na outra conta sem concessão nenhuma ter sido gravada.
+	dela, err := tracks.Listar(ctx, outra)
+	require.NoError(t, err)
+	require.Len(t, dela, 1)
+	require.False(t, dela[0].Minha)
+	require.Equal(t, "dono", dela[0].DonoNome)
+}
+
+// Sem destino, nada mudou: a faixa é de quem pediu e nasce privada. É o teste
+// que protege as 45 faixas que já existem e todo envio que não fala de destino.
+func TestSemDestinoAFaixaNasceDeQuemPediuEPrivada(t *testing.T) {
+	exigirFFmpeg(t)
+	bx := &baixadorDeArquivo{caminho: mp3DeTeste(t, "Só Minha", "Eu", true)}
+	w, jobs, tracks, _, dono, pool := montarComPool(t, bx, tetoDeTeste)
+	ctx := context.Background()
+	outra := dbtest.CriarUsuario(t, pool, "outra@exemplo.test")
+
+	_, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/minha.mp3", "", "", acervo.Destino{})
+	require.NoError(t, err)
+	_, err = w.Rodar(ctx)
+	require.NoError(t, err)
+
+	minhas, err := tracks.Listar(ctx, dono)
+	require.NoError(t, err)
+	require.Len(t, minhas, 1)
+	require.Equal(t, acervo.VisibilidadePrivada, minhas[0].Visibilidade)
+
+	dela, err := tracks.Listar(ctx, outra)
+	require.NoError(t, err)
+	require.Empty(t, dela)
 }

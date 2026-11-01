@@ -270,6 +270,10 @@ func TestEscopoDoTokenNoAcervo(t *testing.T) {
 		{http.MethodGet, "/api/acervo/33333333-3333-4333-8333-333333333333/audio", false},
 		{http.MethodGet, "/api/acervo/33333333-3333-4333-8333-333333333333/art", false},
 		{http.MethodDelete, "/api/acervo/33333333-3333-4333-8333-333333333333", false},
+		// O bot escolhe o destino da faixa que ele mesmo traz (`para`, no corpo
+		// do ingest), mas mudar com quem uma faixa JÁ EXISTENTE é dividida é
+		// mexer no acervo — e para isso o token não serve.
+		{http.MethodPatch, "/api/acervo/33333333-3333-4333-8333-333333333333/compartilhamento", false},
 	}
 
 	for _, c := range casos {
@@ -426,7 +430,7 @@ func TestStatusDaIngestaoPeloToken(t *testing.T) {
 	r, pool, _ := montar(t, true)
 	dono := dbtest.CriarUsuario(t, pool, "dono@exemplo.test")
 	job, _, err := acervo.NewJobs(pool).Enfileirar(context.Background(), dono,
-		"https://exemplo.test/a.mp3", "", "")
+		"https://exemplo.test/a.mp3", "", "", acervo.Destino{})
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/acervo/ingest/"+job.ID, nil)

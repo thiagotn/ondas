@@ -173,16 +173,33 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 	}
 
 	trackID := uuid.NewString()
+
+	// O DONO DA FAIXA PODE NÃO SER QUEM PEDIU (migração 0007). `job.UserID` é
+	// quem mandou; `job.DestinoID`, quando existe, é de quem a faixa será.
+	//
+	// A diferença importa aqui e NÃO importa na área de espera: `job.UserID`
+	// continua sendo a única coisa que reconstrói a key do stage, porque foi na
+	// área dele que o arquivo foi gravado (ver `finalizarUpload`).
+	dono := job.UserID
+	if job.DestinoID != "" {
+		dono = job.DestinoID
+	}
+
 	// Key com o dono na frente, como as fotos do prumo (ADR 0011): a fronteira
 	// fica legível no bucket, não só no banco. Nada de e-mail ou nome aqui —
 	// key aparece em log e em mensagem de erro.
-	audioKey := fmt.Sprintf("u/%s/a/%s.%s", job.UserID, trackID, midia.Ext)
+	//
+	// É `dono` e não `job.UserID`: a key não é fronteira de acesso (quem libera
+	// é o 302 assinado, depois da checagem no banco), mas deixar a faixa de uma
+	// pessoa sob o prefixo de outra faria qualquer varredura ou limpeza por dono
+	// mentir.
+	audioKey := fmt.Sprintf("u/%s/a/%s.%s", dono, trackID, midia.Ext)
 
 	if err := w.enviarArquivo(ctx, bruto, audioKey, midia.ContentType, tamanho); err != nil {
 		return nil, err
 	}
 
-	artKey, thumbKey := w.capas(ctx, dir, bruto, job.UserID, trackID, midia, log)
+	artKey, thumbKey := w.capas(ctx, dir, bruto, dono, trackID, midia, log)
 
 	// Best-effort, como as capas: faixa sem forma de onda desenha barra lisa,
 	// e isso não é motivo para reprovar uma ingestão que já subiu o áudio.
@@ -194,7 +211,7 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 
 	nova := acervo.Nova{
 		ID:     trackID,
-		UserID: job.UserID,
+		UserID: dono,
 		// Ordem: título escolhido no pedido > tags do arquivo > nome do
 		// arquivo enviado > padrão. O nome do arquivo entra DEPOIS das tags
 		// de propósito: um álbum etiquetado não deve virar "01 - Faixa".
@@ -208,6 +225,9 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 		ArtKey:      artKey,
 		ArtThumbKey: thumbKey,
 		Peaks:       picos,
+		// Vazia vira `privada` no SQL — faixa nunca nasce publicada por um
+		// campo esquecido no caminho.
+		Visibilidade: job.Visibilidade,
 	}
 	track, err := w.tracks.Criar(ctx, nova)
 	if err != nil {

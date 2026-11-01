@@ -10,7 +10,10 @@ import (
 
 type chaveCtx string
 
-const chaveUsuario chaveCtx = "usuario"
+const (
+	chaveUsuario chaveCtx = "usuario"
+	chaveToken   chaveCtx = "porToken"
+)
 
 // comUsuario/usuarioDe isolam a chave do contexto: os dois caminhos de
 // autenticação (cookie e token do bot) gravam o usuário do mesmo jeito, e os
@@ -22,6 +25,26 @@ func comUsuario(ctx context.Context, user *auth.User) context.Context {
 func usuarioDe(ctx context.Context) *auth.User {
 	user, _ := ctx.Value(chaveUsuario).(*auth.User)
 	return user
+}
+
+// comToken/porTokenDe guardam COMO o pedido entrou, e não só quem é.
+//
+// Os dois caminhos põem o mesmo `*auth.User` no contexto, o que era suficiente
+// enquanto token e sessão podiam fazer exatamente as mesmas coisas. Desde que o
+// pedido de ingestão pode nomear um destino (migração 0007), deixou de ser: o
+// token é limitado pela lista `INGEST_DESTINOS` e a sessão não, porque limitar
+// um robô e limitar gente não são a mesma decisão.
+//
+// O padrão é `false`, e isso importa: quem esquecer de marcar cai no caminho de
+// SESSÃO, que é o menos restrito. Por isso a marca é posta no único lugar que
+// autentica por token (`exigirSessaoOuToken`), e não espalhada pelos handlers.
+func comToken(ctx context.Context) context.Context {
+	return context.WithValue(ctx, chaveToken, true)
+}
+
+func porTokenDe(ctx context.Context) bool {
+	v, _ := ctx.Value(chaveToken).(bool)
+	return v
 }
 
 // clienteIP confia no CF-Connecting-IP porque o único caminho de entrada do

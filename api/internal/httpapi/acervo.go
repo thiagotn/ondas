@@ -37,6 +37,18 @@ type trackJSON struct {
 	// Explícito, e não por omissão: `undefined` faria a PWA cair no heurístico
 	// `index % 3 === 2` do protótipo e marcar música sua como [pro].
 	Premium bool `json:"premium"`
+	// Nome de exibição do dono, PRESENTE SÓ QUANDO A FAIXA NÃO É DE QUEM PEDIU.
+	//
+	// É a ausência dele que separa os dois recortes da biblioteca na PWA
+	// (`--acervo` vs `--compartilhadas`, ver `visibleTracks` em
+	// packages/core/src/view.ts), então mandá-lo sempre apagaria a distinção.
+	//
+	// É `users.name` e NUNCA o e-mail: a tela precisa de um rótulo, e o e-mail
+	// de uma pessoa não é da outra.
+	Owner string `json:"owner,omitempty"`
+	// `privada` ou `todos`, e só sai na faixa própria — visibilidade é escolha
+	// do dono, e para quem recebeu ela não significa nada acionável.
+	Visibilidade string `json:"visibilidade,omitempty"`
 }
 
 // O prefixo evita colisão com os ids do Audius nas chaves de curtida, de
@@ -60,6 +72,18 @@ func paraJSON(t acervo.Track) trackJSON {
 	if t.ArtThumbKey != "" {
 		j.ArtThumb = "/api/acervo/" + t.ID + "/art?p=thumb"
 	}
+	return j
+}
+
+// paraJSONVisivel é o `paraJSON` da listagem, onde existe um "eu" para a faixa
+// ser comparada: é ele que decide quais dos dois campos novos saem.
+func paraJSONVisivel(v acervo.Visivel) trackJSON {
+	j := paraJSON(v.Track)
+	if v.Minha {
+		j.Visibilidade = v.Visibilidade
+		return j
+	}
+	j.Owner = v.DonoNome
 	return j
 }
 
@@ -120,7 +144,9 @@ func (s *Server) exigirSessaoOuToken(next http.Handler) http.Handler {
 			escreverErro(w, http.StatusUnauthorized, "token inválido")
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(comUsuario(r.Context(), user)))
+		// `comToken` é o que diz ao handler de ingestão que este pedido é do
+		// robô: é dessa marca que depende o teto de `INGEST_DESTINOS`.
+		next.ServeHTTP(w, r.WithContext(comToken(comUsuario(r.Context(), user))))
 	})
 }
 
@@ -151,7 +177,7 @@ func (s *Server) listarAcervo(w http.ResponseWriter, r *http.Request) {
 	}
 	saida := make([]trackJSON, 0, len(faixas))
 	for _, t := range faixas {
-		saida = append(saida, paraJSON(t))
+		saida = append(saida, paraJSONVisivel(t))
 	}
 	escreverJSON(w, http.StatusOK, map[string]any{"tracks": saida})
 }
@@ -181,7 +207,10 @@ func (s *Server) redirecionarAssinado(w http.ResponseWriter, r *http.Request, ke
 	if !ok {
 		return
 	}
-	t, err := s.tracks.PorID(r.Context(), user.ID, id)
+	// `PorIDAudivel` e não `PorID`: aqui o direito é OUVIR, não mexer. Com
+	// `PorID` a faixa compartilhada apareceria na lista e morreria num 404 no
+	// play — o bug que `TestFaixaDeTodosTocaParaAOutraConta` trava.
+	t, err := s.tracks.PorIDAudivel(r.Context(), user.ID, id)
 	if errors.Is(err, acervo.ErrNaoEncontrada) {
 		escreverErro(w, http.StatusNotFound, "faixa não encontrada")
 		return
@@ -253,6 +282,7 @@ func (s *Server) ingerir(w http.ResponseWriter, r *http.Request) {
 		URL    string `json:"url"`
 		Title  string `json:"title"`
 		Artist string `json:"artist"`
+		Para   string `json:"para"`
 	}
 	if !lerJSON(w, r, &req) {
 		return
@@ -274,8 +304,12 @@ func (s *Server) ingerir(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := usuarioDe(r.Context())
+	destino, ok := s.resolverDestino(w, r, req.Para)
+	if !ok {
+		return
+	}
 	job, novo, err := s.jobs.Enfileirar(r.Context(), user.ID, req.URL,
-		strings.TrimSpace(req.Title), strings.TrimSpace(req.Artist))
+		strings.TrimSpace(req.Title), strings.TrimSpace(req.Artist), destino)
 	if err != nil {
 		slog.Error("enfileirar ingestão", "erro", err)
 		escreverErro(w, http.StatusInternalServerError, "não foi possível enfileirar")

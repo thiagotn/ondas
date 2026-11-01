@@ -112,6 +112,43 @@ func (u *Users) ByID(ctx context.Context, id string) (*User, error) {
 	return &user, nil
 }
 
+// NomesPorIDs devolve o nome de exibição de cada id, na ordem em que foram
+// pedidos, pulando quem não existir mais.
+//
+// Serve à resposta de compartilhamento, que fala em NOME e não em e-mail: quem
+// compartilhou já sabe para quem mandou, e a resposta não precisa devolver o
+// e-mail de ninguém pela rede.
+//
+// Uma consulta só, e não uma por id: a lista cabe em 32 (`maxDestinatarios`) e
+// um laço de queries aqui seria 32 idas ao banco para montar um JSON.
+func (u *Users) NomesPorIDs(ctx context.Context, ids []string) ([]string, error) {
+	// `[]string{}` e nunca `nil`: quem serializa quer `[]` no JSON.
+	nomes := []string{}
+	if len(ids) == 0 {
+		return nomes, nil
+	}
+	linhas, err := u.pool.Query(ctx, `
+		SELECT u.name FROM unnest($1::uuid[]) WITH ORDINALITY AS pedido(id, ord)
+		  JOIN users u ON u.id = pedido.id
+		 ORDER BY pedido.ord`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("users: nomesPorIDs: %w", err)
+	}
+	defer linhas.Close()
+
+	for linhas.Next() {
+		var nome string
+		if err := linhas.Scan(&nome); err != nil {
+			return nil, fmt.Errorf("users: nomesPorIDs: scan: %w", err)
+		}
+		nomes = append(nomes, nome)
+	}
+	if err := linhas.Err(); err != nil {
+		return nil, fmt.Errorf("users: nomesPorIDs: %w", err)
+	}
+	return nomes, nil
+}
+
 // PorEmail resolve o dono configurado para a ingestão por token (o bot não tem
 // sessão, então é o e-mail do ConfigMap que diz de quem é a faixa).
 func (u *Users) PorEmail(ctx context.Context, email string) (*User, error) {

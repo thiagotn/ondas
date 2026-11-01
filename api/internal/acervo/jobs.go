@@ -60,8 +60,28 @@ type Job struct {
 	Attempts      int
 	Error         string
 	TrackID       string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	// Conta que vai ser DONA da faixa quando o job terminar. Vazio = o próprio
+	// `UserID`.
+	//
+	// Os dois não são a mesma coisa e não podem ser unificados: `UserID` é quem
+	// PEDIU, e é ele que reconstrói a key da área de espera no R2
+	// (`storage.KeyUploadStage`) e que deixa o bot ler o status do próprio job.
+	DestinoID    string
+	Visibilidade string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+// Destino é para onde a faixa vai quando o job terminar.
+//
+// Existe como struct, e não como dois parâmetros a mais em `Enfileirar`, pelo
+// mesmo motivo de `Nova`: a assinatura já tinha cinco strings seguidas, e duas
+// trocadas de lugar entre si compilariam sem reclamar.
+type Destino struct {
+	// Conta que recebe a faixa. Vazio = quem pediu.
+	UserID string
+	// `privada` ou `todos`. Vazio = `privada`, pelo DEFAULT da coluna.
+	Visibilidade string
 }
 
 type Jobs struct{ pool *pgxpool.Pool }
@@ -70,12 +90,14 @@ func NewJobs(pool *pgxpool.Pool) *Jobs { return &Jobs{pool: pool} }
 
 const colunasJob = `id, user_id, source_url, coalesce(title, ''), coalesce(artist, ''),
 	coalesce(fallback_title, ''), status, attempts, coalesce(error, ''),
-	coalesce(track_id::text, ''), created_at, updated_at`
+	coalesce(track_id::text, ''), coalesce(destino_id::text, ''), visibilidade,
+	created_at, updated_at`
 
 func scanJob(row pgx.Row) (*Job, error) {
 	var j Job
 	err := row.Scan(&j.ID, &j.UserID, &j.SourceURL, &j.Title, &j.Artist,
 		&j.TituloReserva, &j.Status, &j.Attempts, &j.Error, &j.TrackID,
+		&j.DestinoID, &j.Visibilidade,
 		&j.CreatedAt, &j.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrJobNaoEncontrado
@@ -91,19 +113,19 @@ func scanJob(row pgx.Row) (*Job, error) {
 // `novo` diz qual dos dois aconteceu, para o handler responder 202 ou 200. O
 // pedido repetido é esperado: o bot reenvia quando o usuário toca no botão de
 // novo ou quando o Telegram repete a entrega.
-func (r *Jobs) Enfileirar(ctx context.Context, userID, url, title, artist string) (job *Job, novo bool, err error) {
-	return r.enfileirar(ctx, userID, url, title, artist, "")
+func (r *Jobs) Enfileirar(ctx context.Context, userID, url, title, artist string, d Destino) (job *Job, novo bool, err error) {
+	return r.enfileirar(ctx, userID, url, title, artist, "", d)
 }
 
 // EnfileirarEnvio é o Enfileirar de um envio de arquivo: além do título escolhido,
 // guarda um título de RESERVA — o nome do arquivo — que só é usado se o
 // arquivo não tiver tag nenhuma. Método irmão em vez de um parâmetro a mais
 // porque o caminho do bot não tem nome de arquivo para informar.
-func (r *Jobs) EnfileirarEnvio(ctx context.Context, userID, fonte, title, artist, reserva string) (job *Job, novo bool, err error) {
-	return r.enfileirar(ctx, userID, fonte, title, artist, reserva)
+func (r *Jobs) EnfileirarEnvio(ctx context.Context, userID, fonte, title, artist, reserva string, d Destino) (job *Job, novo bool, err error) {
+	return r.enfileirar(ctx, userID, fonte, title, artist, reserva, d)
 }
 
-func (r *Jobs) enfileirar(ctx context.Context, userID, url, title, artist, reserva string) (job *Job, novo bool, err error) {
+func (r *Jobs) enfileirar(ctx context.Context, userID, url, title, artist, reserva string, d Destino) (job *Job, novo bool, err error) {
 	var t, a *string
 	if title != "" {
 		t = &title
@@ -111,25 +133,52 @@ func (r *Jobs) enfileirar(ctx context.Context, userID, url, title, artist, reser
 	if artist != "" {
 		a = &artist
 	}
+	// Vazio tem de virar NULL, e não `''`: a coluna é `uuid` e referencia
+	// `users`.
+	var destino *string
+	if d.UserID != "" {
+		destino = &d.UserID
+	}
+	vis := d.Visibilidade
+	if vis == "" {
+		vis = VisibilidadePrivada
+	}
 	// ON CONFLICT no índice parcial de jobs ativos: sem DO UPDATE, porque
 	// reenviar não deve mexer no que já está sendo processado.
+	//
+	// OS QUATRO CAMPOS DO CONFLITO TÊM DE SER OS MESMOS DO ÍNDICE da migração
+	// 0007, `coalesce` incluído, senão o Postgres não acha índice nenhum para
+	// o conflito e o INSERT falha. O destino entra nele porque a mesma URL para
+	// duas pessoas diferentes são dois pedidos legítimos.
 	j, err := scanJob(r.pool.QueryRow(ctx, `
-		INSERT INTO ingest_jobs (user_id, source_url, title, artist, fallback_title)
-		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (user_id, source_url) WHERE status IN ('pending', 'processing')
+		INSERT INTO ingest_jobs (user_id, source_url, title, artist, fallback_title,
+		                         destino_id, visibilidade)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (user_id, source_url, coalesce(destino_id, user_id), visibilidade)
+		WHERE status IN ('pending', 'processing')
 		DO NOTHING
-		RETURNING `+colunasJob, userID, url, t, a, reserva))
+		RETURNING `+colunasJob, userID, url, t, a, reserva, destino, vis))
 	if err == nil {
 		return j, true, nil
 	}
 	if !errors.Is(err, ErrJobNaoEncontrado) {
 		return nil, false, err
 	}
-	// DO NOTHING não devolve linha: o job ativo já existia.
+	// DO NOTHING não devolve linha: o job ativo já existia. A busca tem de
+	// repetir o MESMO critério do índice — sem o destino aqui, o pedido para a
+	// segunda pessoa devolveria o job da primeira.
+	//
+	// E ela é a segunda tranca: medido falsificando o índice da 0007 para a
+	// forma antiga, o pedido para o segundo destino não devolve o job errado em
+	// silêncio — ele não acha nada e vira erro. Um índice que um dia perca o
+	// destino falha alto em vez de entregar música para a pessoa errada.
 	j, err = scanJob(r.pool.QueryRow(ctx, `
 		SELECT `+colunasJob+` FROM ingest_jobs
-		WHERE user_id = $1 AND source_url = $2 AND status IN ('pending', 'processing')`,
-		userID, url))
+		WHERE user_id = $1 AND source_url = $2
+		  AND coalesce(destino_id, user_id) = coalesce($3::uuid, user_id)
+		  AND visibilidade = $4
+		  AND status IN ('pending', 'processing')`,
+		userID, url, destino, vis))
 	if err != nil {
 		return nil, false, err
 	}
