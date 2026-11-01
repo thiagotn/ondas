@@ -162,6 +162,13 @@ A peneira precisa de um padrão, e ele não é constante: `defaultLibrarySegment
 e `liked` sem ela. É para onde vai tanto `/library` sem segmento quanto o lixo, e depende da sessão
 porque sem conta o acervo não existe — abrir nele marcaria um chip que a tela nem desenha.
 
+Com a migração `0007` nasceu um quarto recorte, `shared`, e ele trouxe à tona um acoplamento que
+dois recortes esconderam por acidente. `promptLine` montava o comando com
+`seg === 'liked' ? 'curtidas' : seg`: funcionava porque `acervo` e `offline` são a mesma palavra nos
+dois vocabulários. Com `shared`, o prompt escreveria `ondas ls --shared` no meio de um app em
+português. São **dois** mapas agora, e de propósito — `SEGMENT_SLUGS` para a URL (inglês) e `CHIPS`
+para a tela (português) —, porque a coincidência de duas palavras não é uma regra.
+
 ## A fronteira com o cache de consultas
 
 Duas bibliotecas de estado no mesmo app precisam de uma regra, e a do Ondas é:

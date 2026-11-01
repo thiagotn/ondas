@@ -166,6 +166,13 @@ there is an account and `liked` when there is not. It is where both `/library` w
 the garbage land, and it depends on the session because without an account the private library does
 not exist — opening on it would press a chip the screen does not even draw.
 
+Migration `0007` brought a fourth segment, `shared`, and it surfaced a coupling that two segments had
+hidden by accident. `promptLine` built the command with `seg === 'liked' ? 'curtidas' : seg`: that
+worked because `acervo` and `offline` are the same word in both vocabularies. With `shared`, the
+prompt would write `ondas ls --shared` in the middle of a Portuguese app. There are **two** maps now,
+deliberately — `SEGMENT_SLUGS` for the URL (English) and `CHIPS` for the screen (Portuguese) —
+because two words coinciding is not a rule.
+
 ## The boundary with the query cache
 
 Two state libraries in one app need a rule, and Ondas' is:

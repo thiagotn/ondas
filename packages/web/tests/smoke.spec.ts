@@ -73,6 +73,30 @@ const ACERVO = [
 ];
 
 /**
+ * Faixa de OUTRA conta, que esta pode ouvir.
+ *
+ * O que a separa da de cima é `owner`: a API só o manda quando a faixa não é de
+ * quem pediu, e é a presença dele que põe a linha em `--compartilhadas` em vez
+ * de `--acervo`.
+ *
+ * Fica FORA de `ACERVO` e entra por `semearCompartilhada`, pelo mesmo motivo da
+ * curtida semeada: metade da suíte conta as faixas da lista (`+ acervo (1)`,
+ * `só o acervo`, o envio) e pô-la no fixture global mudaria os números de uns
+ * seis testes que não falam de compartilhamento nenhum.
+ */
+const COMPARTILHADA = {
+  id: 'acervo:33333333-3333-4333-8333-333333333333',
+  title: 'Vinda de Longe',
+  artist: 'Outra Pessoa',
+  genre: 'acervo',
+  dur: 212,
+  art: '',
+  stream: '/api/acervo/33333333-3333-4333-8333-333333333333/audio',
+  premium: false,
+  owner: 'mayumi',
+};
+
+/**
  * A API do acervo, de mentira.
  *
  * O build de produção que os testes servem não tem backend, e a auth agora é
@@ -95,6 +119,14 @@ function semearCurtida(page: Page, id: string) {
   curtidasSemeadas.get(page)?.add(id);
 }
 
+/** O acervo mutável da API falsa, por página — ver `semearCompartilhada`. */
+const acervoSemeado = new WeakMap<Page, Record<string, unknown>[]>();
+
+/** Põe no acervo desta página uma faixa que é de outra conta. */
+function semearCompartilhada(page: Page) {
+  acervoSemeado.get(page)?.push({ ...COMPARTILHADA });
+}
+
 async function stubApi(page: Page) {
   let logado = false;
   // `true` de propósito, e não "realista".
@@ -108,7 +140,8 @@ async function stubApi(page: Page) {
   let publico = true;
   // O acervo cresce durante o teste de envio: é assim que se prova que a
   // faixa nova aparece na lista depois da ingestão.
-  const acervo = ACERVO.map((t) => ({ ...t }));
+  const acervo: Record<string, unknown>[] = ACERVO.map((t) => ({ ...t }));
+  acervoSemeado.set(page, acervo);
   let enviosRecebidos = 0;
   // As curtidas da conta, no servidor de mentira. Começa vazio; quem quiser
   // uma curtida pré-existente a semeia com `semearCurtida`.
@@ -1747,13 +1780,70 @@ test('curtida feita sem rede fica na fila e sobe quando a rede volta', async ({ 
   await expect(coracao(page, /Maré Baixa/)).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('os recortes da biblioteca aparecem na ordem curtidas, acervo, offline', async ({ page }) => {
+test('os recortes aparecem na ordem curtidas, acervo, compartilhadas, offline', async ({ page }) => {
   await blockAudius(page);
   await logar(page);
   await page.keyboard.press('3');
 
-  const chips = page.getByRole('button', { name: /^--(curtidas|acervo|offline)$/ });
-  await expect(chips).toHaveText(['--curtidas', '--acervo', '--offline']);
+  const chips = page.getByRole('button', { name: /^--(curtidas|acervo|compartilhadas|offline)$/ });
+  await expect(chips).toHaveText(['--curtidas', '--acervo', '--compartilhadas', '--offline']);
+});
+
+test('sem conta, nem --acervo nem --compartilhadas são desenhados', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+  await page.keyboard.press('3');
+
+  // Os dois dependem da mesma rota, que sem sessão responde 401: o chip seria
+  // uma lista sempre vazia.
+  await expect(page.getByRole('button', { name: '--curtidas' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '--offline' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '--acervo' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '--compartilhadas' })).toHaveCount(0);
+});
+
+test('a faixa de outra conta fica em --compartilhadas, e a minha em --acervo', async ({ page }) => {
+  await blockAudius(page);
+  semearCompartilhada(page);
+  await logar(page);
+  await page.keyboard.press('3');
+
+  // `--acervo` é o padrão de quem tem conta: só a minha, e marcada [meu].
+  await expect(page.getByRole('button', { name: '--acervo' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByRole('button', { name: /Fita Caseira/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Vinda de Longe/ })).toHaveCount(0);
+
+  await page.getByRole('button', { name: '--compartilhadas' }).click();
+  await expect(page).toHaveURL('/library/shared');
+  await expect(page.getByRole('button', { name: /Vinda de Longe/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Fita Caseira/ })).toHaveCount(0);
+
+  // E a linha diz de quem é, onde a minha diria [meu]. As duas marcas se
+  // excluem: é a mesma pergunta respondida de dois jeitos.
+  await expect(page.getByText('[de mayumi]')).toBeVisible();
+  await expect(page.getByText('[meu]')).toHaveCount(0);
+
+  // O prompt escreve o chip em português, não o id `shared` da URL.
+  await expect(page.getByText('ondas ls --compartilhadas')).toBeVisible();
+});
+
+test('a faixa compartilhada toca, porque ouvir e ser dono são direitos diferentes', async ({
+  page,
+}) => {
+  await blockAudius(page);
+  semearCompartilhada(page);
+  await logar(page);
+  await page.keyboard.press('3');
+  await page.getByRole('button', { name: '--compartilhadas' }).click();
+
+  await page.getByRole('button', { name: /Vinda de Longe/ }).click();
+  // O rodapé passa a anunciar a faixa: se `/audio` tivesse dado 404 — o que
+  // acontece se a API conferir "sou o dono" em vez de "posso ouvir" —, a tela
+  // ficaria no aviso de stream indisponível.
+  await expect(page.getByText('Vinda de Longe').first()).toBeVisible();
 });
 
 test('o segmento da biblioteca é um endereço, e o voltar anda entre eles', async ({ page }) => {

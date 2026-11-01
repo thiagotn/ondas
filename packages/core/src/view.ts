@@ -2,17 +2,27 @@ import { fmtBytes, fmtTime } from './format.js';
 import type { Catalog, LibrarySegment, Session, TabId, Track } from './types.js';
 
 /**
- * Os três recortes da biblioteca, na ordem em que a tela os mostra.
+ * Os quatro recortes da biblioteca, na ordem em que a tela os mostra.
  *
  * `acervo` fica no MEIO, entre as curtidas e os downloads, e não no fim: ele é
  * o padrão de quem tem conta (`defaultLibrarySegment`), e o padrão no canto
  * direito faz a tela abrir com o chip mais distante marcado.
  *
+ * `shared` encosta em `acervo` porque é a mesma origem vista do outro lado — as
+ * faixas do acervo que são de outra pessoa. `offline` continua por último, que
+ * é onde ele já estava: ele não é sobre procedência, é sobre o que está neste
+ * aparelho.
+ *
  * Aqui, e não na tela: eles viraram endereço (`/library/offline`), e o que
  * entra pela URL é texto de fora — precisa de uma peneira testável. A tela só
  * mapeia esta lista (`LibraryRoute`), então mudar a ordem é mudar esta linha.
  */
-export const LIBRARY_SEGMENTS: readonly LibrarySegment[] = ['liked', 'acervo', 'offline'];
+export const LIBRARY_SEGMENTS: readonly LibrarySegment[] = [
+  'liked',
+  'acervo',
+  'shared',
+  'offline',
+];
 
 /**
  * A palavra de cada recorte na URL.
@@ -27,11 +37,32 @@ const SEGMENT_SLUGS: Record<LibrarySegment, string> = {
   liked: 'liked',
   offline: 'offline',
   acervo: 'archive',
+  shared: 'shared',
 };
 
 /** Recorte → a palavra dele na URL. */
 export function librarySegmentSlug(seg: LibrarySegment): string {
   return SEGMENT_SLUGS[seg];
+}
+
+/**
+ * A palavra de cada recorte NA TELA — o chip e a linha do prompt.
+ *
+ * Separada de `SEGMENT_SLUGS` porque são duas coisas: a URL é inglês e a
+ * interface é português, e dois dos quatro ids coincidem com o português por
+ * acaso. Enquanto eram dois iguais e um diferente isso cabia num ternário no
+ * `promptLine`; com dois diferentes, o ternário escreveria `ondas ls --shared`.
+ */
+const CHIPS: Record<LibrarySegment, string> = {
+  liked: 'curtidas',
+  acervo: 'acervo',
+  shared: 'compartilhadas',
+  offline: 'offline',
+};
+
+/** Recorte → a palavra dele na tela (`--curtidas`, `--compartilhadas`…). */
+export function librarySegmentChip(seg: LibrarySegment): string {
+  return CHIPS[seg];
 }
 
 /**
@@ -44,9 +75,10 @@ export function librarySegmentSlug(seg: LibrarySegment): string {
  * ali o padrão volta a ser `liked`.
  *
  * Desde que a curtida passou a morar na conta, `liked` sem sessão não é mais
- * "o que vive no aparelho e não pede servidor" — os TRÊS recortes pedem conta,
- * e `~/biblioteca` inteira é uma porta fechada para quem não entrou. `liked`
- * continua sendo o padrão por ser o primeiro chip, não por ser o que funciona.
+ * "o que vive no aparelho e não pede servidor" — os QUATRO recortes pedem
+ * conta, e `~/biblioteca` inteira é uma porta fechada para quem não entrou.
+ * `liked` continua sendo o padrão por ser o primeiro chip, não por ser o que
+ * funciona.
  *
  * Aqui, e não na tela, porque é a mesma regra que decide duas coisas: onde
  * `/library` abre e onde cai um segmento que não existe.
@@ -89,14 +121,16 @@ export function hiddenInSegment(
   marks: Pick<ListQuery, 'liked' | 'cached'>,
   tracks: readonly Track[],
 ): number {
-  if (seg === 'acervo') return 0;
+  // `acervo` e `shared` não guardam marca no aparelho: os dois são filtros pela
+  // procedência da faixa, e o que não está na lista não está em lugar nenhum.
+  if (seg === 'acervo' || seg === 'shared') return 0;
   const naLista = new Set(tracks.map((t) => t.id));
   const ids = Object.keys(seg === 'liked' ? marks.liked : marks.cached);
   return ids.filter((id) => !naLista.has(id)).length;
 }
 
 /**
- * Palavra da URL → recorte da biblioteca; o que não é uma das três vale
+ * Palavra da URL → recorte da biblioteca; o que não é uma das quatro vale
  * `padrao` — na tela, o de `defaultLibrarySegment`.
  *
  * Normaliza em silêncio em vez de dar tela de erro: `/library/lixo` é um
@@ -138,10 +172,15 @@ export function visibleTracks(v: ListQuery): Track[] {
     if (!q) return v.tracks.slice(0, 8);
     return v.tracks.filter((t) => `${t.title} ${t.artist} ${t.genre}`.toLowerCase().includes(q));
   }
-  // `acervo` não olha estado local: curtida e offline são marcas que o
-  // aparelho guarda, e o acervo é o que a conta tem. Daí o filtro ser a
-  // procedência da faixa, posta pelo adaptador em `catalog/acervo.ts`.
-  if (v.seg === 'acervo') return v.tracks.filter((t) => t.source === 'acervo');
+  // `acervo` e `shared` não olham estado local: curtida e offline são marcas que
+  // o aparelho guarda, e estes dois são sobre a PROCEDÊNCIA da faixa, posta
+  // pelo adaptador em `catalog/acervo.ts`.
+  //
+  // O que separa os dois é `owner`, que a API só manda quando a faixa NÃO é de
+  // quem pediu. Daí a divisão ser exaustiva: toda faixa do acervo cai em um dos
+  // dois recortes, e em nenhum dos dois duas vezes.
+  if (v.seg === 'acervo') return v.tracks.filter((t) => t.source === 'acervo' && !t.owner);
+  if (v.seg === 'shared') return v.tracks.filter((t) => t.source === 'acervo' && !!t.owner);
   return v.tracks.filter((t) => (v.seg === 'liked' ? v.liked[t.id] : v.cached[t.id]));
 }
 
@@ -180,7 +219,7 @@ export function promptLine(args: {
     return {
       who,
       cwd: '~/biblioteca',
-      cmd: 'ondas ls --' + (seg === 'liked' ? 'curtidas' : seg),
+      cmd: 'ondas ls --' + CHIPS[seg],
       comment: `${count} itens`,
     };
   }
@@ -194,8 +233,13 @@ export function promptLine(args: {
     //
     // Com `só o acervo` a contagem NÃO é anexada: ela já é o número à esquerda,
     // e `fonte: só o acervo (13)` em `13 faixas` seria a mesma conta duas
-    // vezes. O `+ acervo (N)` existe para dizer quanto da lista misturada é
-    // próprio, e aqui não há mistura.
+    // vezes. O `+ acervo (N)` existe para dizer quanto da lista misturada vem
+    // do acervo, e aqui não há mistura.
+    //
+    // "do acervo" e não "é próprio": desde que existe faixa compartilhada, o
+    // número conta as minhas MAIS as de outra pessoa que eu posso ouvir. As
+    // duas vêm da mesma rota e as duas são o que o catálogo público não é — que
+    // é o que esta contagem está dizendo.
     comment:
       `${count} faixas · fonte: ${source || '…'}` +
       (acervo && source !== 'só o acervo' ? ` + acervo (${acervo})` : '') +
@@ -241,6 +285,13 @@ export function emptyText(args: {
     }
     if (seg === 'acervo') {
       return user ? 'vazio — envie um arquivo com [+ arquivo].' : 'o acervo exige login.';
+    }
+    // A quarta porta fechada, na forma das outras três. Com conta a frase não
+    // manda fazer nada: compartilhar não é ato de quem recebe.
+    if (seg === 'shared') {
+      return user
+        ? 'vazio — ninguém compartilhou faixa com você ainda.'
+        : 'compartilhadas exigem login.';
     }
     return user
       ? 'vazio — baixe faixas [d] ou ative o buffer para ouvir sem rede.'

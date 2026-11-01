@@ -3,12 +3,12 @@ import {
   emptyText,
   hiddenInSegment,
   LIBRARY_SEGMENTS,
+  librarySegmentChip,
   parseLibrarySegment,
   promptLine,
   showsPublicCatalog,
   visibleTracks,
   whoAmI,
-  type LibrarySegment,
 } from '@ondas/core';
 import { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -21,15 +21,8 @@ import { useCatalog } from '../query/catalog';
 import s from '../components/shell.module.css';
 import { librarySegPath } from './paths';
 
-/** O rótulo de cada recorte; a ordem é a de `LIBRARY_SEGMENTS`. */
-const ROTULOS: Record<LibrarySegment, string> = {
-  liked: '--curtidas',
-  offline: '--offline',
-  acervo: '--acervo',
-};
-
 /**
- * `~/biblioteca`: envio para o acervo, os três segmentos e a lista.
+ * `~/biblioteca`: envio para o acervo, os quatro segmentos e a lista.
  *
  * O segmento é o path (`/library/offline`), e não estado de tela: assim cada
  * recorte é linkável, sobrevive a um reload e o voltar anda entre eles.
@@ -82,12 +75,13 @@ export function LibraryRoute() {
           rodapé). Enviar fica: é trabalho de acervo, e acervo é conteúdo. */}
       {/* Enviar arquivo só faz sentido com conta: o acervo é por usuário. */}
       {user && <UploadPanel />}
-      {/* `--acervo` só com conta, pela mesma razão do painel de envio: sem
-          sessão o catálogo não traz faixa própria nenhuma, e o chip seria uma
-          lista sempre vazia. Quem sai da conta com ele escolhido cai no texto
-          de vazio que explica o login (ver `emptyText`). */}
+      {/* `--acervo` e `--compartilhadas` só com conta, pela mesma razão do
+          painel de envio: sem sessão o catálogo não traz faixa do acervo
+          nenhuma, e os dois chips seriam listas sempre vazias. Quem sai da
+          conta com um deles escolhido cai no texto de vazio que explica o
+          login (ver `emptyText`). */}
       <div className={s.segments}>
-        {LIBRARY_SEGMENTS.filter((id) => id !== 'acervo' || user).map((id) => (
+        {LIBRARY_SEGMENTS.filter((id) => (id !== 'acervo' && id !== 'shared') || user).map((id) => (
           <button
             key={id}
             type="button"
@@ -95,7 +89,7 @@ export function LibraryRoute() {
             className={seg === id ? `${s.segment} ${s.segmentActive}` : s.segment}
             onClick={() => navigate(librarySegPath(id))}
           >
-            {ROTULOS[id]}
+            {'--' + librarySegmentChip(id)}
           </button>
         ))}
       </div>

@@ -257,7 +257,7 @@ A resposta está na forma do roteador, e não num campo de permissão.
 |---|---|---|
 | Pública | sem credencial | `healthz`, `readyz`, `og/t/{seg}`, `signup`, `login`, `logout` |
 | Sessão **ou** token | entrar com faixa nova | `POST ingest`, `GET ingest/{id}`, `POST upload`, `POST upload/{id}/finalizar` |
-| Só sessão | mexer no que já existe | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}` |
+| Só sessão | mexer no que já existe | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}`, `PATCH {id}/compartilhamento` |
 | Só sessão | mexer na própria conta | `GET /auth/me`, `PATCH /auth/prefs` |
 | Só sessão | mexer no próprio gosto | `GET /likes`, `PATCH /likes` |
 
@@ -360,10 +360,31 @@ da Cloudflare, eu conto por `CF-Connecting-IP` dentro da API.
 
 **"Você tem um token de máquina. Como garante que ele não faz o que não deve?"** Pela forma do
 roteador, não por um campo de permissão. Há dois grupos: "entrar com faixa nova" aceita sessão ou
-token; "mexer no acervo que já existe" — listar, baixar, apagar — aceita só sessão. Um token vazado
-consegue criar objeto na própria área de espera e não consegue exfiltrar nem destruir nada. E como
-mover uma rota entre os dois grupos é uma mudança de indentação que compila, existe um teste
-dedicado a travar a divisão.
+token; "mexer no acervo que já existe" — listar, baixar, apagar, compartilhar — aceita só sessão. Um
+token vazado não consegue exfiltrar nem destruir nada. E como mover uma rota entre os dois grupos é
+uma mudança de indentação que compila, existe um teste dedicado a travar a divisão.
+
+**"E desde que o bot escolhe para quem publicar, o token não ficou mais forte?"** Ficou, e a
+documentação que dizia o contrário foi reescrita em vez de mantida. Até a migração `0007` a faixa
+que entrava por token era sempre do `INGEST_USER_EMAIL`, e o pior que um token vazado fazia era pôr
+arquivo no acervo do próprio dono dele. Agora o pedido pode nomear um destino, e a faixa nasce **na
+conta daquela pessoa**.
+
+O teto novo não está no roteador — está numa lista: `INGEST_DESTINOS`, no ConfigMap, nomeia as
+contas para as quais o **token** pode publicar. Sessão não passa por ela, porque limitar um robô e
+limitar gente não são a mesma decisão. Vazia (o padrão) significa "nenhum destino além do dono", que
+é exatamente o comportamento anterior — é o que deixou a API nova subir antes do ConfigMap sem mudar
+nada.
+
+E a recusa é **a mesma** para um e-mail fora da lista e para um e-mail que não tem conta. Isso é a
+regra, não descuido: se as duas respostas fossem distinguíveis, um token vazado viraria um
+enumerador de contas, tentando e-mail por e-mail e lendo a diferença entre o aceite e a recusa.
+`TestTokenNaoDistingueDestinoForaDaListaDeDestinoInexistente` compara os corpos das duas respostas,
+e não só os status.
+
+O que o token continua não fazendo: listar, baixar, apagar, e **mudar com quem uma faixa que já
+existe é dividida** — essa última é `PATCH /acervo/{id}/compartilhamento`, que mora no grupo de só
+sessão justamente porque é mexer no acervo, e não entrar com faixa nova.
 
 **"Qual o maior risco que você aceitou aqui?"** Não ter revogação de sessão individual. O cookie é
 autocontido; para invalidar uma sessão específica eu precisaria de uma lista de bloqueio, que é

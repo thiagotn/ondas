@@ -427,12 +427,31 @@
   color: var(--color-neutral-500);
 }
 
+/* Com quatro recortes os chips DEIXAM de caber no celular: em JetBrains Mono
+   14px, `--curtidas --acervo --compartilhadas --offline` passa de 430px, contra
+   os 393px de um Pixel 5. Daí a rolagem horizontal aqui.
+
+   Rolar e não `flex-wrap`: quebrar em duas linhas empurraria a primeira faixa
+   para o meio da tela, que é exatamente o problema que tirou conta, buffer e
+   ocupação desta tela (ver o comentário em `LibraryRoute`). O chip cortado na
+   borda direita é o próprio aviso de que há mais o que ver. */
 .segments {
   display: flex;
   gap: 4px;
+  overflow-x: auto;
+  /* A barra de rolagem roubaria altura da faixa de 36px e apareceria por cima
+     do chip ativo. O corte na borda já diz que há mais. */
+  scrollbar-width: none;
+}
+
+.segments::-webkit-scrollbar {
+  display: none;
 }
 
 .segment {
+  /* Sem isto o flex encolhe os chips para caber e `--compartilhadas` vira
+     reticências — a rolagem acima só funciona se eles mantiverem a largura. */
+  flex-shrink: 0;
   min-height: 36px;
   padding: 0 8px;
   border: 0;

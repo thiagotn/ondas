@@ -59,6 +59,11 @@ function valida(bruta: unknown): Track | null {
     art: typeof t['art'] === 'string' ? t['art'] : '',
     ...(typeof t['artThumb'] === 'string' && t['artThumb'] ? { artThumb: t['artThumb'] } : {}),
     ...(picosValidos(t['peaks']) ? { peaks: t['peaks'] as string } : {}),
+    // Só entra quando é string não vazia, e a ausência é significativa: é ela
+    // que faz a faixa cair em `--acervo` em vez de `--compartilhadas`
+    // (`visibleTracks`). Um `owner: ''` que passasse daqui poria a faixa
+    // própria no recorte errado — daí a peneira ser `!!` e não `typeof`.
+    ...(typeof t['owner'] === 'string' && t['owner'] ? { owner: t['owner'] } : {}),
     stream: t['stream'],
     // A API manda `premium: false` explícito; reforçamos aqui porque
     // `undefined` faria o heurístico do protótipo marcar música própria como

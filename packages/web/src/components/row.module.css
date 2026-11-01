@@ -133,6 +133,15 @@
   color: var(--ansi-5);
 }
 
+/* Azul para `[de <nome>]`. É irmã de `[meu]` — as duas respondem "de quem é
+   esta faixa" — e por isso precisava ser uma cor, não o mesmo magenta: com a
+   mesma cor, bater o olho na lista não separaria o que é seu do que é de outra
+   pessoa, que é a única pergunta que as duas marcas existem para responder.
+   Azul é o que sobra sem usar o vermelho, que nesta paleta é erro. */
+.tagDe {
+  color: var(--ansi-4);
+}
+
 .tagPro {
   color: var(--ansi-3);
 }

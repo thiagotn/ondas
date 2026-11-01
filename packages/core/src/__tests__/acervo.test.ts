@@ -41,6 +41,35 @@ describe('AcervoCatalogClient', () => {
     // Sempre `false` explícito: `undefined` faria o heurístico do protótipo
     // marcar música própria como [pro].
     expect(tracks[0]!.premium).toBe(false);
+    // Faixa própria vem SEM dono, e a ausência é o que a põe em `--acervo` em
+    // vez de `--compartilhadas` (ver `visibleTracks`).
+    expect(tracks[0]).not.toHaveProperty('owner');
+  });
+
+  it('lê o dono quando a faixa é de outra pessoa', async () => {
+    const fetchImpl = vi.fn(async () =>
+      resposta(200, { tracks: [{ ...faixaDaAPI, owner: 'mayumi' }] }),
+    );
+    const tracks = await new AcervoCatalogClient(fetchImpl as unknown as typeof fetch).tracks();
+    expect(tracks[0]!.owner).toBe('mayumi');
+  });
+
+  it('dono vazio ou de tipo errado não vira dono', async () => {
+    // Importa porque a ausência É significativa: um `owner: ''` que passasse
+    // daqui poria a faixa própria no recorte das compartilhadas, e ela
+    // desapareceria de `--acervo`.
+    const fetchImpl = vi.fn(async () =>
+      resposta(200, {
+        tracks: [
+          { ...faixaDaAPI, owner: '' },
+          { ...faixaDaAPI, id: 'acervo:2', owner: 42 },
+          { ...faixaDaAPI, id: 'acervo:3', owner: null },
+        ],
+      }),
+    );
+    const tracks = await new AcervoCatalogClient(fetchImpl as unknown as typeof fetch).tracks();
+    expect(tracks).toHaveLength(3);
+    for (const t of tracks) expect(t).not.toHaveProperty('owner');
   });
 
   it('manda o cookie e pede json', async () => {

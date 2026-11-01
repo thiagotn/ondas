@@ -217,8 +217,8 @@ apagava tudo. Hoje ela mora em `likes(user_id, track_id)` e o servidor é o dono
 Três coisas que valem saber porque mudam o que a tela faz:
 
 **Curtir exige conta.** Sem sessão o coração não liga — o rótulo dele diz isso antes do clique, e
-clicar mostra o aviso. A consequência é maior que o coração: os três recortes de `~/biblioteca`
-passam a pedir conta, porque `--offline` e `--acervo` já pediam.
+clicar mostra o aviso. A consequência é maior que o coração: **`~/biblioteca` inteira** passa a
+pedir conta, porque `--offline` e `--acervo` já pediam.
 
 **A linha guarda só o id.** `--curtidas` continua sendo um filtro sobre o catálogo carregado, não
 uma lista que se basta — então curtida de faixa do Audius só aparece se a faixa estiver na lista
@@ -230,6 +230,37 @@ quando a rede volta, no próximo boot, ou na saída da conta — nessa ordem de 
 importa: curtir e clicar em `[sair]` é um gesto só, e depois que o cookie morre o PATCH só levaria
 401. Sair apaga as curtidas deste navegador de propósito: elas estão no servidor e voltam no
 próximo login, e deixá-las aqui faria a próxima conta a entrar adotar o gosto da anterior.
+
+### A faixa pode ser de duas pessoas
+
+Até a migração `0007` o acervo tinha um dono e uma pergunta: *é seu?* Compartilhar partiu isso em
+**dois direitos**, e eles não são o mesmo:
+
+- **ouvir** — sou o dono, OU a faixa está marcada `todos`, OU alguém a concedeu a mim;
+- **mexer** (apagar, compartilhar, mudar visibilidade) — só o dono, e mais ninguém.
+
+São dois mecanismos porque são duas perguntas. "Para todo mundo que tem conta aqui" é uma
+propriedade **da faixa** (a coluna `visibilidade`), e vale para quem se cadastrar **depois** — é
+regra viva, não lista congelada. "Só para esta pessoa" é uma **relação** (a tabela `track_shares`).
+
+Na tela isso é um recorte novo: **`--compartilhadas`**, entre `--acervo` e `--offline`. `--acervo`
+continua sendo estritamente *as minhas*. O que separa os dois é um campo que a API só manda quando
+a faixa **não** é sua — a linha então aparece como `[de mayumi]` onde a sua apareceria como `[meu]`,
+e esse rótulo fica visível no celular também, porque numa lista misturada (em-alta, busca) nada mais
+diria de quem é.
+
+Quem publica é a skill do Telegram, com `--para`: **só para mim**, **para um e-mail** ou **para
+todos**. Duas coisas valem saber porque surpreendem:
+
+**Publicar para alguém entrega a faixa.** Se ela é da mayumi, ela está no acervo *dela* e não no
+seu — nem em `--compartilhadas`, porque você não tem direito nenhum sobre ela. Para os dois
+ouvirem, o destino é `todos`.
+
+**O alcance do token de máquina aumentou, e é limitado por uma lista.** Antes, faixa que entrava por
+token era sempre do dono do homelab; agora o pedido pode nomear um destino. `INGEST_DESTINOS` (no
+ConfigMap) diz para quais contas o **token** pode publicar — sessão não passa por ela. E a recusa é
+idêntica para "fora da lista" e para "e-mail sem conta", senão um token vazado descobriria quem tem
+conta tentando e-mail por e-mail.
 
 ### Os endereços da PWA
 
@@ -243,7 +274,7 @@ não redirecionam: uso pessoal, e um endereço a menos para manter.
 | --- | --- |
 | `/` | em-alta; `?genre=<slug>` é o chip, omitido quando é `tudo` |
 | `/search` | busca; `?q=<termo>` escrito com `replace`, para o voltar não andar letra por letra |
-| `/library/<recorte>` | `liked`, `archive` ou `offline` — nessa ordem na tela; `/library` vale `archive` com conta e `liked` sem ela — e o que não é um dos três cai no mesmo padrão (`defaultLibrarySegment`, `parseLibrarySegment`) |
+| `/library/<recorte>` | `liked`, `archive`, `shared` ou `offline` — nessa ordem na tela; `/library` vale `archive` com conta e `liked` sem ela — e o que não é um dos quatro cai no mesmo padrão (`defaultLibrarySegment`, `parseLibrarySegment`) |
 | `/t/<slug>-<id>` | a faixa: o link que se manda E o player cheio aberto |
 | `/login` | fora do `AppLayout`, é a única tela sem abas |
 | `?account=1` / `?shortcuts=1` | os dois overlays que não são conteúdo, no `useOverlayParam` |
@@ -254,9 +285,14 @@ deles é linkável, sobrevive a um reload e o voltar anda entre eles. O preço a
 vai para o path limpo e esquece o filtro, que o voltar devolve.
 
 O padrão da biblioteca depende da sessão: com conta, `/library` abre em `--acervo`, que é o recorte
-das faixas da pessoa e o que o envio alimenta; sem conta o acervo não existe — o catálogo não traz
-faixa própria nenhuma e o chip nem é desenhado —, então ali ela abre em `--curtidas`, que vive no
-aparelho e não pede servidor.
+das faixas da pessoa e o que o envio alimenta; sem conta nem `--acervo` nem `--compartilhadas` são
+desenhados — a rota do acervo responde 401 e os dois chips seriam listas sempre vazias —, então ali
+ela abre em `--curtidas`. Não porque funcione: desde que a curtida é da conta, os **quatro** pedem
+login, e `--curtidas` é só o primeiro chip.
+
+No celular os quatro chips não cabem numa linha (`--compartilhadas` sozinho tem 16 caracteres), e a
+faixa deles **rola na horizontal** em vez de quebrar em duas linhas — quebrar empurraria a primeira
+faixa para o meio da tela, que é o problema que já tirou conta, buffer e ocupação dessa tela.
 
 ### Link de faixa
 

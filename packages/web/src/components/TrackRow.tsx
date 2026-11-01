@@ -99,7 +99,10 @@ export function TrackRow({
           </span>
           <span className={s.meta}>
             <span className={s.artist}>{track.artist}</span>{' '}
-            {!(compact && row.minha) && (
+            {/* Faixa do acervo tem gênero `acervo` sempre (o worker o fixa), e
+                na tela estreita `#acervo` é ruído que empurra a duração. Vale
+                para a minha e para a compartilhada — as duas vêm do acervo. */}
+            {!(compact && (row.minha || row.owner)) && (
               <>
                 <span style={{ color: row.genreColor }}>#{track.genre}</span>{' '}
               </>
@@ -111,8 +114,20 @@ export function TrackRow({
 
       {/* Antes de [pro] e [off]: a origem da faixa é o que o dono procura
           primeiro na linha. [meu] e [pro] nunca aparecem juntos — faixa do
-          acervo vem com premium: false e o selo [pro] só existe sem sessão. */}
+          acervo vem com premium: false e o selo [pro] só existe sem sessão.
+
+          [meu] e [de <nome>] se excluem pela mesma régua: as duas marcas
+          respondem "de quem é esta faixa", e `minha` já é falso quando há
+          dono (ver `useTrackRows`). */}
       {row.minha && !compact && <span className={`${s.tag} ${s.tagMeu}`}>[meu]</span>}
+      {/* `[de <nome>]` fica NA TELA ESTREITA TAMBÉM, e `[meu]` não. A assimetria
+          é de propósito: "é minha" é a suposição padrão de quem abre o próprio
+          acervo, então esconder `[meu]` no celular não engana ninguém — já
+          esconder o dono faria a faixa de outra pessoa parecer sua numa lista
+          misturada (em-alta e busca), onde o chip do recorte não ajuda. E a
+          largura existe: a linha do acervo já abre mão do `#acervo` no compacto
+          (ver o gênero acima). */}
+      {row.owner && <span className={`${s.tag} ${s.tagDe}`}>[de {row.owner}]</span>}
       {row.locked && <span className={`${s.tag} ${s.tagPro}`}>[pro]</span>}
       {row.cached && !compact && <span className={`${s.tag} ${s.tagOff}`}>[off]</span>}
       {row.dlLabel && <span className={`${s.tag} ${s.tagDl}`}>[{row.dlLabel}]</span>}

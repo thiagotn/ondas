@@ -29,6 +29,19 @@ export interface Track {
    */
   source?: 'audius' | 'acervo';
   /**
+   * Nome de quem é a faixa, PRESENTE SÓ QUANDO ELA NÃO É SUA.
+   *
+   * É a ausência dele que separa os dois recortes do acervo: `--acervo` são as
+   * faixas sem dono anotado (as minhas) e `--compartilhadas` são as com
+   * (as de outra pessoa que posso ouvir, ver `visibleTracks`). Por isso é
+   * `undefined` na faixa própria em vez de vir sempre preenchido — a API decide
+   * isso em `paraJSONVisivel` e a tela só obedece.
+   *
+   * É nome de exibição, nunca e-mail: a linha precisa de um rótulo, e o e-mail
+   * de uma pessoa não é da outra.
+   */
+  owner?: string;
+  /**
    * Forma de onda medida no áudio, um caractere por trecho (ver
    * `waveform.ts`). Só as faixas do acervo têm: do catálogo público o app
    * nunca baixa o arquivo inteiro, então não há o que medir. Ausente = barra
@@ -82,7 +95,7 @@ export interface ThemeDef {
 }
 
 export type TabId = 'home' | 'search' | 'library';
-export type LibrarySegment = 'liked' | 'offline' | 'acervo';
+export type LibrarySegment = 'liked' | 'offline' | 'acervo' | 'shared';
 export type GateKind = 'play' | 'dl';
 
 export interface Gate {
@@ -112,10 +125,13 @@ export interface Catalog {
   tracks: Track[];
   source: CatalogSource;
   /**
-   * Quantas faixas do acervo entraram na lista. Fica fora de `source` de
-   * propósito: `CatalogSource` descreve de onde vieram os metadados PÚBLICOS e
-   * continua sendo um conjunto fechado de rótulos — compor string ali faria o
-   * tipo deixar de dizer qualquer coisa.
+   * Quantas faixas do acervo entraram na lista — as minhas MAIS as que outra
+   * pessoa compartilhou comigo, porque as duas vêm da mesma rota e as duas são
+   * o que o catálogo público não é.
+   *
+   * Fica fora de `source` de propósito: `CatalogSource` descreve de onde vieram
+   * os metadados PÚBLICOS e continua sendo um conjunto fechado de rótulos —
+   * compor string ali faria o tipo deixar de dizer qualquer coisa.
    */
   acervo?: number;
 }

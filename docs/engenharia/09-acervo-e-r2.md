@@ -160,6 +160,54 @@ A consulta de leitura segue o mesmo cuidado: `PorID` filtra por usuário **no pr
 num `if` depois da leitura (`api/internal/acervo/tracks.go:76-78`) — senão um id de outro dono
 vazaria metadados antes da checagem.
 
+## Dois direitos sobre a mesma linha
+
+Até a migração `0007` o acervo tinha um dono e uma pergunta: *é seu?* Compartilhar faixa partiu essa
+pergunta em duas, e **misturá-las é o bug que o código em volta existe para impedir**:
+
+| Direito | Quem tem | Onde mora |
+|---|---|---|
+| **ouvir** | o dono, OU qualquer conta se a faixa é `todos`, OU quem recebeu concessão | `condicaoAudivel` |
+| **mexer** (apagar, compartilhar, mudar visibilidade) | só o dono | `PorID`, `Remover`, `AplicarCompartilhamento` |
+
+São dois mecanismos porque são duas perguntas do produto. "Publica para todo mundo que tem conta
+aqui" é uma propriedade **da faixa** — a coluna `tracks.visibilidade` (`privada`|`todos`) —, e
+"publica só para esta pessoa" é uma **relação** entre a faixa e alguém — a tabela `track_shares`.
+
+`visibilidade = 'todos'` é regra **viva**: conta criada amanhã já vê o que foi marcado hoje. A
+alternativa — gravar uma concessão por conta existente no momento da publicação — congelaria o
+passado, e quem chegasse depois nasceria sem ver nada.
+
+O direito de ouvir existe como **um fragmento de SQL único**, `condicaoAudivel`
+(`api/internal/acervo/tracks.go`), reusado pela listagem e pelo redirect assinado. Não é economia de
+digitação: uma segunda cópia da regra produziria um dos dois bugs simétricos — faixa que **aparece
+na lista e não toca**, ou faixa que **toca e não aparece**. Foi exatamente isso que `audio` e `arte`
+teriam feito se continuassem em `PorID`, e `TestFaixaDeTodosApareceEtocaParaAOutraConta` assere as
+duas metades de propósito.
+
+Já o direito de mexer não precisou de código nenhum: `Remover` sempre filtrou por dono no SQL, então
+"o destinatário não apaga a faixa de quem compartilhou" veio de graça — o `DELETE` não encontra a
+linha e a resposta é 404. **Por vir de graça é que tem teste**: nada no código diz isso em voz alta.
+
+E 404 e não 403, pela régua que já valia: para quem não é dono, a faixa não existe. Um 403
+confirmaria o id.
+
+### A FK que `likes` não pôde ter
+
+`track_shares` referencia `tracks` com `ON DELETE CASCADE`, e o contraste com a migração `0006`
+explica as duas tabelas. Curtida aponta quase sempre para faixa do Audius, que não existe em
+`tracks` nenhuma — uma FK ali tornaria impossível o caso comum, e o preço foi `removerFaixa` apagar
+a curtida à mão. Concessão só aponta para faixa do acervo, então a FK sai de graça.
+
+A PK também é diferente, e pelo motivo oposto. Em `likes` a chave `(user_id, track_id)` servia de
+índice porque a pergunta era "as minhas". Aqui a pergunta de toda listagem é "compartilhadas
+**comigo**", e com `track_id` na frente a PK não serve para ela — daí o índice separado por
+`user_id`.
+
+Um efeito colateral virou requisito: `likes.RemoverFaixa` apaga por faixa e **sem dono**. Era
+detalhe quando uma faixa só podia ser curtida pelo próprio dono; com faixa compartilhada, é o que
+tira a curtida de quem recebeu quando o dono apaga a música.
+
 ## CORS como código, em duas formas de uma fonte
 
 A política de CORS do bucket vive em Go (`api/internal/storage/r2.go:228-235`), e dela saem as

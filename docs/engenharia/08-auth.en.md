@@ -260,7 +260,7 @@ The answer is in the router's shape, not in a permission field.
 |---|---|---|
 | Public | no credential | `healthz`, `readyz`, `og/t/{seg}`, `signup`, `login`, `logout` |
 | Session **or** token | bringing in a new track | `POST ingest`, `GET ingest/{id}`, `POST upload`, `POST upload/{id}/finalizar` |
-| Session only | touching what already exists | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}` |
+| Session only | touching what already exists | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}`, `PATCH {id}/compartilhamento` |
 | Session only | touching one's own account | `GET /auth/me`, `PATCH /auth/prefs` |
 | Session only | touching one's own taste | `GET /likes`, `PATCH /likes` |
 
@@ -365,10 +365,32 @@ Cloudflare tunnel, I count by `CF-Connecting-IP` inside the API.
 
 **"You have a machine token. How do you keep it from doing what it should not?"** Through the
 router's shape, not a permission field. There are two groups: "bringing in a new track" accepts
-session or token; "touching the library that already exists" — listing, downloading, deleting —
-accepts session only. A leaked token can create an object in its own staging area and cannot
-exfiltrate or destroy anything. And since moving a route between groups is an indentation change
-that compiles, there is a dedicated test guarding the division.
+session or token; "touching the library that already exists" — listing, downloading, deleting,
+sharing — accepts session only. A leaked token cannot exfiltrate or destroy anything. And since
+moving a route between groups is an indentation change that compiles, there is a dedicated test
+guarding the division.
+
+**"And since the bot picks who to publish for, hasn't the token grown stronger?"** It has, and the
+documentation that said otherwise was rewritten rather than kept. Until migration `0007` a track
+entering by token always belonged to `INGEST_USER_EMAIL`, and the worst a leaked token could do was
+put a file in its own owner's library. Now the request can name a destination, and the track is born
+**in that person's account**.
+
+The new ceiling is not in the router — it is a list: `INGEST_DESTINOS`, in the ConfigMap, names the
+accounts the **token** may publish for. A session does not go through it, because limiting a robot
+and limiting a person are not the same decision. Empty (the default) means "no destination beyond
+the owner", which is exactly the previous behaviour — that is what let the new API ship before the
+ConfigMap without changing anything.
+
+And the refusal is **the same** for an address outside the list and for an address with no account.
+That is the rule, not an oversight: if the two answers were distinguishable, a leaked token would
+become an account enumerator, trying address after address and reading the difference between
+acceptance and refusal. `TestTokenNaoDistingueDestinoForaDaListaDeDestinoInexistente` compares the
+two response bodies, not just the statuses.
+
+What the token still cannot do: list, download, delete, and **change who an existing track is shared
+with** — that last one is `PATCH /acervo/{id}/compartilhamento`, which lives in the session-only
+group precisely because it is touching the library, not bringing in a new track.
 
 **"What is the biggest risk you accepted here?"** Not having per-session revocation. The cookie is
 self-contained; to invalidate one session I would need a blocklist, which is exactly the server-side

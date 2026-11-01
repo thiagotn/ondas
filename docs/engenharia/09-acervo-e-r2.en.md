@@ -156,6 +156,55 @@ The read query follows the same care: `PorID` filters by user **in the SQL predi
 `if` after the read (`api/internal/acervo/tracks.go:76-78`) — otherwise another owner's id would
 leak metadata before the check.
 
+## Two rights over the same row
+
+Until migration `0007` the library had one owner and one question: *is it yours?* Sharing tracks
+split that question in two, and **conflating them is the bug the surrounding code exists to
+prevent**:
+
+| Right | Who has it | Where it lives |
+|---|---|---|
+| **listen** | the owner, OR any account if the track is `todos`, OR whoever was granted it | `condicaoAudivel` |
+| **touch** (delete, share, change visibility) | the owner only | `PorID`, `Remover`, `AplicarCompartilhamento` |
+
+Two mechanisms because they are two product questions. "Publish for everyone who has an account
+here" is a property **of the track** — the `tracks.visibilidade` column (`privada`|`todos`) — and
+"publish only for this person" is a **relation** between the track and someone — the `track_shares`
+table.
+
+`visibilidade = 'todos'` is a **live** rule: an account created tomorrow already sees what was
+marked today. The alternative — writing one grant per existing account at publish time — would
+freeze the past, and whoever arrived later would start out seeing nothing.
+
+The right to listen exists as **a single SQL fragment**, `condicaoAudivel`
+(`api/internal/acervo/tracks.go`), reused by the listing and by the signed redirect. That is not
+keystroke economy: a second copy of the rule would produce one of two symmetric bugs — a track that
+**shows in the list and will not play**, or one that **plays and does not show**. That is exactly
+what `audio` and `arte` would have done had they stayed on `PorID`, and
+`TestFaixaDeTodosApareceEtocaParaAOutraConta` asserts both halves on purpose.
+
+The right to touch needed no code at all: `Remover` always filtered by owner in SQL, so "the
+recipient does not delete the sharer's track" came for free — the `DELETE` finds no row and the
+answer is 404. **Because it came for free, it has a test**: nothing in the code says it out loud.
+
+And 404 rather than 403, by the rule that already applied: to a non-owner, the track does not exist.
+A 403 would confirm the id.
+
+### The FK that `likes` could not have
+
+`track_shares` references `tracks` with `ON DELETE CASCADE`, and the contrast with migration `0006`
+explains both tables. A like almost always points at an Audius track, which exists in no `tracks`
+row — an FK there would make the common case impossible, and the price was `removerFaixa` deleting
+the like by hand. A grant only ever points at a library track, so the FK is free.
+
+The PK differs too, for the opposite reason. In `likes` the key `(user_id, track_id)` doubled as the
+index because the question was "mine". Here every listing asks "shared **with me**", and with
+`track_id` leading, the PK does not serve it — hence the separate index on `user_id`.
+
+A side effect became a requirement: `likes.RemoverFaixa` deletes by track and **without an owner**.
+That was a detail while a track could only be liked by its own owner; with shared tracks, it is what
+removes the recipient's like when the owner deletes the music.
+
 ## CORS as code, two shapes from one source
 
 The bucket's CORS policy lives in Go (`api/internal/storage/r2.go:228-235`), and from it come the

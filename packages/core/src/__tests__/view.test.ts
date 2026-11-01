@@ -9,6 +9,7 @@ import {
   emptyText,
   genreOptions,
   LIBRARY_SEGMENTS,
+  librarySegmentChip,
   librarySegmentSlug,
   parseLibrarySegment,
   promptLine,
@@ -65,19 +66,42 @@ describe('hiddenInSegment', () => {
   it('o acervo não entra na conta: ele não depende de marca local', () => {
     expect(hiddenInSegment('acervo', marks, [])).toBe(0);
   });
+
+  it('as compartilhadas também não: elas são procedência, não marca', () => {
+    expect(hiddenInSegment('shared', marks, [])).toBe(0);
+  });
 });
 
 describe('LIBRARY_SEGMENTS', () => {
-  it('a ordem é a da tela, e o acervo fica no meio', () => {
+  it('a ordem é a da tela: curtidas, acervo, compartilhadas, offline', () => {
     // Esta lista É a ordem dos chips (`LibraryRoute` só a mapeia). O acervo no
     // meio e não no fim porque ele é o padrão de quem tem conta, e o padrão no
     // canto direito faria a tela abrir com o chip mais distante marcado.
-    expect([...LIBRARY_SEGMENTS]).toEqual(['liked', 'acervo', 'offline']);
+    // `shared` encosta nele por ser a mesma origem vista do outro lado.
+    expect([...LIBRARY_SEGMENTS]).toEqual(['liked', 'acervo', 'shared', 'offline']);
+  });
+
+  it('o chip é português e o slug é inglês, nos quatro', () => {
+    // Os dois vocabulários existem de propósito: path em inglês, tela em
+    // português. Dois ids coincidem com o português por acaso, e é esse acaso
+    // que já tinha escondido um `ondas ls --shared` no prompt.
+    expect(LIBRARY_SEGMENTS.map(librarySegmentChip)).toEqual([
+      'curtidas',
+      'acervo',
+      'compartilhadas',
+      'offline',
+    ]);
+    expect(LIBRARY_SEGMENTS.map(librarySegmentSlug)).toEqual([
+      'liked',
+      'archive',
+      'shared',
+      'offline',
+    ]);
   });
 });
 
 describe('parseLibrarySegment', () => {
-  it('ida e volta pelos três recortes', () => {
+  it('ida e volta pelos quatro recortes', () => {
     for (const seg of LIBRARY_SEGMENTS) {
       expect(parseLibrarySegment(librarySegmentSlug(seg), 'liked')).toBe(seg);
     }
@@ -151,6 +175,34 @@ describe('visibleTracks', () => {
     expect(so.every((t) => t.source === 'acervo')).toBe(true);
     // Nada de curtida nem de offline: as duas marcas estão vazias aqui.
     expect(visibleTracks({ ...base, tracks: misturadas, tab: 'library', seg: 'liked' })).toHaveLength(0);
+  });
+
+  it('`owner` é o que divide acervo de compartilhadas, e a divisão é exaustiva', () => {
+    const minhas = tracks.slice(0, 2).map((t) => ({ ...t, source: 'acervo' as const }));
+    const dela = tracks.slice(2, 5).map((t) => ({ ...t, source: 'acervo' as const, owner: 'mayumi' }));
+    const misturadas = [...minhas, ...dela, ...tracks.slice(5)];
+
+    const meu = visibleTracks({ ...base, tracks: misturadas, tab: 'library', seg: 'acervo' });
+    const compartilhado = visibleTracks({ ...base, tracks: misturadas, tab: 'library', seg: 'shared' });
+
+    expect(meu.map((t) => t.title)).toEqual(minhas.map((t) => t.title));
+    expect(compartilhado.map((t) => t.title)).toEqual(dela.map((t) => t.title));
+
+    // Exaustiva e sem sobreposição: toda faixa do acervo cai em exatamente um
+    // dos dois. Sem isto, `--acervo` mostraria faixa de outra pessoa como se
+    // fosse sua, ou uma delas não apareceria em lugar nenhum.
+    const doAcervo = misturadas.filter((t) => t.source === 'acervo');
+    expect(meu.length + compartilhado.length).toBe(doAcervo.length);
+    expect(meu.filter((t) => compartilhado.includes(t))).toHaveLength(0);
+  });
+
+  it('faixa pública com `owner` não entra em compartilhadas: o filtro pede as duas coisas', () => {
+    // Defesa contra JSON estranho: `owner` só significa algo junto de
+    // `source: 'acervo'`, e o catálogo público não tem dono nenhum.
+    const esquisitas = tracks.slice(0, 3).map((t) => ({ ...t, owner: 'alguem' }));
+    expect(
+      visibleTracks({ ...base, tracks: esquisitas, tab: 'library', seg: 'shared' }),
+    ).toHaveLength(0);
   });
 });
 
@@ -231,6 +283,10 @@ describe('promptLine', () => {
     expect(promptLine({ ...args, seg: 'liked' }).cmd).toBe('ondas ls --curtidas');
     expect(promptLine({ ...args, seg: 'offline' }).cmd).toBe('ondas ls --offline');
     expect(promptLine({ ...args, seg: 'acervo' }).cmd).toBe('ondas ls --acervo');
+    // O id é `shared` e a tela é português: o prompt tem de escrever o chip, e
+    // não o id, senão aparece `ondas ls --shared` no meio de um app em
+    // português.
+    expect(promptLine({ ...args, seg: 'shared' }).cmd).toBe('ondas ls --compartilhadas');
     expect(promptLine({ ...args, seg: 'offline' }).comment).toBe('3 itens');
   });
 });
@@ -247,7 +303,7 @@ describe('emptyText', () => {
     expect(
       emptyText({ tab: 'library', seg: 'liked', q: '', loading: false, user: { name: 'a' } }),
     ).toBe('vazio — pressione [l] ou o coração para curtir.');
-    // Sem conta os TRÊS recortes pedem login: a curtida virou da conta, e
+    // Sem conta os QUATRO recortes pedem login: a curtida virou da conta, e
     // mandar apertar [l] seria mandar apertar um botão que não liga.
     expect(emptyText({ tab: 'library', seg: 'liked', q: '', loading: false, user: null })).toBe(
       'curtidas exigem login.',
@@ -264,6 +320,26 @@ describe('emptyText', () => {
     expect(emptyText({ tab: 'library', seg: 'acervo', q: '', loading: false, user: null })).toBe(
       'o acervo exige login.',
     );
+    // Com conta a frase NÃO manda fazer nada, ao contrário das outras três:
+    // compartilhar não é ato de quem recebe.
+    expect(
+      emptyText({ tab: 'library', seg: 'shared', q: '', loading: false, user: { name: 'a' } }),
+    ).toBe('vazio — ninguém compartilhou faixa com você ainda.');
+    expect(emptyText({ tab: 'library', seg: 'shared', q: '', loading: false, user: null })).toBe(
+      'compartilhadas exigem login.',
+    );
+  });
+
+  it('os quatro recortes têm texto, e nenhum cai no genérico', () => {
+    // Guarda contra o recorte número cinco: sem isto, um `LibrarySegment` novo
+    // cairia no `return` final — o texto de `--offline` — e a tela diria para
+    // baixar faixas num recorte que não é de download.
+    const vistos = new Set(
+      LIBRARY_SEGMENTS.map((seg) =>
+        emptyText({ tab: 'library', seg, q: '', loading: false, user: { name: 'a' } }),
+      ),
+    );
+    expect(vistos.size).toBe(LIBRARY_SEGMENTS.length);
   });
 });
 
