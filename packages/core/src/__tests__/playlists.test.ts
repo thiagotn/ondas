@@ -98,9 +98,21 @@ describe('emptyText das playlists', () => {
     expect(emptyText({ ...comConta, user: { name: 'thiago' } })).toContain('nenhuma playlist');
   });
 
-  it('a playlist aberta e vazia manda marcar faixas', () => {
+  // Desde que o botão saiu da tela (ele custava uma linha inteira acima da
+  // lista), estas duas frases são o ÚNICO lugar que ensina o gesto a quem só
+  // toca — a janela `?` não tem porta no toque. Elas têm de nomear os dois
+  // caminhos.
+  it('a playlist aberta e vazia ensina o gesto e a tecla', () => {
     const texto = emptyText({ ...comConta, user: { name: 'thiago' }, playlistAberta: true });
+    expect(texto).toContain('segure uma faixa');
+    expect(texto).toContain('tecle v');
     expect(texto).toContain('[+ playlist]');
+  });
+
+  it('o índice vazio ensina o mesmo gesto', () => {
+    const texto = emptyText({ ...comConta, user: { name: 'thiago' } });
+    expect(texto).toContain('segure uma faixa');
+    expect(texto).toContain('tecle v');
   });
 
   // O ramo que não existia: com o catálogo público LIGADO, a faixa pode faltar

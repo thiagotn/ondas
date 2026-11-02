@@ -50,6 +50,10 @@ const TABELA: readonly Atalho[] = [
   // seleção faria a mesma tecla fazer duas coisas opostas dependendo de um
   // estado que não está escrito em lugar nenhum da tela.
   { tecla: 'v', acao: 'marcar faixas (e sair da marcação)', grupo: 'selecionar' },
+  // Um gesto numa tabela de teclas: é irregular, e entra mesmo assim porque
+  // esta janela é a única referência do app, e porque segurar a linha é a
+  // ÚNICA porta de quem não tem teclado — não há botão na tela.
+  { tecla: 'segurar', acao: 'o mesmo, no toque: segure a faixa', grupo: 'selecionar' },
   { tecla: 'x', acao: 'marcar ou desmarcar a linha', grupo: 'selecionar' },
   // `a` e não `enter`: `enter` já é "tocar a linha marcada", e a mesma tecla
   // listada duas vezes na janela `?` não se explica — ela diria duas coisas

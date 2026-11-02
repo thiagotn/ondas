@@ -248,9 +248,9 @@ export function likeCurrent(): void {
 /**
  * Liga o modo de seleção, ou marca uma linha se ele já está ligado.
  *
- * Uma função para as duas portas (a tecla `v` e o botão `[selecionar]`), e é
- * ela que recusa sem sessão: playlist é da conta, e um modo de seleção que não
- * leva a nada seria pior que a recusa.
+ * Uma função para as duas portas — a tecla `v` e o toque longo na linha
+ * (`useToqueLongo`) —, e é ela que recusa sem sessão: playlist é da conta, e um
+ * modo de seleção que não leva a nada seria pior que a recusa.
  */
 export function marcar(id?: string): void {
   if (!sessionStore.getState().user) {

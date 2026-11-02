@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
 
 /**
  * Smoke da PWA. Roda contra o build de produção (ver `webServer` no config) e
@@ -1984,17 +1984,38 @@ test('a busca mora no endereço, e o voltar não anda letra por letra', async ({
 /** A barra de seleção, ligada. */
 const marcadas = (page: Page) => page.getByText(/^\d+ marcadas?$/);
 
+/**
+ * Segura a linha — a única porta do modo de seleção no toque.
+ *
+ * Pressão de verdade (down, espera, up) e não um evento sintético: o que se
+ * quer provar inclui o `click` que o navegador dispara no `pointerup`, e que o
+ * `useToqueLongo` tem de engolir.
+ */
+async function segurar(page: Page, alvo: Locator) {
+  // `hover()` e não um `boundingBox()` lido à mão: ele espera a linha ficar
+  // ESTÁVEL antes de mover o ponteiro. Com a caixa lida na hora, uma lista que
+  // ainda estava montando movia a linha entre a leitura e o clique, e a pressão
+  // caía no vazio — que foi exatamente o que aconteceu aqui.
+  await alvo.hover();
+  await page.mouse.down();
+  await page.waitForTimeout(600);
+  await page.mouse.up();
+}
+
 test('marcar faixas e criar uma playlist com elas', async ({ page }) => {
   await blockAudius(page);
   await logar(page);
   await page.keyboard.press('3');
 
   // Sem o modo ligado, a lista é uma lista: a porta é o botão (ou `v`).
-  await page.getByRole('button', { name: '[selecionar]' }).click();
-  await expect(marcadas(page)).toHaveText('0 marcadas');
+  // Não há botão na tela: a porta é segurar a linha. O gesto já entra marcando
+  // a faixa que foi segurada — a primeira pressão tem de ter feito algo.
+  await segurar(page, page.getByRole('button', { name: /Fita Caseira/ }));
+  await expect(marcadas(page)).toHaveText('1 marcada');
 
-  // No modo de seleção a linha MARCA em vez de tocar — é o idioma do celular,
-  // onde um toque por faixa não pode ser uma faixa tocada por toque.
+  // Com o modo ligado, um toque simples passa a MARCAR em vez de tocar.
+  await page.getByRole('button', { name: /Fita Caseira/ }).click();
+  await expect(marcadas(page)).toHaveText('0 marcadas');
   await page.getByRole('button', { name: /Fita Caseira/ }).click();
   await expect(marcadas(page)).toHaveText('1 marcada');
   // A calha vira a caixa de marcação, no lugar do número.
@@ -2069,12 +2090,11 @@ test('tirar faixa da playlist, e a playlist que fica vazia diz o que fazer', asy
   await logar(page);
   await page.goto('/library/playlists/semeada-disco');
 
-  await page.getByRole('button', { name: '[selecionar]' }).click();
-  await page.getByRole('button', { name: /Maré Baixa/ }).click();
+  await segurar(page, page.getByRole('button', { name: /Maré Baixa/ }));
   await page.getByRole('button', { name: '[− playlist]' }).click();
 
   await expect(page.getByText('faixa tirada da playlist')).toBeVisible();
-  await expect(page.getByText(/marque faixas com \[selecionar\]/)).toBeVisible();
+  await expect(page.getByText(/segure uma faixa na lista \(ou tecle v\)/)).toBeVisible();
 });
 
 test('a faixa que saiu do catálogo não vira playlist vazia em silêncio', async ({ page }) => {
@@ -2118,8 +2138,7 @@ test('nome repetido é recusado com a frase do servidor', async ({ page }) => {
   await logar(page);
   await page.keyboard.press('3');
 
-  await page.getByRole('button', { name: '[selecionar]' }).click();
-  await page.getByRole('button', { name: /Fita Caseira/ }).click();
+  await segurar(page, page.getByRole('button', { name: /Fita Caseira/ }));
   await page.getByRole('button', { name: '[+ playlist]' }).click();
   await page.getByRole('button', { name: /nova playlist/ }).click();
   await page.getByLabel('nome da playlist').fill('TREINO');
@@ -2156,8 +2175,12 @@ test('sem conta, --playlists não é desenhado', async ({ page }) => {
 
   // Playlist é da conta: o chip seria uma lista sempre vazia, como `--acervo`.
   await expect(page.getByRole('button', { name: '--playlists' })).toHaveCount(0);
-  // E o `[selecionar]` também não, para não oferecer o que termina em login.
-  await expect(page.getByRole('button', { name: '[selecionar]' })).toHaveCount(0);
+
+  // E o gesto não liga o modo: ele diz por quê, como o coração faz.
+  await page.keyboard.press('1');
+  await segurar(page, page.getByRole('button', { name: /Maré Baixa/ }).first());
+  await expect(page.getByText('playlists exigem entrar na conta')).toBeVisible();
+  await expect(marcadas(page)).toHaveCount(0);
 });
 
 test('v marca pelo teclado, x alterna a linha do cursor e Esc desiste', async ({ page }) => {
@@ -2198,8 +2221,7 @@ test('o seletor diz quantas das marcadas já estão em cada playlist', async ({ 
   // Marca pela home, onde a faixa demo1 aparece.
   await page.keyboard.press('1');
 
-  await page.getByRole('button', { name: '[selecionar]' }).click();
-  await page.getByRole('button', { name: /Maré Baixa/ }).click();
+  await segurar(page, page.getByRole('button', { name: /Maré Baixa/ }));
   await page.getByRole('button', { name: '[+ playlist]' }).click();
 
   // Sem este número, adicionar de novo pareceria não ter feito nada: o servidor
@@ -2207,3 +2229,46 @@ test('o seletor diz quantas das marcadas já estão em cada playlist', async ({ 
   await expect(page.getByRole('button', { name: /treino 1 já está aqui/ })).toBeVisible();
 });
 
+
+test('segurar marca uma vez só, e não toca a música', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+  await page.keyboard.press('1');
+
+  // Nada tocando antes: o botão do rodapé só existe com faixa carregada.
+  await expect(page.getByRole('button', { name: 'Abrir player' })).toHaveCount(0);
+
+  await segurar(page, page.getByRole('button', { name: /Maré Baixa/ }));
+  await expect(marcadas(page)).toHaveText('1 marcada');
+  await expect(page.getByRole('button', { name: 'Abrir player' })).toHaveCount(0);
+
+  // A segunda pressão é a que prova o engolidor de clique.
+  //
+  // Na primeira, a barra nasce e empurra a lista para baixo: o dedo solta sobre
+  // outra linha, o navegador não acha um alvo comum e nenhum clique chega ao
+  // botão — o acerto é por acidente de layout. Com o modo JÁ ligado nada se
+  // move, o `click` do `pointerup` cai na mesma linha, e sem engoli-lo ele
+  // DESMARCARIA o que a pressão acabou de marcar.
+  await segurar(page, page.getByRole('button', { name: /Concreto Molhado/ }));
+  await expect(marcadas(page)).toHaveText('2 marcadas');
+});
+
+test('com a marcação desligada, a lista começa logo abaixo dos chips', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+  await page.keyboard.press('3');
+
+  // Antes, um `[selecionar]` sozinho ocupava uma linha inteira entre os dois:
+  // 36px da linha mais dois `gap` de 14px do `.content`, 64px de altura acima
+  // da primeira faixa numa tela onde a lista já começa na metade.
+  const chips = page.locator('[class*="segments"]').first();
+  const primeira = page.getByRole('button', { name: /^01 / }).first();
+  const abaixo = await chips.boundingBox();
+  const acima = await primeira.boundingBox();
+  expect(abaixo).not.toBeNull();
+  expect(acima).not.toBeNull();
+  expect(acima!.y - (abaixo!.y + abaixo!.height)).toBeLessThan(30);
+
+  // E a barra não existe enquanto o modo está desligado — nem vazia.
+  await expect(page.getByRole('button', { name: '[sair]' })).toHaveCount(0);
+});

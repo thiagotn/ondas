@@ -2,9 +2,10 @@
 
 /* ── barra de seleção ─────────────────────────────────────────── */
 
-/* Desligada, é só um `[selecionar]` à direita: a barra existe acima de TODA
-   lista, e um painel permanente ali roubaria a primeira faixa da tela do
-   celular — o mesmo motivo que tirou a conta da biblioteca. */
+/* Só existe LIGADA. Desligada a barra não desenha nada: um botão sozinho aqui
+   custava 36px mais dois `gap` de 14px do `.content`, roubando a primeira faixa
+   da tela do celular — o mesmo motivo que tirou conta, buffer e ocupação da
+   biblioteca. A porta do modo virou o gesto (segurar a linha) e a tecla `v`. */
 .barra {
   display: flex;
   align-items: center;

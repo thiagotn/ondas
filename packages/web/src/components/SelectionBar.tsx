@@ -12,14 +12,19 @@ export interface SelectionBarProps {
 }
 
 /**
- * A barra de seleção, acima de qualquer lista.
+ * A barra de seleção — só existe com o modo LIGADO.
  *
- * Uma barra só, e não um quarto botão na linha: no estreito três alvos de 44px
- * já comem o título da faixa (ver `TrackRow`). Ela também é a única porta de
- * entrada visível do modo — a tecla `v` é a outra, e a janela `?` a anuncia.
+ * Desligada ela não desenha nada, e isso é a decisão de layout: um
+ * `[selecionar]` sozinho numa linha própria custava 64px de altura (36 da linha
+ * mais dois `gap` de 14 do `.content`) logo acima da primeira faixa, na tela
+ * onde a lista já começa na metade. As portas de entrada passaram a ser o gesto
+ * — segurar a linha (`useToqueLongo`) — e a tecla `v`.
  *
- * Só aparece com sessão: playlist é da conta, e um `[selecionar]` que termina
- * num aviso de login seria oferecer o que não existe.
+ * Ligada, ela ocupa a linha com conteúdo que a justifica: a contagem e as ações.
+ * Uma barra, e não um quarto botão na linha da faixa: no estreito três alvos de
+ * 44px já comem o título.
+ *
+ * Só aparece com sessão: playlist é da conta.
  */
 export function SelectionBar({ playlistID }: SelectionBarProps) {
   const user = useSession((st) => st.user);
@@ -28,25 +33,9 @@ export function SelectionBar({ playlistID }: SelectionBarProps) {
   const playlists = useLibrary((st) => st.playlists);
   const [criando, setCriando] = useState(false);
 
-  if (!user) return null;
+  if (!user || !selecionando) return null;
 
   const quantas = Object.keys(marcadas).length;
-
-  if (!selecionando) {
-    return (
-      <div className={s.barra}>
-        <span className={s.espaco} />
-        <button
-          type="button"
-          className={s.acao}
-          title="Marcar faixas para uma playlist (v)"
-          onClick={() => controller.marcar()}
-        >
-          [selecionar]
-        </button>
-      </div>
-    );
-  }
 
   return (
     <>

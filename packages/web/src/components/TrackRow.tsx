@@ -1,6 +1,7 @@
 import { CheckCircle, DownloadSimple, Heart, ShareNetwork } from '@phosphor-icons/react';
 import { useEffect, useRef } from 'react';
 import type { RowModel } from '../hooks/useTrackRows';
+import { useToqueLongo } from '../hooks/useToqueLongo';
 import s from './row.module.css';
 import { TrackArt } from './TrackArt';
 
@@ -61,6 +62,15 @@ export function TrackRow({
     .filter(Boolean)
     .join(' ');
 
+  // Segurar a linha liga a marcação e marca esta faixa — o idioma do celular
+  // para seleção múltipla. É a ÚNICA porta no toque: não há botão na tela, por
+  // escolha de layout (um `[selecionar]` sozinho custava 64px de altura acima
+  // da primeira faixa). No teclado a porta é `v`, e a janela `?` anuncia as duas.
+  //
+  // Com o modo já ligado, segurar faz o mesmo que tocar: alterna a marca. Não
+  // há um segundo gesto a inventar aí.
+  const longo = useToqueLongo(() => onMark(track.id));
+
   // `:08` pode marcar uma linha fora da janela de rolagem, e aí a marca não
   // serviria de nada. `nearest` para `j` descendo não recentralizar a lista a
   // cada tecla.
@@ -89,7 +99,14 @@ export function TrackRow({
         type="button"
         className={s.main}
         aria-pressed={selecionando ? row.marcada : undefined}
-        onClick={() => (selecionando ? onMark(track.id) : onPlay(row.index))}
+        {...longo.handlers}
+        onClick={() => {
+          // O clique que vem no rastro da pressão é engolido: sem isto,
+          // segurar marcaria a faixa E a tocaria.
+          if (longo.consumiuClique()) return;
+          if (selecionando) onMark(track.id);
+          else onPlay(row.index);
+        }}
         onFocus={(e) => {
           // Só o foco que o teclado desenha arrasta a marca. O clique e o
           // toque também focam o botão, e sem esta pergunta a linha tocada

@@ -361,9 +361,13 @@ export function emptyText(args: {
         const quantas = hidden === 1 ? '1 faixa desta playlist' : `${hidden} faixas desta playlist`;
         return `${quantas} não está no catálogo de hoje — faixa pública sai de ~/em-alta com o tempo; a do acervo fica.`;
       }
+      // Estas duas frases são o único lugar da tela que ENSINA o gesto. Desde
+      // que o botão saiu (ele custava uma linha inteira acima da lista), marcar
+      // é segurar a faixa ou teclar `v`, e nada mais anuncia isso para quem só
+      // toca — a janela `?` não tem porta no toque.
       return playlistAberta
-        ? 'vazio — marque faixas com [selecionar] e use [+ playlist].'
-        : 'nenhuma playlist — marque faixas com [selecionar] e crie a primeira.';
+        ? 'vazio — segure uma faixa na lista (ou tecle v) para marcar, e use [+ playlist].'
+        : 'nenhuma playlist — segure uma faixa na lista (ou tecle v) para marcar, e crie a primeira.';
     }
     // A quarta porta fechada, na forma das outras três. Com conta a frase não
     // manda fazer nada: compartilhar não é ato de quem recebe.

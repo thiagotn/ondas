@@ -268,11 +268,21 @@ A primeira lista da biblioteca que **você** escolhe. Os quatro recortes anterio
 `--curtidas` é um booleano por faixa, `--acervo` e `--compartilhadas` são procedência, `--offline` é
 o aparelho. Faltava dizer *estas sete, nesta ordem*.
 
-**Como se põe faixa numa playlist:** `[selecionar]` (ou a tecla `v`) liga a marcação, a linha passa
-a **marcar em vez de tocar** — a calha vira `[x]` no lugar do número —, e `[+ playlist]` manda as
-marcadas para a playlist escolhida, ou cria uma. Uma barra acima da lista, e não um quarto botão na
-linha: no celular três alvos de 44px já comem o título. As marcas atravessam troca de recorte e de
-aba, então dá para juntar faixa do acervo e faixa pública na mesma leva.
+**Como se põe faixa numa playlist:** **segure uma faixa** na lista (ou tecle `v`) para ligar a
+marcação. A partir daí a linha passa a **marcar em vez de tocar** — a calha vira `[x]` no lugar do
+número —, e `[+ playlist]` manda as marcadas para a playlist escolhida, ou cria uma. As marcas
+atravessam troca de recorte e de aba, então dá para juntar faixa do acervo e faixa pública na mesma
+leva.
+
+Não há botão de "selecionar" na tela, e isso é escolha de layout: um botão sozinho ocupava uma linha
+inteira entre os chips e a primeira faixa — 36px da linha mais dois `gap` de 14px —, numa tela de
+celular onde a lista já começa na metade. O preço é a descoberta: quem nunca segurou uma linha não
+sabe que o modo existe. Quem paga esse preço são as frases de lista vazia das playlists, que ensinam
+o gesto, e a janela `?`, onde `segurar` aparece ao lado de `v`.
+
+Ligado o modo, a barra aparece acima da lista com a contagem e as ações — aí ela ocupa a linha com
+conteúdo que a justifica. Uma barra, e não um quarto botão na linha da faixa: no celular três alvos
+de 44px já comem o título.
 
 **Dentro de uma playlist** (`/library/playlists/<id>`), `J`/`K` movem a faixa do cursor — no celular,
 marque uma e use as setas da barra. `[− playlist]` tira as marcadas.
