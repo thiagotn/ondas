@@ -85,3 +85,71 @@ describe('isPlayable', () => {
     expect(isPlayable(ctx(), 999)).toBe(false);
   });
 });
+
+describe('a fila: o caminho é a lista da tela', () => {
+  // Antes das playlists, `n` andava pelo catálogo inteiro — em `--curtidas` ele
+  // já saía do recorte. Numa playlist isso seria fatal: na segunda faixa a
+  // playlist já tinha acabado.
+  const fila = [tracks[5]!.id, tracks[1]!.id, tracks[9]!.id];
+
+  it('anda pela fila, na ordem dela, e devolve índice do catálogo', () => {
+    expect(stepIndex(ctx({ fila, cur: 5 }), 1)).toBe(1);
+    expect(stepIndex(ctx({ fila, cur: 1 }), 1)).toBe(9);
+    // Circular dentro da fila, como era circular dentro do catálogo.
+    expect(stepIndex(ctx({ fila, cur: 9 }), 1)).toBe(5);
+    expect(stepIndex(ctx({ fila, cur: 5 }), -1)).toBe(9);
+  });
+
+  it('sem fila continua andando pelo catálogo', () => {
+    expect(stepIndex(ctx({ cur: 0 }), 1)).toBe(1);
+  });
+
+  it('a faixa atual fora da fila: `n` entra pela primeira, `p` pela última', () => {
+    // Tocando uma faixa e indo para um recorte onde ela não está: `n` tem de
+    // entrar na lista da tela, e não ficar paralisado.
+    expect(stepIndex(ctx({ fila, cur: 3 }), 1)).toBe(5);
+    expect(stepIndex(ctx({ fila, cur: 3 }), -1)).toBe(9);
+  });
+
+  it('id da fila que não está no catálogo some do caminho', () => {
+    // Faixa pública que saiu do trending e continua na playlist: sem isto ela
+    // seria um passo que não toca nada.
+    const comFantasma = [tracks[5]!.id, 'saiu-do-ar', tracks[9]!.id];
+    expect(stepIndex(ctx({ fila: comFantasma, cur: 5 }), 1)).toBe(9);
+  });
+
+  it('fila que não casa com nada cai no catálogo, em vez de matar o `n`', () => {
+    expect(stepIndex(ctx({ fila: ['nada', 'disso'], cur: 0 }), 1)).toBe(1);
+  });
+
+  it('pula a não-tocável dentro da fila, sem sair dela', () => {
+    // Índices 2, 5, 8, 11 são [pro] no heurístico cada-3ª: o visitante pula o 5
+    // e cai no 1, que é o próximo DA FILA.
+    expect(stepIndex(ctx({ fila, session: null, cur: 9 }), 1)).toBe(1);
+  });
+
+  it('o shuffle sorteia dentro da fila', () => {
+    // Antes ele sorteava o catálogo inteiro, o que em `--curtidas` era quase
+    // sempre uma faixa fora da tela.
+    const c = ctx({ fila, shuffle: true, cur: 5 });
+    for (const [sorteio, esperado] of [
+      [0, 5],
+      [0.5, 1],
+      [0.99, 9],
+    ] as const) {
+      expect(stepIndex(c, 1, () => sorteio)).toBe(esperado);
+    }
+  });
+
+  it('firstPlayable entra pela fila', () => {
+    expect(firstPlayable(ctx({ fila }))).toBe(5);
+  });
+
+  it('o buffer pré-carrega a próxima DA FILA, não a vizinha do catálogo', () => {
+    expect(prefetchTarget(ctx({ fila }), 5)).toBe(1);
+  });
+
+  it('o fim da faixa segue a fila', () => {
+    expect(onEnded(ctx({ fila, cur: 1 }))).toEqual({ type: 'play', index: 9 });
+  });
+});

@@ -9,6 +9,7 @@ import { BottomBar } from '../components/BottomBar';
 import { FullPlayer } from '../components/FullPlayer';
 import { Gate } from '../components/Gate';
 import { HelpOverlay } from '../components/HelpOverlay';
+import { PlaylistPicker } from '../components/PlaylistPicker';
 import { TabBar } from '../components/TabBar';
 import s from '../components/shell.module.css';
 import { searchInputRef } from '../hooks/searchInputRef';
@@ -31,6 +32,7 @@ export function AppLayout() {
   const gate = useUi((st) => st.gate);
   const { isHelpOpen } = useHelpOverlay();
   const { isAccountOpen } = useAccountOverlay();
+  const seletorPlaylist = useUi((st) => st.seletorPlaylist);
   const { pathname } = useLocation();
 
   // `/t/...` diz duas coisas ao mesmo tempo, e por isso é um valor só: o
@@ -84,6 +86,11 @@ export function AppLayout() {
       {/* Por cima de tudo: é referência passageira, quem abre quer fechar em
           seguida — e é a primeira camada que o Esc tira. */}
       {isHelpOpen && <HelpOverlay />}
+      {/* Fora da cadeia de params dos outros overlays: ele não é endereço, é um
+          passo dentro de um gesto (marquei faixas, estou escolhendo o destino).
+          Um `?playlist=1` na URL sobreviveria ao reload com as marcas já
+          perdidas — o modo de seleção não é persistido. */}
+      {seletorPlaylist && <PlaylistPicker />}
       {gate && <Gate gate={gate} />}
     </div>
   );

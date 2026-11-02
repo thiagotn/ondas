@@ -11,7 +11,7 @@
  * é do bundler da web, e este pacote não conhece navegador nenhum.
  */
 
-export type GrupoAtalho = 'tocar' | 'ir' | 'janela' | 'dev';
+export type GrupoAtalho = 'tocar' | 'ir' | 'selecionar' | 'janela' | 'dev';
 
 export interface Atalho {
   tecla: string;
@@ -23,6 +23,7 @@ export interface Atalho {
 export const GRUPOS: readonly (readonly [GrupoAtalho, string])[] = [
   ['tocar', 'tocar'],
   ['ir', 'ir'],
+  ['selecionar', 'selecionar'],
   ['janela', 'janela'],
   ['dev', 'dev'],
 ];
@@ -44,6 +45,18 @@ const TABELA: readonly Atalho[] = [
   { tecla: '1', acao: '~/em-alta', grupo: 'ir' },
   { tecla: '2', acao: '~/buscar', grupo: 'ir' },
   { tecla: '3', acao: '~/biblioteca', grupo: 'ir' },
+
+  // A marca é `x` e não espaço: espaço toca e pausa, e roubá-lo no modo de
+  // seleção faria a mesma tecla fazer duas coisas opostas dependendo de um
+  // estado que não está escrito em lugar nenhum da tela.
+  { tecla: 'v', acao: 'marcar faixas (e sair da marcação)', grupo: 'selecionar' },
+  { tecla: 'x', acao: 'marcar ou desmarcar a linha', grupo: 'selecionar' },
+  // `a` e não `enter`: `enter` já é "tocar a linha marcada", e a mesma tecla
+  // listada duas vezes na janela `?` não se explica — ela diria duas coisas
+  // dependendo de um modo. Com `a`, o `enter` continua tocando a linha, o que
+  // serve para ouvir a faixa antes de pôr na playlist.
+  { tecla: 'a', acao: 'pôr as marcadas numa playlist', grupo: 'selecionar' },
+  { tecla: 'J/K', acao: 'mover a faixa na playlist aberta', grupo: 'selecionar' },
 
   { tecla: '0', acao: 'detalhes da faixa que está tocando', grupo: 'janela' },
   { tecla: '4', acao: 'temas', grupo: 'janela' },

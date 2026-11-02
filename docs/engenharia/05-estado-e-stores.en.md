@@ -84,9 +84,9 @@ using it as an **internal** identity.
 | Store | Where | Holds |
 |---|---|---|
 | `player` | `packages/core/src/stores/player.ts` | what is playing, time, buffer, shuffle, repeat |
-| `library` | `packages/core/src/stores/library.ts` | likes (mirror of the account), downloads, sizes, progress |
+| `library` | `packages/core/src/stores/library.ts` | likes and playlists (mirror of the account), downloads, sizes, progress |
 | `session` | `packages/core/src/stores/session.ts` | the user, and whether the session was read yet |
-| `ui` | `packages/core/src/stores/ui.ts` | theme, cursor, toast, gate, picker, background |
+| `ui` | `packages/core/src/stores/ui.ts` | theme, cursor, toast, gate, pickers, selection, background |
 | `avulsas` | `packages/web/src/app/extras.ts` | tracks opened by direct link |
 | `guest` | `packages/web/src/app/guest.ts` | guest mode (not persisted) |
 | `uploads` | `packages/web/src/app/uploads.ts` | the file upload queue |
@@ -108,16 +108,22 @@ The four web stores use React's `create` because they are interface state only t
 `library` is the cleanest example of a boundary that is usually left implicit. The store separates
 two types by construction (`packages/core/src/stores/library.ts:4-9`):
 
-- **`LibrarySnapshot`** — what goes to disk: likes, downloaded tracks, sizes, the prefetch
-preference;
+- **`LibrarySnapshot`** — what goes to disk: likes, playlists, downloaded tracks, sizes, the
+prefetch preference;
 - **`LibraryState`** — the snapshot plus `dl: Record<string, number>`, download progress, which does
 **not** persist.
 
-The snapshot's four fields do not share an **owner**, and that difference matters more than the
-previous one. `cached`, `sizes` and `prefetch` belong to this device — the bytes are on it. `liked`
-belongs to the **account**: since migration `0006` the server owns it, and what sits on disk is a
-mirror. That is why logging out zeroes `liked` and touches nothing else (`controller.logout`): the
-likes come back on the next login, the bytes come back from nowhere.
+The snapshot's fields do not share an **owner**, and that difference matters more than the previous
+one. `cached`, `sizes` and `prefetch` belong to this device — the bytes are on it. `liked` and
+`playlists` belong to the **account**: since migrations `0006` and `0008` the server owns them, and
+what sits on disk is a mirror. That is why logging out zeroes both and touches nothing else
+(`controller.logout`): likes and playlists come back on the next login, the bytes come back from
+nowhere.
+
+A playlist joins the mirror for the same reason a like did — the PWA opens offline and has to draw
+the row before talking to anyone — and with one simplification: **there is no adoption to do**. A
+playlist never existed on this device before existing on the server, so the likes' `ADOTADAS_KEY`
+marker has no counterpart here.
 
 The mechanism is a closure called `commit` (`packages/core/src/stores/library.ts:44-47`): it applies
 the change and calls `persist?.(snapshotOf(get()))`. And `setDl`
@@ -231,6 +237,41 @@ adoption exists to save.
 And the queue goes up **before** `auth.logout()`. Liking and leaving right after is one gesture,
 and `registrar`'s debounce may not even have fired — once the cookie dies, the PATCH would only
 earn a 401. The e2e that logs out and back in is what pins this.
+
+### The playlist copies the like, minus the queue
+
+A playlist is account data that the screen also **writes**, so it follows the like's design: the
+server owns it, IndexedDB mirrors it, 401 is the only invalidator, and `esquecerPlaylists` runs on
+logout against the same risk of the next account inheriting what is not its own.
+
+What it does **not** copy is the offline queue (`packages/web/src/app/playlists.ts`). Liking is a
+reflex you perform with no network, and losing the gesture would lose the information; creating and
+reordering a playlist is deliberate desk work, and with no network the honest answer is to refuse and
+say so. A reorder held back to apply later, onto a state that has moved, is worse than the refusal.
+
+The exception is `J`/`K`, and it is the only optimistic write here: a repeated key has to move the
+line in the same frame, otherwise you press it five times waiting for the network and the track jumps
+five places at once. The optimism is cheap because the correction is free — **every** response from
+the API is the whole collection, so a failure restores the real state with no undo code at all. And a
+pending order goes up **before** `auth.logout()`, for the same reason as the likes queue.
+
+### The playback queue stopped being the catalogue
+
+`j`/`k` already walked what is on screen; `n` did not. It walked the whole catalogue, which in
+`~/biblioteca --curtidas` already meant leaving the slice on the first keypress. With playlists that
+stops being an oddity and becomes a defect: playing a playlist would abandon it on the second track.
+
+`QueueContext` gained `fila`: the visible ids, which `TrackList` already pushed to the controller.
+The detail that keeps the change small is that `tracks` remains the full catalogue and is still what
+gives the index — the access rules depend on the global position (`isLocked`, and the prototype's
+`index % 3` heuristic underneath it). The queue decides only the **path**, and `stepIndex` maps back
+to a global index. An empty queue falls back to the previous behaviour, which is what keeps the old
+`queue.ts` tests valid without a single change.
+
+Two rules had to be written down because circular arithmetic would not give them for free: an id in
+the queue that is not in the catalogue **drops out of the path** (a public track that left trending
+and stayed in the playlist), and a current track **outside** the queue makes `n` enter at the first
+line and `p` at the last.
 
 The rule holds well, and it pays a concrete debt. The catalogue key is **scoped by session and by
 preference** (`packages/web/src/query/catalog.ts:41`), three ways: `[...,'visitante']` for no

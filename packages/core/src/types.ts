@@ -95,7 +95,25 @@ export interface ThemeDef {
 }
 
 export type TabId = 'home' | 'search' | 'library';
-export type LibrarySegment = 'liked' | 'offline' | 'acervo' | 'shared';
+export type LibrarySegment = 'liked' | 'playlists' | 'offline' | 'acervo' | 'shared';
+
+/**
+ * Uma playlist da conta: um nome e uma ORDEM de ids.
+ *
+ * Nenhum metadado de faixa mora aqui, pela mesma decisão das curtidas — a
+ * playlist é um recorte do catálogo que está carregado, e não uma lista que se
+ * basta. A consequência é visível na tela e está dita lá: faixa pública que sai
+ * do trending sai da playlist, e `hiddenInSegment` conta quantas são para o
+ * texto de vazio não mentir.
+ *
+ * `itens` é a ordem, e é por isso que é um array e não um `Record<string,
+ * boolean>` como `liked`: ali a pergunta é "está?", aqui é "em que lugar?".
+ */
+export interface Playlist {
+  id: string;
+  nome: string;
+  itens: string[];
+}
 export type GateKind = 'play' | 'dl';
 
 export interface Gate {

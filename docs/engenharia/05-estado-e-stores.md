@@ -82,9 +82,9 @@ identidade **interna**.
 | Store | Onde | Guarda |
 |---|---|---|
 | `player` | `packages/core/src/stores/player.ts` | o que toca, tempo, buffer, shuffle, repeat |
-| `library` | `packages/core/src/stores/library.ts` | curtidas (espelho da conta), baixadas, tamanhos, progresso |
+| `library` | `packages/core/src/stores/library.ts` | curtidas e playlists (espelho da conta), baixadas, tamanhos, progresso |
 | `session` | `packages/core/src/stores/session.ts` | usuário e se a sessão já foi lida |
-| `ui` | `packages/core/src/stores/ui.ts` | tema, cursor, toast, gate, picker, fundo |
+| `ui` | `packages/core/src/stores/ui.ts` | tema, cursor, toast, gate, pickers, marcação, fundo |
 | `avulsas` | `packages/web/src/app/extras.ts` | faixas abertas por link direto |
 | `guest` | `packages/web/src/app/guest.ts` | modo visitante (não persiste) |
 | `uploads` | `packages/web/src/app/uploads.ts` | fila de envio de arquivos |
@@ -107,16 +107,21 @@ lê.
 `library` é o exemplo mais limpo de uma fronteira que normalmente fica implícita. O store separa
 dois tipos por construção (`packages/core/src/stores/library.ts:4-9`):
 
-- **`LibrarySnapshot`** — o que vai para o disco: curtidas, faixas baixadas, tamanhos, preferência
-de *prefetch*;
+- **`LibrarySnapshot`** — o que vai para o disco: curtidas, playlists, faixas baixadas, tamanhos,
+preferência de *prefetch*;
 - **`LibraryState`** — o snapshot mais `dl: Record<string, number>`, o progresso de download, que
 **não** persiste.
 
-Os quatro campos do snapshot não têm o mesmo **dono**, e essa diferença é mais importante que a
-anterior. `cached`, `sizes` e `prefetch` são deste aparelho — os bytes estão nele. `liked` é da
-**conta**: desde a migração `0006` o servidor é o dono, e o que fica no disco é espelho. É por isso
-que sair da conta zera `liked` e não encosta no resto (`controller.logout`): as curtidas voltam no
-próximo login, os bytes não voltam de lugar nenhum.
+Os campos do snapshot não têm o mesmo **dono**, e essa diferença é mais importante que a anterior.
+`cached`, `sizes` e `prefetch` são deste aparelho — os bytes estão nele. `liked` e `playlists` são da
+**conta**: desde as migrações `0006` e `0008` o servidor é o dono, e o que fica no disco é espelho. É
+por isso que sair da conta zera os dois e não encosta no resto (`controller.logout`): curtidas e
+playlists voltam no próximo login, os bytes não voltam de lugar nenhum.
+
+A playlist entra no espelho pela mesma razão da curtida — a PWA abre offline e precisa desenhar a
+fileira antes de falar com alguém — e com uma simplificação: **não há adoção a fazer**. Playlist
+nunca existiu neste aparelho antes de existir no servidor, então o marcador `ADOTADAS_KEY` das
+curtidas não tem par aqui.
 
 O mecanismo é um closure chamado `commit` (`packages/core/src/stores/library.ts:44-47`): ele aplica
 a mudança e chama `persist?.(snapshotOf(get()))`. E `setDl`
@@ -224,6 +229,40 @@ que ainda não são de conta nenhuma; apagá-las seria destruir o que a adoção
 E a fila sobe **antes** de `auth.logout()`. Curtir e sair em seguida é um gesto só, e o debounce de
 `registrar` pode nem ter disparado — depois que o cookie morre, o PATCH só levaria 401. O e2e que
 sai e entra de novo é o que trava isso.
+
+### A playlist copia a curtida, menos a fila
+
+A playlist é dado da conta que a tela também **escreve**, então ela segue o desenho da curtida:
+servidor como dono, IndexedDB como espelho, 401 como único invalidador, e `esquecerPlaylists` no
+logout pelo mesmo risco de a próxima conta herdar o que não é dela.
+
+O que ela **não** copia é a fila (`packages/web/src/app/playlists.ts`). Curtir é reflexo que se faz
+sem rede, e perder o gesto seria perder a informação; criar e reordenar playlist é trabalho
+deliberado, e sem rede a resposta honesta é recusar e dizer. Uma reordenação guardada para aplicar
+depois, sobre um estado que mudou, é pior que a recusa.
+
+A exceção é o `J`/`K`, e ela é a única escrita otimista daqui: a tecla repetida precisa mover a linha
+no mesmo quadro, senão a pessoa aperta cinco vezes esperando a rede e a faixa anda cinco casas de uma
+vez. O otimismo sai barato porque a correção é de graça — **toda** resposta da API é a coleção
+inteira, então uma falha restaura o estado de verdade sem nenhum código de desfazer. E a ordem
+pendente sobe **antes** de `auth.logout()`, pelo mesmo motivo da fila de curtidas.
+
+### A fila de reprodução deixou de ser o catálogo
+
+`j`/`k` já andavam pelo que está na tela; `n` não. Ele andava pelo catálogo inteiro, o que em
+`~/biblioteca --curtidas` já significava sair do recorte na primeira tecla. Com playlist isso deixa
+de ser esquisitice e passa a ser defeito: tocar uma playlist a abandonaria na segunda faixa.
+
+`QueueContext` ganhou `fila`: os ids visíveis, que o `TrackList` já empurrava para o controller. O
+detalhe que faz a mudança ser pequena é que `tracks` continua sendo o catálogo completo e é ele que
+dá o índice — as regras de acesso dependem da posição global (`isLocked`, e o heurístico `index % 3`
+do protótipo por baixo dela). A fila decide só o **caminho**, e `stepIndex` devolve índice global de
+volta. Fila vazia cai no comportamento anterior, que é o que mantém os testes antigos de `queue.ts`
+válidos sem uma linha de mudança.
+
+Duas regras ficaram escritas porque a aritmética circular não as daria de graça: id da fila que não
+está no catálogo **some do caminho** (faixa pública que saiu do trending e continua na playlist), e
+faixa atual **fora** da fila faz `n` entrar pela primeira linha e `p` pela última.
 
 A regra pega bem, e paga uma dívida concreta. A chave do catálogo é **escopada pela sessão e pela
 preferência** (`packages/web/src/query/catalog.ts:41`), em três: `[...,'visitante']` para quem não

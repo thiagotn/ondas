@@ -3,6 +3,7 @@ import {
   firstPlayable,
   fmtMB,
   indexOfTrack,
+  moverNaOrdem,
   offlineBytes,
   onEnded,
   playability,
@@ -27,6 +28,7 @@ import { CATALOG_LOGADO_KEY, catalogKey } from '../query/catalog';
 import { ehCotaExcedida } from '../platform/CacheOfflineStore';
 import { useAvulsas } from './extras';
 import { esquecerCurtidas, registrar, sincronizar } from './likes';
+import * as listas from './playlists';
 import { auth, connectivity, engine, offlineStore } from './services';
 import { libraryStore, playerStore, sessionStore, uiStore } from './stores';
 
@@ -71,6 +73,11 @@ function queueContext(): QueueContext {
     shuffle: player.shuffle,
     repeat: player.repeat,
     cur: player.cur,
+    // A FILA é a lista da tela, e o fio para cá já existia: o `TrackList`
+    // empurra os ids visíveis desde que `j`/`k` passaram a andar pelo recorte
+    // (ver `setVisible`). Ligá-lo aqui é o que faz `n` seguir a playlist — e,
+    // de passagem, o que faz `n` em `--curtidas` parar de sair do recorte.
+    fila: visiveis,
   };
 }
 
@@ -238,6 +245,121 @@ export function likeCurrent(): void {
   if (track) toggleLike(track.id);
 }
 
+/**
+ * Liga o modo de seleção, ou marca uma linha se ele já está ligado.
+ *
+ * Uma função para as duas portas (a tecla `v` e o botão `[selecionar]`), e é
+ * ela que recusa sem sessão: playlist é da conta, e um modo de seleção que não
+ * leva a nada seria pior que a recusa.
+ */
+export function marcar(id?: string): void {
+  if (!sessionStore.getState().user) {
+    uiStore.getState().flash('playlists exigem entrar na conta');
+    return;
+  }
+  const ui = uiStore.getState();
+  if (!ui.selecionando) {
+    ui.entrarNaSelecao(id);
+    return;
+  }
+  if (id) ui.alternarMarca(id);
+}
+
+/** Marca ou desmarca a linha do cursor (tecla `x`). */
+export function marcarCursorNaSelecao(): void {
+  const id = uiStore.getState().cursorId;
+  if (id) marcar(id);
+}
+
+/**
+ * As marcadas, NA ORDEM EM QUE FORAM MARCADAS.
+ *
+ * É a ordem das chaves do objeto, que para chave de texto é a de inserção.
+ * Marcando de cima para baixo — o caso normal — ela é a ordem da lista; e
+ * desmarcar e marcar de novo manda a faixa para o fim, que é o que a pessoa
+ * acabou de pedir.
+ */
+function marcadasEmOrdem(): string[] {
+  return Object.keys(uiStore.getState().marcadas);
+}
+
+export function quantasMarcadas(): number {
+  return marcadasEmOrdem().length;
+}
+
+/** Põe as marcadas numa playlist que já existe. */
+export async function adicionarMarcadas(playlistID: string): Promise<void> {
+  const ids = marcadasEmOrdem();
+  if (!ids.length) return;
+  const nome = listas.playlistPorID(playlistID)?.nome ?? 'playlist';
+  if (!(await listas.adicionar(playlistID, ids))) return;
+  uiStore.getState().sairDaSelecao();
+  uiStore.getState().flash(`${ids.length === 1 ? '1 faixa' : ids.length + ' faixas'} → ${nome}`);
+}
+
+/**
+ * Cria a playlist e põe as marcadas nela.
+ *
+ * Dois pedidos, e não um: o `POST` não aceita itens de propósito (criar e
+ * encher são coisas diferentes do lado do servidor). O id da nova sai da
+ * resposta pelo NOME, que é único por conta — é a única coisa que quem pediu
+ * conhece, e o índice único garante que não há duas.
+ */
+export async function criarComMarcadas(nome: string): Promise<void> {
+  if (!(await listas.criar(nome))) return;
+  const nova = libraryStore.getState().playlists.find((p) => p.nome === nome);
+  if (!nova) {
+    uiStore.getState().flash('playlist criada — abra em --playlists');
+    return;
+  }
+  if (!marcadasEmOrdem().length) {
+    uiStore.getState().sairDaSelecao();
+    uiStore.getState().flash(`playlist "${nome}" criada`);
+    return;
+  }
+  await adicionarMarcadas(nova.id);
+}
+
+/** Tira as marcadas da playlist que está aberta. */
+export async function removerMarcadas(playlistID: string): Promise<void> {
+  const ids = marcadasEmOrdem();
+  if (!ids.length) return;
+  if (!(await listas.remover(playlistID, ids))) return;
+  uiStore.getState().sairDaSelecao();
+  uiStore.getState().flash(ids.length === 1 ? 'faixa tirada da playlist' : 'faixas tiradas da playlist');
+}
+
+/**
+ * Move uma faixa na playlist aberta (`J`/`K`, ou os botões da barra).
+ *
+ * A faixa é a do cursor, e não a que está tocando: mexer na ordem é editar a
+ * lista que se está olhando. Com exatamente uma marcada, é ela — é o caminho do
+ * celular, onde não há cursor.
+ */
+export function moverNaPlaylist(playlistID: string, dir: 1 | -1): void {
+  const lista = listas.playlistPorID(playlistID);
+  if (!lista) return;
+  const marcadas = marcadasEmOrdem();
+  const alvo = marcadas.length === 1 ? marcadas[0]! : uiStore.getState().cursorId;
+  if (!alvo) return;
+  const nova = moverNaOrdem(lista.itens, alvo, dir);
+  // Mesma referência = borda da lista, ou faixa que não é item: não gasta PATCH
+  // para não fazer nada.
+  if (nova === lista.itens) return;
+  // O cursor acompanha a faixa, senão a tecla seguinte moveria a vizinha.
+  uiStore.getState().setCursor(alvo);
+  listas.mover(playlistID, nova);
+}
+
+export async function renomearPlaylist(id: string, nome: string): Promise<void> {
+  if (await listas.renomear(id, nome)) uiStore.getState().flash(`playlist → ${nome}`);
+}
+
+export async function apagarPlaylist(id: string): Promise<void> {
+  const nome = listas.playlistPorID(id)?.nome ?? '';
+  if (await listas.apagar(id)) uiStore.getState().flash(`playlist "${nome}" apagada`);
+}
+
 /** Manda o link da faixa que está tocando (tecla `c` e botão do player). */
 export function shareCurrent(): void {
   const track = currentTrack();
@@ -335,6 +457,8 @@ export async function logout(): Promise<void> {
   // só, e o debounce de `registrar` pode nem ter disparado ainda: depois do
   // `auth.logout()` o PATCH só levaria 401, e a curtida morreria no caminho.
   await sincronizar();
+  // Pelo mesmo motivo, para a ordem que o `J`/`K` deixou pendente.
+  await listas.subirPendente();
   await auth.logout();
   sessionStore.getState().setUser(null);
   // O catálogo do logado tem as faixas do acervo, e ele fica persistido em
@@ -347,6 +471,11 @@ export async function logout(): Promise<void> {
   // Pelo mesmo motivo, e com um risco a mais: curtida que fica no store depois
   // de sair seria ADOTADA pela próxima conta que entrasse neste navegador.
   await esquecerCurtidas();
+  // E as playlists, pelo mesmo risco: espelho que fica aparece para a próxima
+  // conta que entrar neste navegador.
+  listas.esquecerPlaylists();
+  // Marca de seleção é da tela, e a tela é de quem entrou agora.
+  uiStore.getState().sairDaSelecao();
 }
 
 /**
@@ -489,6 +618,9 @@ export function bootstrap(): () => void {
       ui.flash(value ? 'rede conectada' : 'rede desconectada — apenas faixas [off]');
       // A rede voltou: é a hora de subir o que foi curtido sem ela.
       if (value) void sincronizar();
+      // As playlists não têm fila para subir (ver `app/playlists.ts`), mas o
+      // espelho pode ter perdido uma escrita recusada por falta de rede.
+      if (value) void listas.carregarPlaylists();
     }),
   ];
   setOnline(connectivity.isOnline());

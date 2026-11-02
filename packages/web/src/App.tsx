@@ -45,6 +45,15 @@ export function App() {
           <Route path={PATHS.home} element={<HomeRoute />} />
           <Route path={PATHS.search} element={<SearchRoute />} />
           <Route path={`${PATHS.library}/:seg?`} element={<LibraryRoute />} />
+          {/* Uma playlist é um nível abaixo do chip: a MESMA tela desenha o
+              índice e a playlist aberta, porque as duas são `--playlists` e a
+              diferença é só haver um id.
+              O recorte continua sendo `:seg` aqui, e não fixo em `playlists`:
+              sem ele, `useParams().seg` viria vazio nesta rota e a tela cairia
+              no recorte padrão — com a playlist na URL e `--acervo` na tela.
+              Um id sob outro recorte (`/library/offline/xyz`) é endereço
+              digitado errado e normaliza em silêncio, como `/library/lixo`. */}
+          <Route path={`${PATHS.library}/:seg/:id`} element={<LibraryRoute />} />
           {/* Endereço da faixa: o link que se manda E o player cheio aberto.
               Fica DENTRO do layout porque quem chega por ele precisa do app
               inteiro: abas, rodapé e o player. */}

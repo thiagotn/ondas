@@ -1,0 +1,156 @@
+/* Playlists: a barra de seleção, o índice e o seletor. */
+
+/* ── barra de seleção ─────────────────────────────────────────── */
+
+/* Desligada, é só um `[selecionar]` à direita: a barra existe acima de TODA
+   lista, e um painel permanente ali roubaria a primeira faixa da tela do
+   celular — o mesmo motivo que tirou a conta da biblioteca. */
+.barra {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 36px;
+}
+
+.barraOn {
+  justify-content: flex-start;
+  border-bottom: 1px solid var(--color-neutral-800);
+}
+
+.espaco {
+  flex: 1;
+}
+
+.contador {
+  color: var(--ansi-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.acao {
+  min-height: 36px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-neutral-400);
+  cursor: pointer;
+  font: inherit;
+}
+
+.acao:hover {
+  color: var(--color-text);
+}
+
+.acaoForte {
+  color: var(--ansi-2);
+}
+
+.acaoRisco {
+  color: var(--ansi-1);
+}
+
+/* Alvo quadrado de 36px para as setas de ordem, que no celular são o único
+   caminho — lá não há cursor para o J/K mover. */
+.seta {
+  width: 36px;
+  min-height: 36px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-neutral-400);
+  cursor: pointer;
+  font: inherit;
+}
+
+.seta:hover {
+  color: var(--color-text);
+}
+
+/* ── índice das playlists ─────────────────────────────────────── */
+
+.lista {
+  display: flex;
+  flex-direction: column;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  border-bottom: 1px solid var(--color-neutral-800);
+}
+
+.item:last-child {
+  border-bottom: 0;
+}
+
+.abrir {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.marca {
+  width: 2ch;
+  flex-shrink: 0;
+  color: var(--color-neutral-500);
+}
+
+.nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+.quantas {
+  flex-shrink: 0;
+  color: var(--color-neutral-500);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── campo de nome (criar e renomear) ─────────────────────────── */
+
+.campo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+}
+
+.entrada {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 6px;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+}
+
+.entrada::placeholder {
+  color: var(--color-neutral-600);
+}
+
+/* ── seletor ──────────────────────────────────────────────────── */
+
+/* Quantas das marcadas já estão naquela playlist. Sem este número, adicionar
+   duas vezes parece não ter feito nada (o servidor ignora a repetição). */
+.jaTem {
+  margin-left: auto;
+  color: var(--color-neutral-500);
+}

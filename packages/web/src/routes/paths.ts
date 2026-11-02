@@ -40,6 +40,17 @@ export const librarySegPath = (seg: LibrarySegment): string =>
   `${PATHS.library}/${librarySegmentSlug(seg)}`;
 
 /**
+ * O endereço de UMA playlist, um nível abaixo do chip dela.
+ *
+ * Path e não param de tela, pela mesma razão do recorte: assim cada playlist é
+ * linkável, sobrevive ao reload e o voltar sai dela para o índice. O id vai
+ * cru — ele é um uuid gerado por nós, e o nome mudaria o endereço a cada
+ * renomeação.
+ */
+export const playlistPath = (id: string): string =>
+  `${librarySegPath('playlists')}/${id}`;
+
+/**
  * Pathname → aba, ou `undefined` quando o path não é de aba (`/t/...`, `/login`).
  *
  * Não é um `Record` porque `/library/liked` também é a aba da biblioteca.

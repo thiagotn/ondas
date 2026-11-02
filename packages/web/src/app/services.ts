@@ -4,6 +4,7 @@ import {
   AudiusCatalogClient,
   HttpAuthService,
   HttpLikesService,
+  HttpPlaylistsService,
 } from '@ondas/core';
 import { BrowserConnectivity } from '../platform/BrowserConnectivity';
 import { CacheOfflineStore } from '../platform/CacheOfflineStore';
@@ -25,6 +26,11 @@ export const auth = new HttpAuthService(kv);
  * que já é a fonte do render e já persiste (ver `app/likes.ts`).
  */
 export const likesClient = new HttpLikesService();
+/**
+ * As playlists da conta. Como as curtidas, não guarda espelho: quem guarda é o
+ * `libraryStore` (ver `app/playlists.ts`).
+ */
+export const playlistsClient = new HttpPlaylistsService();
 export const offlineStore = new CacheOfflineStore();
 export const connectivity = new BrowserConnectivity();
 export const catalogClient = new AudiusCatalogClient();

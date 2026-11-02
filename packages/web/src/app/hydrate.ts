@@ -1,5 +1,6 @@
 import type { BackgroundSettings, LibrarySnapshot } from '@ondas/core';
 import { sincronizar } from './likes';
+import { carregarPlaylists } from './playlists';
 import { auth, kv, offlineStore } from './services';
 import { BACKGROUND_KEY, libraryStore, LIBRARY_KEY, sessionStore, uiStore } from './stores';
 
@@ -26,4 +27,7 @@ export async function hydrate(): Promise<void> {
   // propósito: o boot não pode ficar preso na rede, e a tela já desenhou os
   // corações do espelho — é exatamente para isso que ele existe.
   void sincronizar();
+  // Mesma regra, mesma razão: o espelho já desenhou a fileira de playlists, e o
+  // boot não pode ficar preso na rede esperando a versão autoritativa.
+  void carregarPlaylists();
 }

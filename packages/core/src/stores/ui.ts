@@ -45,6 +45,33 @@ export interface UiState {
    * passaria a apontar para outra faixa depois do login.
    */
   cursorId: string | null;
+  /**
+   * Modo de seleção ligado: as linhas da lista marcam em vez de tocar.
+   *
+   * Mora aqui, e não no endereço, porque é estado de tela como o `cursorId` — e
+   * NÃO é persistido de propósito: uma marca que sobrevive ao reload é uma marca
+   * invisível, que volta semanas depois e adiciona a faixa errada.
+   */
+  selecionando: boolean;
+  /**
+   * As faixas marcadas, por id.
+   *
+   * Por id e não por posição, como o `cursorId` e pelo mesmo motivo: a marca
+   * atravessa troca de recorte e de aba, o que é o que deixa montar uma playlist
+   * com faixa do acervo e faixa pública na mesma leva. Posição não sobreviveria
+   * nem ao login, que põe o acervo na frente da lista.
+   */
+  marcadas: Readonly<Record<string, boolean>>;
+  /**
+   * O seletor de playlist está aberto (as marcadas vão para a que for escolhida).
+   *
+   * Campo próprio, e não o `pickerOpen` do tema: `t` e `4` abrem aquele, e um
+   * booleano só faria uma tecla abrir o seletor errado. Os dois também não se
+   * parecem por dentro — o de tema pré-visualiza ao vivo e desfaz no Esc.
+   */
+  seletorPlaylist: boolean;
+  /** Linha sob o cursor no seletor de playlist (`j`/`k`). */
+  seletorIdx: number;
   /** Simulação de queda de rede — só habilitada em build de dev. */
   simulatedOffline: boolean;
   /** Transparência do fundo (0,3–1). Em 1 o app fica idêntico ao opaco. */
@@ -63,6 +90,15 @@ export interface UiState {
   setPickIdx(index: number): void;
   setCmdOpen(open: boolean): void;
   setCursor(id: string | null): void;
+  /** Liga o modo de seleção, opcionalmente já marcando uma linha. */
+  entrarNaSelecao(id?: string): void;
+  /** Desliga o modo E limpa as marcas: ver o comentário de `marcadas`. */
+  sairDaSelecao(): void;
+  alternarMarca(id: string): void;
+  limparMarcas(): void;
+  abrirSeletorPlaylist(): void;
+  fecharSeletorPlaylist(): void;
+  setSeletorIdx(index: number): void;
   setSimulatedOffline(value: boolean): void;
   setOpacity(value: number): void;
   setBlur(value: number): void;
@@ -84,6 +120,10 @@ export function createUiStore(initial?: { themeId?: ThemeId; opacity?: number })
     pickIdx: 0,
     cmdOpen: false,
     cursorId: null,
+    selecionando: false,
+    marcadas: {},
+    seletorPlaylist: false,
+    seletorIdx: 0,
     simulatedOffline: false,
     opacity: clamp(initial?.opacity ?? OPACITY_MAX, OPACITY_MIN, OPACITY_MAX),
     blur: 16,
@@ -106,6 +146,25 @@ export function createUiStore(initial?: { themeId?: ThemeId; opacity?: number })
     setPickIdx: (pickIdx) => set({ pickIdx }),
     setCmdOpen: (cmdOpen) => set({ cmdOpen }),
     setCursor: (cursorId) => set({ cursorId }),
+    entrarNaSelecao: (id) =>
+      set((st) => ({
+        selecionando: true,
+        marcadas: id ? { ...st.marcadas, [id]: true } : st.marcadas,
+      })),
+    // Fecha o seletor junto: ele só existe para mandar as marcadas a algum
+    // lugar, e sair da seleção com ele aberto deixaria um painel sem assunto.
+    sairDaSelecao: () => set({ selecionando: false, marcadas: {}, seletorPlaylist: false }),
+    alternarMarca: (id) =>
+      set((st) => {
+        const marcadas = { ...st.marcadas };
+        if (marcadas[id]) delete marcadas[id];
+        else marcadas[id] = true;
+        return { marcadas };
+      }),
+    limparMarcas: () => set({ marcadas: {} }),
+    abrirSeletorPlaylist: () => set({ seletorPlaylist: true, seletorIdx: 0 }),
+    fecharSeletorPlaylist: () => set({ seletorPlaylist: false }),
+    setSeletorIdx: (seletorIdx) => set({ seletorIdx }),
     setSimulatedOffline: (simulatedOffline) => set({ simulatedOffline }),
     setOpacity: (value) => set({ opacity: clamp(value, OPACITY_MIN, OPACITY_MAX) }),
     setBlur: (value) => set({ blur: clamp(Math.round(value), 0, BLUR_MAX) }),

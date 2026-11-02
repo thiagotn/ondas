@@ -262,6 +262,43 @@ ConfigMap) diz para quais contas o **token** pode publicar — sessão não pass
 idêntica para "fora da lista" e para "e-mail sem conta", senão um token vazado descobriria quem tem
 conta tentando e-mail por e-mail.
 
+### Playlists
+
+A primeira lista da biblioteca que **você** escolhe. Os quatro recortes anteriores não eram escolha:
+`--curtidas` é um booleano por faixa, `--acervo` e `--compartilhadas` são procedência, `--offline` é
+o aparelho. Faltava dizer *estas sete, nesta ordem*.
+
+**Como se põe faixa numa playlist:** `[selecionar]` (ou a tecla `v`) liga a marcação, a linha passa
+a **marcar em vez de tocar** — a calha vira `[x]` no lugar do número —, e `[+ playlist]` manda as
+marcadas para a playlist escolhida, ou cria uma. Uma barra acima da lista, e não um quarto botão na
+linha: no celular três alvos de 44px já comem o título. As marcas atravessam troca de recorte e de
+aba, então dá para juntar faixa do acervo e faixa pública na mesma leva.
+
+**Dentro de uma playlist** (`/library/playlists/<id>`), `J`/`K` movem a faixa do cursor — no celular,
+marque uma e use as setas da barra. `[− playlist]` tira as marcadas.
+
+Três coisas que valem saber porque surpreendem:
+
+**A playlist guarda só ids**, como a curtida — nenhum metadado de faixa é copiado para o nosso banco.
+A consequência é que ela é um recorte do catálogo carregado: faixa do acervo nunca sofre (ele vem
+inteiro), mas faixa **pública** sai do trending com o tempo e desaparece da playlist. A tela não
+esconde isso — o prompt diz `7 itens · 2 fora da lista`, e a playlist que ficou vazia explica por quê
+em vez de dizer "vazio".
+
+**A fila de reprodução passou a ser a lista da tela.** Era o catálogo inteiro: em `--curtidas`, `n`
+já pulava para a faixa seguinte do catálogo e saía do recorte. Sem mudar isso, "tocar a playlist" não
+tocaria a playlist — na segunda faixa ela já teria acabado. Agora `n`, `p`, o fim da faixa, o
+aleatório e o smart buffer andam pela lista que está na tela. O lado incômodo da mesma regra: tocar
+uma playlist e ir para `~/em-alta` faz o `n` seguir a tela, não a playlist.
+
+**Escrita de playlist não tem fila offline**, ao contrário da curtida. Curtir é reflexo que se faz no
+avião; criar e reordenar é trabalho deliberado — sem rede a barra recusa e diz. A única exceção é o
+`J`/`K`, que move na hora e manda a ordem com 400ms de atraso, porque a tecla repetida precisa
+responder no mesmo quadro; se o PATCH falha, a releitura desfaz.
+
+Nome é único por conta (sem distinguir maiúscula), porque duas playlists "Treino" são
+indistinguíveis no seletor — que é justamente a tela onde a escolha acontece.
+
 ### Os endereços da PWA
 
 Todo path é inglês; o texto da interface segue em português. `~/biblioteca` continua
@@ -274,7 +311,8 @@ não redirecionam: uso pessoal, e um endereço a menos para manter.
 | --- | --- |
 | `/` | em-alta; `?genre=<slug>` é o chip, omitido quando é `tudo` |
 | `/search` | busca; `?q=<termo>` escrito com `replace`, para o voltar não andar letra por letra |
-| `/library/<recorte>` | `liked`, `archive`, `shared` ou `offline` — nessa ordem na tela; `/library` vale `archive` com conta e `liked` sem ela — e o que não é um dos quatro cai no mesmo padrão (`defaultLibrarySegment`, `parseLibrarySegment`) |
+| `/library/<recorte>` | `liked`, `playlists`, `archive`, `shared` ou `offline` — nessa ordem na tela; `/library` vale `archive` com conta e `liked` sem ela — e o que não é um dos cinco cai no mesmo padrão (`defaultLibrarySegment`, `parseLibrarySegment`) |
+| `/library/playlists/<id>` | as faixas de uma playlist, na ordem dela; um id que não existe cai no índice |
 | `/t/<slug>-<id>` | a faixa: o link que se manda E o player cheio aberto |
 | `/login` | fora do `AppLayout`, é a única tela sem abas |
 | `?account=1` / `?shortcuts=1` | os dois overlays que não são conteúdo, no `useOverlayParam` |
@@ -285,12 +323,15 @@ deles é linkável, sobrevive a um reload e o voltar anda entre eles. O preço a
 vai para o path limpo e esquece o filtro, que o voltar devolve.
 
 O padrão da biblioteca depende da sessão: com conta, `/library` abre em `--acervo`, que é o recorte
-das faixas da pessoa e o que o envio alimenta; sem conta nem `--acervo` nem `--compartilhadas` são
-desenhados — a rota do acervo responde 401 e os dois chips seriam listas sempre vazias —, então ali
-ela abre em `--curtidas`. Não porque funcione: desde que a curtida é da conta, os **quatro** pedem
-login, e `--curtidas` é só o primeiro chip.
+das faixas da pessoa e o que o envio alimenta; sem conta, `--acervo`, `--compartilhadas` e
+`--playlists` não são desenhados — a rota do acervo responde 401 e os três chips seriam listas sempre
+vazias —, então ali ela abre em `--curtidas`. Não porque funcione: desde que a curtida é da conta, os
+**cinco** pedem login, e `--curtidas` é só o primeiro chip.
 
-No celular os quatro chips não cabem numa linha (`--compartilhadas` sozinho tem 16 caracteres), e a
+`--playlists` é o único recorte que não lista faixas: sem id ele é o índice das playlists, com id são
+as faixas de uma. As duas telas são a mesma rota, e a diferença mora no endereço.
+
+No celular os cinco chips não cabem numa linha (`--compartilhadas` sozinho tem 16 caracteres), e a
 faixa deles **rola na horizontal** em vez de quebrar em duas linhas — quebrar empurraria a primeira
 faixa para o meio da tela, que é o problema que já tirou conta, buffer e ocupação dessa tela.
 
@@ -517,7 +558,9 @@ Decisões que valem registrar:
 - **`j`/`k` andam pelo que está na tela**, e é o `TrackList` que diz ao
   controller quais linhas são essas — ele é o único lugar que sabe. Sem esse
   fio, `j` em `~/biblioteca --curtidas` pularia para vizinhos do catálogo que
-  não estão na lista. Com overlay aberto as duas teclas não fazem nada: a lista
+  não estão na lista. **O `n` passou a usar o mesmo fio** quando as playlists
+  chegaram: a fila de reprodução é a lista da tela, e não o catálogo inteiro —
+  senão tocar uma playlist a abandonaria na segunda faixa. Com overlay aberto as duas teclas não fazem nada: a lista
   não está na tela, e mover um cursor invisível deixaria o `enter` tocando algo
   que ninguém viu. A marca é uma barra à esquerda, e não um `▸` na calha, que
   tem `3ch` e já mostra o número.

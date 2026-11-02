@@ -263,6 +263,7 @@ The answer is in the router's shape, not in a permission field.
 | Session only | touching what already exists | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}`, `PATCH {id}/compartilhamento` |
 | Session only | touching one's own account | `GET /auth/me`, `PATCH /auth/prefs` |
 | Session only | touching one's own taste | `GET /likes`, `PATCH /likes` |
+| Session only | organising one's own library | `GET /playlists`, `POST /playlists`, `PATCH /playlists/{id}`, `DELETE /playlists/{id}`, `PATCH /playlists/{id}/itens` |
 
 The last two rows are the same ruler applied to new cases. `PATCH /auth/prefs` turns the account's public
 catalogue on and off (`users.publico`), and the machine token does **not** reach it: the token exists
@@ -291,6 +292,28 @@ Two ceilings, protecting different things. The body goes to 64 KiB via `lerJSONA
 ids comfortably exceed 4 KiB, and the `400 requisição inválida` that would come out of there would
 be for a perfectly valid request. That ceiling protects our memory; the other one,
 `maxIDsPorPedido`, protects the database from an `unnest` of arbitrary size.
+
+`/playlists` repeats both of `/likes`' decisions, for the same reasons: **outside** the `/acervo`
+group, because a playlist can be made entirely of Audius tracks and depends on no R2 credential; and
+**session, never token**, because organising someone's library is not entering with a new track.
+`TestPlaylistsExigemSessaoENaoAceitamToken` pins all five routes.
+
+Every response is the **whole collection** of playlists with their items — the same contract as
+`DefinirPublico` and `Likes.Aplicar`. Here it buys one thing more: there is no detail route, so there
+is no index and detail to drift apart. That is only honest with caps, and there are three: 50
+playlists per account, 500 items per playlist, 60 characters of name.
+
+`PATCH /{id}/itens` covers the screen's three gestures in one handler — `{add, remove, ordem}`,
+applied in that order. `add` serves selection mode, which **does not know** the destination
+playlist's contents; `ordem` serves `J`/`K`, which sends the whole list as it should end up, and an id
+that is not an item there is ignored silently, because the screen may be a second behind another tab.
+
+Two things the database guarantees and the code need not repeat: the `(playlist_id, track_id)` PK
+makes the same track twice the same item (a repeated `add` is `ON CONFLICT DO NOTHING`), and the
+unique index on `(user_id, lower(nome))` refuses a repeated name with **409**, as signup does with an
+e-mail already in use. What the database does **not** give is the cleanup: `playlist_items.track_id`
+is `text` with no FK to `tracks`, for migration `0006`'s reason — most ids are Audius' — so deleting
+an archive track removes the items by hand, next to the orphan like.
 
 And `api/internal/httpapi/server.go:122-127` names the threat model:
 

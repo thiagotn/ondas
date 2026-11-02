@@ -39,6 +39,8 @@ export interface RowModel {
    * público. A lista marca com `[de <nome>]`, onde marcaria `[meu]`.
    */
   owner: string;
+  /** Marcada no modo de seleção: a calha mostra `[x]` e o toque marca. */
+  marcada: boolean;
 }
 
 /**
@@ -50,6 +52,7 @@ export function useTrackRows(visible: readonly Track[], all: readonly Track[]): 
   const { liked, cached, dl } = useLibrary((s) => s);
   const { cur, playing } = usePlayer((s) => s);
   const cursorId = useUi((s) => s.cursorId);
+  const marcadas = useUi((s) => s.marcadas);
   const { offline } = useNetwork();
 
   return useMemo(() => {
@@ -82,7 +85,8 @@ export function useTrackRows(visible: readonly Track[], all: readonly Track[]): 
         // `[meu]` seria dizer o contrário do que a tela quer dizer.
         minha: track.source === 'acervo' && !track.owner,
         owner: track.source === 'acervo' ? (track.owner ?? '') : '',
+        marcada: !!marcadas[track.id],
       };
     });
-  }, [all, cached, cur, cursorId, dl, liked, offline, playing, session, visible]);
+  }, [all, cached, cur, cursorId, dl, liked, marcadas, offline, playing, session, visible]);
 }

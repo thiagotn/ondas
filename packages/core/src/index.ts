@@ -15,4 +15,5 @@ export * from './catalog/index.js';
 export * from './acervo/index.js';
 export * from './auth/index.js';
 export * from './likes/index.js';
+export * from './playlists/index.js';
 export * from './stores/index.js';

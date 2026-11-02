@@ -20,12 +20,21 @@ export interface TrackRowProps {
    * do acervo já diz de quem ela é — os selos só competiam com o título.
    */
   compact: boolean;
+  /**
+   * O modo de seleção está ligado: o corpo da linha MARCA em vez de tocar.
+   *
+   * É o idioma do celular, onde montar uma playlist com um toque por faixa não
+   * pode significar tocar uma faixa por toque. Quem quer ouvir antes de
+   * adicionar tem o `enter` do teclado, que continua tocando a linha do cursor.
+   */
+  selecionando: boolean;
   onPlay(index: number): void;
   /** O Tab chegou nesta linha: o cursor da lista vem junto. */
   onCursor(id: string): void;
   onLike(id: string): void;
   onDownload(row: RowModel): void;
   onShare(row: RowModel): void;
+  onMark(id: string): void;
 }
 
 /** `[01] [capa] titulo / artista #genero m:ss  [pro] [off] [ 42%]  ♥  ↓` */
@@ -34,11 +43,13 @@ export function TrackRow({
   showArt,
   showShare,
   compact,
+  selecionando,
   onPlay,
   onCursor,
   onLike,
   onDownload,
   onShare,
+  onMark,
 }: TrackRowProps) {
   const { track } = row;
   const className = [
@@ -77,7 +88,8 @@ export function TrackRow({
         ref={botao}
         type="button"
         className={s.main}
-        onClick={() => onPlay(row.index)}
+        aria-pressed={selecionando ? row.marcada : undefined}
+        onClick={() => (selecionando ? onMark(track.id) : onPlay(row.index))}
         onFocus={(e) => {
           // Só o foco que o teclado desenha arrasta a marca. O clique e o
           // toque também focam o botão, e sem esta pergunta a linha tocada
@@ -87,7 +99,12 @@ export function TrackRow({
           if (e.currentTarget.matches(':focus-visible')) onCursor(track.id);
         }}
       >
-        <span className={row.isCurrent ? `${s.idx} ${s.idxCurrent}` : s.idx}>{row.idx}</span>
+        {/* A calha vira a caixa de marcação: ela já é a coluna de 3ch à
+            esquerda de toda linha, e abrir uma sexta coluna só para a marca
+            empurraria o título. O número volta ao sair do modo. */}
+        <span className={row.isCurrent ? `${s.idx} ${s.idxCurrent}` : s.idx}>
+          {selecionando ? (row.marcada ? '[x]' : '[ ]') : row.idx}
+        </span>
         {showArt && (
           <span className={s.thumb}>
             <TrackArt sources={row.artSources} />

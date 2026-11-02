@@ -73,26 +73,35 @@ describe('hiddenInSegment', () => {
 });
 
 describe('LIBRARY_SEGMENTS', () => {
-  it('a ordem é a da tela: curtidas, acervo, compartilhadas, offline', () => {
+  it('a ordem é a da tela: curtidas, playlists, acervo, compartilhadas, offline', () => {
     // Esta lista É a ordem dos chips (`LibraryRoute` só a mapeia). O acervo no
     // meio e não no fim porque ele é o padrão de quem tem conta, e o padrão no
     // canto direito faria a tela abrir com o chip mais distante marcado.
-    // `shared` encosta nele por ser a mesma origem vista do outro lado.
-    expect([...LIBRARY_SEGMENTS]).toEqual(['liked', 'acervo', 'shared', 'offline']);
+    // `shared` encosta nele por ser a mesma origem vista do outro lado, e
+    // `playlists` encosta em `liked` porque os dois são escolha de quem ouve.
+    expect([...LIBRARY_SEGMENTS]).toEqual([
+      'liked',
+      'playlists',
+      'acervo',
+      'shared',
+      'offline',
+    ]);
   });
 
-  it('o chip é português e o slug é inglês, nos quatro', () => {
+  it('o chip é português e o slug é inglês, nos cinco', () => {
     // Os dois vocabulários existem de propósito: path em inglês, tela em
-    // português. Dois ids coincidem com o português por acaso, e é esse acaso
+    // português. Três ids coincidem com o português por acaso, e é esse acaso
     // que já tinha escondido um `ondas ls --shared` no prompt.
     expect(LIBRARY_SEGMENTS.map(librarySegmentChip)).toEqual([
       'curtidas',
+      'playlists',
       'acervo',
       'compartilhadas',
       'offline',
     ]);
     expect(LIBRARY_SEGMENTS.map(librarySegmentSlug)).toEqual([
       'liked',
+      'playlists',
       'archive',
       'shared',
       'offline',

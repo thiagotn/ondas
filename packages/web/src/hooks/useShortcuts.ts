@@ -1,8 +1,8 @@
 import { THEMES, themeIndex } from '@ondas/core';
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import * as controller from '../app/controller';
-import { playerStore, uiStore } from '../app/stores';
+import { libraryStore, playerStore, uiStore } from '../app/stores';
 import { PATHS } from '../routes/paths';
 import { applyTheme } from '../theme/applyTheme';
 import { cmdInputRef } from './cmdInputRef';
@@ -20,6 +20,9 @@ import { useTabNavigation } from './useTabNavigation';
  */
 export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): void {
   const navigate = useNavigate();
+  // A playlist aberta sai do ENDEREÇO, não de um estado de tela: é ele que diz
+  // se `J`/`K` têm uma ordem para mexer (ver `playlistPath`).
+  const { pathname } = useLocation();
   const { goToTab } = useTabNavigation();
   const { openPlayer, closePlayer, isPlayerOpen } = usePlayerOverlay();
   const { isAccountOpen, openAccount, closeAccount } = useAccountOverlay();
@@ -31,6 +34,26 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
       const target = e.target as HTMLElement | null;
       const typing = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA';
       const k = e.key;
+
+      // O seletor de playlist captura o teclado, como o de tema — e antes
+      // dele, porque é o mais recente a abrir quando os dois estão de pé.
+      //
+      // Sem `enter` aqui: a escolha é um ato irreversível de graça (adicionar
+      // duas vezes não duplica), mas `enter` sem linha é um clique no vazio.
+      if (ui.seletorPlaylist) {
+        const quantas = libraryStore.getState().playlists.length;
+        if (k === 'Escape') ui.fecharSeletorPlaylist();
+        else if (quantas && (k === 'j' || k === 'ArrowDown' || k === 'k' || k === 'ArrowUp')) {
+          e.preventDefault();
+          const dir = k === 'j' || k === 'ArrowDown' ? 1 : -1;
+          ui.setSeletorIdx((ui.seletorIdx + dir + quantas) % quantas);
+        } else if (k === 'Enter' && quantas) {
+          e.preventDefault();
+          const alvo = libraryStore.getState().playlists[ui.seletorIdx];
+          if (alvo) void controller.adicionarMarcadas(alvo.id);
+        }
+        return;
+      }
 
       // Theme picker captura o teclado enquanto está aberto.
       if (ui.pickerOpen) {
@@ -62,6 +85,10 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
         else if (isHelpOpen) closeHelp();
         else if (isAccountOpen) closeAccount();
         else if (isPlayerOpen) closePlayer();
+        // A seleção é o ÚLTIMO elo: ela não é overlay, está na própria lista, e
+        // por isso é a camada de baixo. Sair dela limpa as marcas (ver
+        // `sairDaSelecao`), que é o que o Esc significa aqui — desistir.
+        else if (ui.selecionando) ui.sairDaSelecao();
         return;
       }
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -106,6 +133,28 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
         f: () => (isPlayerOpen ? closePlayer() : openPlayer()),
         j: () => naLista && controller.moverCursor(1),
         k: () => naLista && controller.moverCursor(-1),
+        // `v` de visual, como no vim: liga a marcação e marca a linha do cursor
+        // de uma vez, para a primeira tecla já ter feito algo.
+        v: () => {
+          if (!naLista) return;
+          if (ui.selecionando) ui.sairDaSelecao();
+          else controller.marcar(ui.cursorId ?? undefined);
+        },
+        x: () => naLista && controller.marcarCursorNaSelecao(),
+        // `a` e não `enter`: `enter` é "tocar a linha marcada" e continua sendo
+        // (ouvir antes de adicionar é o uso), e a janela `?` não pode listar a
+        // mesma tecla duas vezes dizendo coisas diferentes.
+        a: () => {
+          if (!naLista || !controller.quantasMarcadas()) return;
+          if (libraryStore.getState().playlists.length) ui.abrirSeletorPlaylist();
+          // Sem playlist nenhuma o seletor seria um painel vazio; o caminho é o
+          // botão `[+ playlist]`, que abre o campo de nome.
+          else ui.flash('nenhuma playlist ainda — use [+ playlist] para criar a primeira');
+        },
+        // `J`/`K` só fazem sentido dentro de uma playlist, que é a única lista
+        // com ordem própria para mexer.
+        J: () => naLista && moverNaPlaylistDaRota(pathname, 1),
+        K: () => naLista && moverNaPlaylistDaRota(pathname, -1),
         // `0` é "a de agora", os outros dígitos são lugares. Faz o mesmo que o
         // `f` do handoff, que fica valendo sem ser anunciado.
         '0': () => (isPlayerOpen ? closePlayer() : openPlayer()),
@@ -163,6 +212,20 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
     openAccount,
     openHelp,
     openPlayer,
+    pathname,
     searchInput,
   ]);
+}
+
+/**
+ * O id da playlist aberta, lido do endereço.
+ *
+ * Daqui e não de um estado de tela: a rota é a dona de qual playlist está
+ * aberta (`/library/playlists/<id>`), e um segundo dono divergiria dela — foi o
+ * que já aconteceu entre a aba e o `playerOpen`.
+ */
+function moverNaPlaylistDaRota(pathname: string, dir: 1 | -1): void {
+  const partes = pathname.split('/').filter(Boolean);
+  if (partes[0] !== 'library' || partes[1] !== 'playlists' || !partes[2]) return;
+  controller.moverNaPlaylist(partes[2], dir);
 }

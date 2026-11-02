@@ -2,16 +2,22 @@ import { fmtBytes, fmtTime } from './format.js';
 import type { Catalog, LibrarySegment, Session, TabId, Track } from './types.js';
 
 /**
- * Os quatro recortes da biblioteca, na ordem em que a tela os mostra.
+ * Os cinco recortes da biblioteca, na ordem em que a tela os mostra.
  *
- * `acervo` fica no MEIO, entre as curtidas e os downloads, e não no fim: ele é
- * o padrão de quem tem conta (`defaultLibrarySegment`), e o padrão no canto
- * direito faz a tela abrir com o chip mais distante marcado.
+ * `acervo` fica no MEIO e não no fim: ele é o padrão de quem tem conta
+ * (`defaultLibrarySegment`), e o padrão no canto direito faz a tela abrir com o
+ * chip mais distante marcado.
  *
- * `shared` encosta em `acervo` porque é a mesma origem vista do outro lado — as
- * faixas do acervo que são de outra pessoa. `offline` continua por último, que
- * é onde ele já estava: ele não é sobre procedência, é sobre o que está neste
- * aparelho.
+ * `playlists` encosta em `liked` porque os dois são ESCOLHA de quem ouve, e os
+ * outros três não são — `acervo` e `shared` são procedência da faixa, `offline`
+ * é o que está neste aparelho. `shared` encosta em `acervo` porque é a mesma
+ * origem vista do outro lado, e `offline` continua por último.
+ *
+ * `playlists` é o único que NÃO lista faixas: `/library/playlists` é o índice
+ * das playlists, e `/library/playlists/<id>` são as faixas de uma delas. Ele
+ * entra nesta lista de todo jeito porque é daqui que saem a fileira de chips e
+ * a peneira do que vem pela URL — mantê-lo fora exigiria uma segunda fonte para
+ * as duas coisas.
  *
  * Aqui, e não na tela: eles viraram endereço (`/library/offline`), e o que
  * entra pela URL é texto de fora — precisa de uma peneira testável. A tela só
@@ -19,6 +25,7 @@ import type { Catalog, LibrarySegment, Session, TabId, Track } from './types.js'
  */
 export const LIBRARY_SEGMENTS: readonly LibrarySegment[] = [
   'liked',
+  'playlists',
   'acervo',
   'shared',
   'offline',
@@ -35,6 +42,7 @@ export const LIBRARY_SEGMENTS: readonly LibrarySegment[] = [
  */
 const SEGMENT_SLUGS: Record<LibrarySegment, string> = {
   liked: 'liked',
+  playlists: 'playlists',
   offline: 'offline',
   acervo: 'archive',
   shared: 'shared',
@@ -55,6 +63,7 @@ export function librarySegmentSlug(seg: LibrarySegment): string {
  */
 const CHIPS: Record<LibrarySegment, string> = {
   liked: 'curtidas',
+  playlists: 'playlists',
   acervo: 'acervo',
   shared: 'compartilhadas',
   offline: 'offline',
@@ -118,14 +127,21 @@ export function showsPublicCatalog(user: Session): boolean {
  */
 export function hiddenInSegment(
   seg: LibrarySegment,
-  marks: Pick<ListQuery, 'liked' | 'cached'>,
+  marks: Pick<ListQuery, 'liked' | 'cached' | 'playlist'>,
   tracks: readonly Track[],
 ): number {
   // `acervo` e `shared` não guardam marca no aparelho: os dois são filtros pela
   // procedência da faixa, e o que não está na lista não está em lugar nenhum.
   if (seg === 'acervo' || seg === 'shared') return 0;
   const naLista = new Set(tracks.map((t) => t.id));
-  const ids = Object.keys(seg === 'liked' ? marks.liked : marks.cached);
+  // A playlist é o terceiro caso, e o único cuja ausência NÃO depende do
+  // catálogo público estar desligado: id guardado no servidor aponta para faixa
+  // que pode ter saído do trending desde que foi salva. Quem lê este número
+  // precisa saber disso — ver `emptyText`.
+  const ids =
+    seg === 'playlists'
+      ? (marks.playlist ?? [])
+      : Object.keys(seg === 'liked' ? marks.liked : marks.cached);
   return ids.filter((id) => !naLista.has(id)).length;
 }
 
@@ -160,6 +176,13 @@ export interface ListQuery {
   seg: LibrarySegment;
   liked: Readonly<Record<string, boolean>>;
   cached: Readonly<Record<string, boolean>>;
+  /**
+   * Os ids da playlist aberta, NA ORDEM dela. Ausente fora de uma playlist.
+   *
+   * É um array e não um mapa justamente por isso: aqui a ordem é o conteúdo da
+   * informação, e `liked`/`cached` só respondem "está?".
+   */
+  playlist?: readonly string[];
 }
 
 /** A lista visível na aba atual. Busca casa título + artista + gênero, ignorando `#` inicial. */
@@ -181,6 +204,19 @@ export function visibleTracks(v: ListQuery): Track[] {
   // dois recortes, e em nenhum dos dois duas vezes.
   if (v.seg === 'acervo') return v.tracks.filter((t) => t.source === 'acervo' && !t.owner);
   if (v.seg === 'shared') return v.tracks.filter((t) => t.source === 'acervo' && !!t.owner);
+  // A playlist é o ÚNICO recorte que não é um filtro sobre a lista: ela percorre
+  // os próprios ids, e por isso sai NA ORDEM DELA e não na do catálogo. Filtrar
+  // `v.tracks` daria as mesmas faixas na ordem errada — e a ordem é o que
+  // distingue uma playlist de uma pilha de curtidas.
+  //
+  // Id sem faixa carregada é descartado em silêncio aqui; quem conta quantos
+  // são é `hiddenInSegment`, para o texto de vazio poder dizer.
+  if (v.seg === 'playlists') {
+    const porID = new Map(v.tracks.map((t) => [t.id, t]));
+    return (v.playlist ?? [])
+      .map((id) => porID.get(id))
+      .filter((t): t is Track => t !== undefined);
+  }
   return v.tracks.filter((t) => (v.seg === 'liked' ? v.liked[t.id] : v.cached[t.id]));
 }
 
@@ -200,12 +236,20 @@ export function promptLine(args: {
   seg: LibrarySegment;
   count: number;
   source: Catalog['source'] | '';
+  /**
+   * O nome da playlist aberta. Ausente em `--playlists` significa o ÍNDICE das
+   * playlists, que é outra tela — e por isso outra linha de prompt.
+   */
+  playlistNome?: string;
+  /** Itens da playlist que não estão no catálogo (`hiddenInSegment`). */
+  fora?: number;
   /** Quantas faixas próprias entraram na lista (ver `Catalog.acervo`). */
   acervo?: number;
   /** Há um refetch em andamento: o que está na tela ainda é o dado anterior. */
   refreshing?: boolean;
 }): PromptLine {
   const { tab, who, genre, q, seg, count, source, acervo, refreshing } = args;
+  const { playlistNome, fora } = args;
   if (tab === 'search') {
     const typed = q.trim().replace(/^#/, '');
     return {
@@ -216,11 +260,24 @@ export function promptLine(args: {
     };
   }
   if (tab === 'library') {
+    // A playlist aberta é a única tela da biblioteca cujo comando leva um
+    // argumento, e a única que precisa confessar o que não está ali: id
+    // guardado no servidor pode apontar para faixa que saiu do catálogo.
+    if (seg === 'playlists' && playlistNome) {
+      return {
+        who,
+        cwd: '~/biblioteca',
+        cmd: `ondas ls --playlist="${playlistNome}"`,
+        comment: `${count} itens` + (fora ? ` · ${fora} fora da lista` : ''),
+      };
+    }
     return {
       who,
       cwd: '~/biblioteca',
       cmd: 'ondas ls --' + CHIPS[seg],
-      comment: `${count} itens`,
+      // O índice das playlists conta playlists, e não itens: dizer "3 itens"
+      // numa tela de três playlists com trinta faixas seria uma meia-verdade.
+      comment: seg === 'playlists' ? `${count} playlists` : `${count} itens`,
     };
   }
   return {
@@ -266,8 +323,14 @@ export function emptyText(args: {
   publicOff?: boolean;
   /** Itens do recorte que estão no aparelho mas fora da lista (`hiddenInSegment`). */
   hidden?: number;
+  /**
+   * Há uma playlist ABERTA, e não o índice delas. Os dois são `--playlists` e
+   * dizem coisas opostas quando estão vazios: um não tem playlist nenhuma, o
+   * outro tem uma playlist sem faixas.
+   */
+  playlistAberta?: boolean;
 }): string {
-  const { tab, seg, q, loading, user, publicOff, hidden } = args;
+  const { tab, seg, q, loading, user, publicOff, hidden, playlistAberta } = args;
   if (tab === 'search') return `grep: nenhum resultado para "${q}"`;
   if (tab === 'library') {
     // O recorte tem coisa guardada, e ela está fora da lista porque o catálogo
@@ -285,6 +348,22 @@ export function emptyText(args: {
     }
     if (seg === 'acervo') {
       return user ? 'vazio — envie um arquivo com [+ arquivo].' : 'o acervo exige login.';
+    }
+    // As playlists ficam DEPOIS do ramo de `publicOff` acima de propósito: com
+    // o catálogo público desligado, "religue em [ondas whoami]" é mais útil que
+    // explicar o decaimento, porque é a frase que tem conserto.
+    if (seg === 'playlists') {
+      if (!user) return 'playlists exigem login.';
+      // Playlist aberta e vazia na tela, mas com itens guardados: eles são de
+      // faixa pública que saiu do catálogo. Sem esta frase a tela mostraria uma
+      // playlist vazia que o índice jura ter 7 faixas.
+      if (playlistAberta && hidden) {
+        const quantas = hidden === 1 ? '1 faixa desta playlist' : `${hidden} faixas desta playlist`;
+        return `${quantas} não está no catálogo de hoje — faixa pública sai de ~/em-alta com o tempo; a do acervo fica.`;
+      }
+      return playlistAberta
+        ? 'vazio — marque faixas com [selecionar] e use [+ playlist].'
+        : 'nenhuma playlist — marque faixas com [selecionar] e crie a primeira.';
     }
     // A quarta porta fechada, na forma das outras três. Com conta a frase não
     // manda fazer nada: compartilhar não é ato de quem recebe.

@@ -260,6 +260,7 @@ A resposta está na forma do roteador, e não num campo de permissão.
 | Só sessão | mexer no que já existe | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}`, `PATCH {id}/compartilhamento` |
 | Só sessão | mexer na própria conta | `GET /auth/me`, `PATCH /auth/prefs` |
 | Só sessão | mexer no próprio gosto | `GET /likes`, `PATCH /likes` |
+| Só sessão | organizar a própria biblioteca | `GET /playlists`, `POST /playlists`, `PATCH /playlists/{id}`, `DELETE /playlists/{id}`, `PATCH /playlists/{id}/itens` |
 
 A última linha é a mesma régua aplicada a um caso novo. `PATCH /auth/prefs` liga e desliga o
 catálogo público da conta (`users.publico`), e o token de máquina **não** a alcança: ele existe para
@@ -286,6 +287,28 @@ Dois tetos, e eles protegem coisas diferentes. O corpo vai a 64 KiB por `lerJSON
 ids passam folgado dos 4 KiB, e o `400 requisição inválida` que sairia dali seria para um pedido
 perfeitamente válido. Esse teto protege a nossa memória; o outro, `maxIDsPorPedido`, protege o
 banco de um `unnest` de tamanho arbitrário.
+
+`/playlists` repete as duas decisões de `/likes`, e pelas mesmas razões: **fora** do grupo
+`/acervo`, porque playlist pode ser feita só de faixa do Audius e não depende de credencial de R2; e
+**sessão, nunca token**, porque organizar a biblioteca de alguém não é entrar com faixa nova.
+`TestPlaylistsExigemSessaoENaoAceitamToken` trava as cinco rotas.
+
+Toda resposta é a **coleção inteira** de playlists com os itens — mesmo contrato de `DefinirPublico`
+e `Likes.Aplicar`. Aqui ele compra uma coisa a mais: não existe rota de detalhe, logo não existe
+índice e detalhe para divergirem. Isso só é honesto com teto, e são três: 50 playlists por conta, 500
+itens por playlist, 60 caracteres de nome.
+
+`PATCH /{id}/itens` cobre os três gestos da tela com um handler — `{add, remove, ordem}`, aplicados
+nessa ordem. `add` serve o modo de seleção, que **não conhece** o conteúdo da playlist de destino;
+`ordem` serve o `J`/`K`, que manda a lista inteira como ela deve ficar, e id que não é item dali é
+ignorado em silêncio, porque a tela pode estar um segundo atrasada em relação a outra aba.
+
+Duas coisas o banco garante e o código não precisa repetir: a PK `(playlist_id, track_id)` faz a
+mesma faixa duas vezes ser o mesmo item (`add` repetido é `ON CONFLICT DO NOTHING`), e o índice único
+em `(user_id, lower(nome))` recusa nome repetido com **409**, como o cadastro faz com e-mail em uso.
+O que o banco **não** dá é a limpeza: `playlist_items.track_id` é `text` sem FK para `tracks`, pela
+razão da migração `0006` — a maioria dos ids é do Audius —, então apagar uma faixa do acervo tira os
+itens à mão, ao lado da curtida órfã.
 
 E `api/internal/httpapi/server.go:122-127` nomeia o modelo de ameaça:
 

@@ -115,6 +115,22 @@ const COMPARTILHADA = {
  */
 const curtidasSemeadas = new WeakMap<Page, Set<string>>();
 
+/** As playlists da API falsa, por página — ver `semearPlaylist`. */
+const playlistsSemeadas = new WeakMap<
+  Page,
+  { id: string; nome: string; itens: string[] }[]
+>();
+
+/**
+ * Põe uma playlist no servidor de mentira ANTES do login.
+ *
+ * É o que deixa um teste provar que a fileira de playlists veio do servidor, e
+ * não de um espelho que este navegador tinha guardado.
+ */
+function semearPlaylist(page: Page, nome: string, itens: string[]) {
+  playlistsSemeadas.get(page)?.push({ id: `semeada-${nome}`, nome, itens });
+}
+
 function semearCurtida(page: Page, id: string) {
   curtidasSemeadas.get(page)?.add(id);
 }
@@ -208,6 +224,73 @@ async function stubApi(page: Page) {
       for (const id of corpo.add ?? []) curtidas.add(id);
     }
     return route.fulfill({ status: 200, json: { ids: [...curtidas] } });
+  });
+
+  // As playlists da conta, no servidor de mentira.
+  //
+  // Guarda estado no closure como as curtidas, e pelo mesmo motivo: é o que faz
+  // a playlist sobreviver a um reload, e é o que deixa um teste provar que ela
+  // VEIO do servidor e não do espelho deste navegador.
+  //
+  // O comportamento copia o da API de verdade nos três pontos que a tela
+  // depende: toda resposta é a coleção INTEIRA, `add` anexa no fim sem duplicar
+  // (é a PK dos itens lá), e `ordem` reescreve a ordem ignorando id que não é
+  // item.
+  const listas: { id: string; nome: string; itens: string[] }[] = [];
+  playlistsSemeadas.set(page, listas);
+  let proximoID = 1;
+
+  await page.route(/\/api\/playlists(\/[^?]*)?$/, async (route) => {
+    if (!logado) return route.fulfill({ status: 401, json: { error: 'sessão expirada' } });
+    const metodo = route.request().method();
+    const url = new URL(route.request().url());
+    const partes = url.pathname.split('/').filter(Boolean);
+    // /api/playlists | /api/playlists/<id> | /api/playlists/<id>/itens
+    const id = partes[2];
+    const corpo = JSON.parse(route.request().postData() ?? '{}');
+    const responder = (status = 200) =>
+      route.fulfill({ status, json: { playlists: listas } });
+
+    if (metodo === 'GET') return responder();
+
+    if (metodo === 'POST' && !id) {
+      const nome = String(corpo.nome ?? '').trim();
+      if (listas.some((p) => p.nome.toLowerCase() === nome.toLowerCase())) {
+        return route.fulfill({
+          status: 409,
+          json: { error: 'já existe uma playlist com esse nome' },
+        });
+      }
+      listas.push({ id: `pl-${proximoID++}`, nome, itens: [] });
+      return responder(201);
+    }
+
+    const lista = listas.find((p) => p.id === id);
+    if (!lista) return route.fulfill({ status: 404, json: { error: 'playlist não encontrada' } });
+
+    if (metodo === 'DELETE') {
+      listas.splice(listas.indexOf(lista), 1);
+      return responder();
+    }
+    if (metodo === 'PATCH' && partes[3] === 'itens') {
+      for (const it of corpo.remove ?? []) {
+        const i = lista.itens.indexOf(it);
+        if (i >= 0) lista.itens.splice(i, 1);
+      }
+      for (const it of corpo.add ?? []) {
+        if (!lista.itens.includes(it)) lista.itens.push(it);
+      }
+      if (corpo.ordem) {
+        const pedida = (corpo.ordem as string[]).filter((it) => lista.itens.includes(it));
+        lista.itens = pedida;
+      }
+      return responder();
+    }
+    if (metodo === 'PATCH') {
+      lista.nome = String(corpo.nome ?? '').trim();
+      return responder();
+    }
+    return route.fulfill({ status: 405, json: { error: 'método não suportado' } });
   });
 
   await page.route('**/api/acervo', async (route) =>
@@ -1780,13 +1863,24 @@ test('curtida feita sem rede fica na fila e sobe quando a rede volta', async ({ 
   await expect(coracao(page, /Maré Baixa/)).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('os recortes aparecem na ordem curtidas, acervo, compartilhadas, offline', async ({ page }) => {
+test('os recortes aparecem na ordem curtidas, playlists, acervo, compartilhadas, offline', async ({
+  page,
+}) => {
   await blockAudius(page);
   await logar(page);
   await page.keyboard.press('3');
 
-  const chips = page.getByRole('button', { name: /^--(curtidas|acervo|compartilhadas|offline)$/ });
-  await expect(chips).toHaveText(['--curtidas', '--acervo', '--compartilhadas', '--offline']);
+  // A alternativa (um regex com os nomes de hoje) deixaria de cobrir a ordem no
+  // dia em que entrasse um chip novo: ele seria filtrado fora e a asserção
+  // passaria sem ver. Daí o seletor ser "todo chip de recorte".
+  const chips = page.getByRole('button', { name: /^--[a-zç]+$/ });
+  await expect(chips).toHaveText([
+    '--curtidas',
+    '--playlists',
+    '--acervo',
+    '--compartilhadas',
+    '--offline',
+  ]);
 });
 
 test('sem conta, nem --acervo nem --compartilhadas são desenhados', async ({ page }) => {
@@ -1884,3 +1978,232 @@ test('a busca mora no endereço, e o voltar não anda letra por letra', async ({
   await page.goBack();
   await expect(page).toHaveURL('/');
 });
+
+// ── playlists ──────────────────────────────────────────────────────────────
+
+/** A barra de seleção, ligada. */
+const marcadas = (page: Page) => page.getByText(/^\d+ marcadas?$/);
+
+test('marcar faixas e criar uma playlist com elas', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+  await page.keyboard.press('3');
+
+  // Sem o modo ligado, a lista é uma lista: a porta é o botão (ou `v`).
+  await page.getByRole('button', { name: '[selecionar]' }).click();
+  await expect(marcadas(page)).toHaveText('0 marcadas');
+
+  // No modo de seleção a linha MARCA em vez de tocar — é o idioma do celular,
+  // onde um toque por faixa não pode ser uma faixa tocada por toque.
+  await page.getByRole('button', { name: /Fita Caseira/ }).click();
+  await expect(marcadas(page)).toHaveText('1 marcada');
+  // A calha vira a caixa de marcação, no lugar do número.
+  await expect(page.getByRole('button', { name: /^\[x\] Fita Caseira/ })).toBeVisible();
+
+  await page.getByRole('button', { name: '[+ playlist]' }).click();
+  await page.getByLabel('nome da playlist').fill('treino');
+  await page.getByRole('button', { name: '[ok]' }).click();
+
+  // Adicionar sai do modo e diz o que aconteceu.
+  await expect(page.getByText('1 faixa → treino')).toBeVisible();
+  await expect(marcadas(page)).toHaveCount(0);
+
+  await page.getByRole('button', { name: '--playlists' }).click();
+  await expect(page).toHaveURL('/library/playlists');
+  await expect(page.getByText('# 1 playlists')).toBeVisible();
+  await expect(page.getByRole('button', { name: /treino 1 faixa/ })).toBeVisible();
+});
+
+test('a playlist toca na ordem dela, e o `n` não sai dela', async ({ page }) => {
+  await blockAudius(page);
+  // Duas faixas do catálogo demo, na ordem INVERSA à da lista: é o que prova
+  // que a playlist manda na ordem, e não o catálogo.
+  semearPlaylist(page, 'disco', ['demo3', 'demo0']);
+  await logar(page);
+  await page.goto('/library/playlists/semeada-disco');
+
+  await expect(page.getByText('ondas ls --playlist="disco"')).toBeVisible();
+  const linhas = page.getByRole('button', { name: /^\d\d / });
+  await expect(linhas.first()).toContainText('Fio de Cobre');
+  await expect(linhas.nth(1)).toContainText('Maré Baixa');
+
+  // Toca a primeira DA PLAYLIST e pede a próxima: antes da fila, `n` iria para
+  // a vizinha no catálogo (demo4), que nem está nesta tela.
+  await linhas.first().click();
+  await expect(page.getByText('Fio de Cobre').first()).toBeVisible();
+  await page.keyboard.press('n');
+  await expect(page.getByRole('button', { name: /^▶ Maré Baixa/ })).toBeVisible();
+  // E dá a volta DENTRO da playlist, em vez de seguir pelo catálogo.
+  await page.keyboard.press('n');
+  await expect(page.getByRole('button', { name: /^▶ Fio de Cobre/ })).toBeVisible();
+});
+
+test('J move a faixa na playlist, e a ordem sobrevive ao reload', async ({ page }) => {
+  await blockAudius(page);
+  semearPlaylist(page, 'disco', ['demo0', 'demo3']);
+  await logar(page);
+  await page.goto('/library/playlists/semeada-disco');
+
+  const linhas = page.getByRole('button', { name: /^\d\d / });
+  await expect(linhas.first()).toContainText('Maré Baixa');
+
+  // `J` move a linha do CURSOR, então primeiro o cursor vai para ela.
+  await page.keyboard.press('j');
+  await page.keyboard.press('J');
+  await expect(linhas.first()).toContainText('Fio de Cobre');
+
+  // O reload é a prova: a ordem otimista da tela só sobrevive se o PATCH
+  // chegou ao servidor (ver o debounce em `app/playlists.ts`).
+  await page.waitForTimeout(600);
+  await page.reload();
+  await skipSplash(page);
+  await expect(page.getByRole('button', { name: /Fio de Cobre/ }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /^\d\d / }).first()).toContainText(
+    'Fio de Cobre',
+  );
+});
+
+test('tirar faixa da playlist, e a playlist que fica vazia diz o que fazer', async ({ page }) => {
+  await blockAudius(page);
+  semearPlaylist(page, 'disco', ['demo0']);
+  await logar(page);
+  await page.goto('/library/playlists/semeada-disco');
+
+  await page.getByRole('button', { name: '[selecionar]' }).click();
+  await page.getByRole('button', { name: /Maré Baixa/ }).click();
+  await page.getByRole('button', { name: '[− playlist]' }).click();
+
+  await expect(page.getByText('faixa tirada da playlist')).toBeVisible();
+  await expect(page.getByText(/marque faixas com \[selecionar\]/)).toBeVisible();
+});
+
+test('a faixa que saiu do catálogo não vira playlist vazia em silêncio', async ({ page }) => {
+  await blockAudius(page);
+  // Dois ids que não existem em catálogo nenhum: é o que acontece com faixa
+  // pública guardada na playlist depois que ela sai do trending.
+  semearPlaylist(page, 'antiga', ['faixa-que-saiu', 'outra-que-saiu']);
+  await logar(page);
+  await page.goto('/library/playlists/semeada-antiga');
+
+  // O prompt confessa a diferença entre o que ela tem e o que ela mostra.
+  await expect(page.getByText('# 0 itens · 2 fora da lista')).toBeVisible();
+  await expect(page.getByText(/2 faixas desta playlist não está no catálogo de hoje/)).toBeVisible();
+});
+
+test('renomear e apagar playlist, com dois toques para apagar', async ({ page }) => {
+  await blockAudius(page);
+  semearPlaylist(page, 'treino', []);
+  await logar(page);
+  await page.goto('/library/playlists');
+
+  await page.getByRole('button', { name: '[renomear]' }).click();
+  await page.getByLabel('novo nome').fill('corrida');
+  await page.getByRole('button', { name: '[ok]' }).click();
+  await expect(page.getByRole('button', { name: /corrida/ })).toBeVisible();
+
+  // Um toque só mostra a pergunta; apagar não dá para desfazer.
+  await page.getByRole('button', { name: '[apagar]' }).click();
+  await expect(page.getByText('apagar?')).toBeVisible();
+  await page.getByRole('button', { name: '[não]' }).click();
+  await expect(page.getByRole('button', { name: /corrida/ })).toBeVisible();
+
+  await page.getByRole('button', { name: '[apagar]' }).click();
+  await page.getByRole('button', { name: '[sim]' }).click();
+  await expect(page.getByText('nenhuma playlist')).toBeVisible();
+});
+
+test('nome repetido é recusado com a frase do servidor', async ({ page }) => {
+  await blockAudius(page);
+  semearPlaylist(page, 'treino', []);
+  await logar(page);
+  await page.keyboard.press('3');
+
+  await page.getByRole('button', { name: '[selecionar]' }).click();
+  await page.getByRole('button', { name: /Fita Caseira/ }).click();
+  await page.getByRole('button', { name: '[+ playlist]' }).click();
+  await page.getByRole('button', { name: /nova playlist/ }).click();
+  await page.getByLabel('nome da playlist').fill('TREINO');
+  await page.getByRole('button', { name: '[ok]' }).click();
+
+  // A mensagem é a do servidor, em pt-BR e dita para ser lida — e as marcas
+  // continuam lá, porque a pessoa só precisa escolher outro nome.
+  await expect(page.getByText('já existe uma playlist com esse nome')).toBeVisible();
+  await expect(marcadas(page)).toHaveText('1 marcada');
+});
+
+test('as playlists vêm do servidor, e sair da conta as leva', async ({ page }) => {
+  await blockAudius(page);
+  semearPlaylist(page, 'veio-do-servidor', ['demo0']);
+  await logar(page);
+  await page.goto('/library/playlists');
+  await expect(page.getByRole('button', { name: /veio-do-servidor/ })).toBeVisible();
+
+  await page.keyboard.press('5');
+  await page.getByRole('button', { name: /sair/ }).click();
+  await expect(page).toHaveURL(/login/);
+
+  // Espelho que ficasse apareceria para a próxima conta que entrasse neste
+  // navegador. Entrar de novo as traz, porque elas estão no servidor.
+  await logar(page);
+  await page.goto('/library/playlists');
+  await expect(page.getByRole('button', { name: /veio-do-servidor/ })).toBeVisible();
+});
+
+test('sem conta, --playlists não é desenhado', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+  await page.keyboard.press('3');
+
+  // Playlist é da conta: o chip seria uma lista sempre vazia, como `--acervo`.
+  await expect(page.getByRole('button', { name: '--playlists' })).toHaveCount(0);
+  // E o `[selecionar]` também não, para não oferecer o que termina em login.
+  await expect(page.getByRole('button', { name: '[selecionar]' })).toHaveCount(0);
+});
+
+test('v marca pelo teclado, x alterna a linha do cursor e Esc desiste', async ({ page }) => {
+  await blockAudius(page);
+  semearPlaylist(page, 'treino', []);
+  await logar(page);
+  await page.keyboard.press('3');
+
+  // `v` liga o modo marcando a linha do cursor; sem cursor, apenas liga.
+  await page.keyboard.press('j');
+  await page.keyboard.press('v');
+  await expect(marcadas(page)).toHaveText('1 marcada');
+
+  // `x` alterna a mesma linha.
+  await page.keyboard.press('x');
+  await expect(marcadas(page)).toHaveText('0 marcadas');
+  await page.keyboard.press('x');
+  await expect(marcadas(page)).toHaveText('1 marcada');
+
+  // `a` abre o seletor, `j`/`k` andam e `enter` escolhe.
+  await page.keyboard.press('a');
+  await expect(page.getByRole('dialog', { name: 'ondas +add-to-playlist' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'ondas +add-to-playlist' })).toBeHidden();
+
+  // Esc na lista é a última camada: desiste da seleção e limpa as marcas.
+  await expect(marcadas(page)).toHaveText('1 marcada');
+  await page.keyboard.press('Escape');
+  await expect(marcadas(page)).toHaveCount(0);
+});
+
+test('o seletor diz quantas das marcadas já estão em cada playlist', async ({ page }) => {
+  await blockAudius(page);
+  semearPlaylist(page, 'treino', ['demo0']);
+  await logar(page);
+  await page.keyboard.press('3');
+  await page.getByRole('button', { name: '--curtidas' }).click();
+  // Marca pela home, onde a faixa demo1 aparece.
+  await page.keyboard.press('1');
+
+  await page.getByRole('button', { name: '[selecionar]' }).click();
+  await page.getByRole('button', { name: /Maré Baixa/ }).click();
+  await page.getByRole('button', { name: '[+ playlist]' }).click();
+
+  // Sem este número, adicionar de novo pareceria não ter feito nada: o servidor
+  // ignora a repetição.
+  await expect(page.getByRole('button', { name: /treino 1 já está aqui/ })).toBeVisible();
+});
+
