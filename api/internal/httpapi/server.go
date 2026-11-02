@@ -16,6 +16,7 @@ import (
 	"github.com/thiagotn/ondas/api/internal/auth"
 	"github.com/thiagotn/ondas/api/internal/config"
 	"github.com/thiagotn/ondas/api/internal/likes"
+	"github.com/thiagotn/ondas/api/internal/playlists"
 	"github.com/thiagotn/ondas/api/internal/storage"
 )
 
@@ -28,6 +29,8 @@ type Server struct {
 	tracks   *acervo.Tracks
 	jobs     *acervo.Jobs
 	likes    *likes.Likes
+	// As playlists da conta. Como as curtidas, não dependem de R2 nenhum.
+	playlists *playlists.Playlists
 	// Prévia de link: cliente do Audius com cache, e um freio próprio — é a
 	// única rota pública que faz chamada para fora.
 	audius    *audius.Client
@@ -47,6 +50,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool) *Server {
 		tracks:    acervo.NewTracks(pool),
 		jobs:      acervo.NewJobs(pool),
 		likes:     likes.NewLikes(pool),
+		playlists: playlists.NewPlaylists(pool),
 		audius:    audius.New(audius.Opcoes{}),
 		ogLimiter: auth.NewLimiter(60, time.Minute),
 	}
@@ -109,6 +113,23 @@ func (s *Server) Router() http.Handler {
 			r.Use(s.exigirSessao)
 			r.Get("/", s.listarLikes)
 			r.Patch("/", s.aplicarLikes)
+		})
+
+		// Playlists: a mesma régua das curtidas, e pelos mesmos dois motivos.
+		//
+		// Sessão, NUNCA token: o token de máquina do Hermes existe para entrar
+		// com faixa nova, e organizar a biblioteca de alguém não é isso.
+		//
+		// E fora do grupo /acervo de propósito: playlist não depende de R2
+		// nenhum — ela pode ser feita só de faixa do Audius —, então o 503
+		// "acervo não configurado" de `exigirAcervo` seria uma mentira.
+		r.Route("/playlists", func(r chi.Router) {
+			r.Use(s.exigirSessao)
+			r.Get("/", s.listarPlaylists)
+			r.Post("/", s.criarPlaylist)
+			r.Patch("/{id}", s.renomearPlaylist)
+			r.Delete("/{id}", s.apagarPlaylist)
+			r.Patch("/{id}/itens", s.aplicarItensDaPlaylist)
 		})
 
 		// Nada aqui é público: o acervo é privado por definição.

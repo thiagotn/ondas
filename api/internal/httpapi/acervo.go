@@ -263,6 +263,13 @@ func (s *Server) removerFaixa(w http.ResponseWriter, r *http.Request) {
 	if err := s.likes.RemoverFaixa(r.Context(), prefixoID+id); err != nil {
 		slog.Error("curtida órfã", "faixa", id, "erro", err)
 	}
+	// E das playlists, pela mesma razão e com o mesmo id prefixado: a tabela de
+	// itens também não tem FK para `tracks` (migração 0008). Sem esta linha a
+	// faixa apagada continuaria contando como item, e a playlist mostraria
+	// "3 itens" com duas faixas na tela.
+	if err := s.playlists.RemoverFaixa(r.Context(), prefixoID+id); err != nil {
+		slog.Error("item de playlist órfão", "faixa", id, "erro", err)
+	}
 	// A linha já foi apagada; se a limpeza do R2 falhar, o objeto fica órfão
 	// mas o acervo do usuário já está correto. Erro vai para o log, não para a
 	// resposta.
