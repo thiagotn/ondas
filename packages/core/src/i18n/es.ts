@@ -15,7 +15,7 @@ export const ES: Record<Chave, Frase> = {
   'cwd.library': '~/biblioteca',
   'who.visitante': 'visitante',
 
-  'cmd.trending': 'ondas trending --genero={genero}',
+  'cmd.trending': 'ondas trending --{flag}={genero}',
   'cmd.search': 'ondas search',
   'cmd.ls': 'ondas ls --{recorte}',
   'cmd.lsPlaylist': 'ondas ls --playlist="{nome}"',
@@ -25,6 +25,7 @@ export const ES: Record<Chave, Frase> = {
   'recorte.acervo': 'archivo',
   'recorte.shared': 'compartidas',
   'recorte.offline': 'offline',
+  'genero.flag': 'genero',
   'genero.tudo': 'todo',
 
   'prompt.resultados': { one: '{n} resultado', other: '{n} resultados' },
@@ -128,6 +129,9 @@ export const ES: Record<Chave, Frase> = {
   'atalho.simularOffline': 'simular caída de red',
   'atalho.idiomas': 'idioma',
 
+  'tecla.segurar': 'mantener',
+  'tecla.numero': 'nº',
+  'tecla.ou': 'o',
   'legenda.play': 'play',
   'legenda.faixa': 'pista',
   'legenda.seek': '±10s',

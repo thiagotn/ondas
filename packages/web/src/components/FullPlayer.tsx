@@ -64,7 +64,7 @@ export function FullPlayer({ track }: { track: Track }) {
           {traduzir('player.agoraTocando')} — #{track.genre}
         </span>
         <button type="button" className={s.close} onClick={closePlayer}>
-          {wide ? '[esc] fechar' : 'fechar'}
+          {traduzir(wide ? 'ui.fecharEsc' : 'ui.fechar')}
         </button>
 
         <div className={s.body}>

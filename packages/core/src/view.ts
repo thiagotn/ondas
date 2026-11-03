@@ -293,7 +293,7 @@ export function promptLine(args: {
   return {
     who,
     cwd: traduzir('cwd.home'),
-    cmd: traduzir('cmd.trending', { genero: genre }),
+    cmd: traduzir('cmd.trending', { flag: traduzir('genero.flag'), genero: genre }),
     // Enquanto o refetch não volta, a lista na tela é a da sessão anterior:
     // dizer "ao vivo" sem ressalva seria mentira. E quando o acervo entra, a
     // fonte deixa de ser uma só — dizer apenas "audius" esconderia metade.

@@ -25,7 +25,7 @@ export const PT_BR = {
   'cwd.library': '~/biblioteca',
   'who.visitante': 'visitante',
 
-  'cmd.trending': 'ondas trending --genero={genero}',
+  'cmd.trending': 'ondas trending --{flag}={genero}',
   'cmd.search': 'ondas search',
   'cmd.ls': 'ondas ls --{recorte}',
   'cmd.lsPlaylist': 'ondas ls --playlist="{nome}"',
@@ -36,6 +36,7 @@ export const PT_BR = {
   'recorte.acervo': 'acervo',
   'recorte.shared': 'compartilhadas',
   'recorte.offline': 'offline',
+  'genero.flag': 'genero',
   'genero.tudo': 'tudo',
 
   // ── o comentário do prompt ───────────────────────────────────
@@ -148,6 +149,9 @@ export const PT_BR = {
   'atalho.simularOffline': 'simular queda de rede',
   'atalho.idiomas': 'idioma',
 
+  'tecla.segurar': 'segurar',
+  'tecla.numero': 'nº',
+  'tecla.ou': 'ou',
   'legenda.play': 'play',
   'legenda.faixa': 'faixa',
   'legenda.seek': '±10s',

@@ -2369,7 +2369,10 @@ test('o seletor troca de idioma, e a escolha sobrevive ao reload', async ({ page
   // E a raiz passa a mandar para o inglês, que é o que prova que a escolha
   // foi guardada — e não só que a URL mudou.
   await page.goto('/');
-  await expect(page).toHaveURL(/\/en\/?$/);
+  // `/en/login` e não `/en/`: sem sessão o app manda para o login, como sempre
+  // fez. O que este teste afirma é que o PREFIXO foi aplicado — isto é, que a
+  // escolha foi guardada e relida, e não só que a URL mudou no clique.
+  await expect(page).toHaveURL(/\/en\//);
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 });
 

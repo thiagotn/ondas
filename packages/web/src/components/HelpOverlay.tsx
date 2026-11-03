@@ -1,4 +1,4 @@
-import { atalhos, grupos } from '@ondas/core';
+import { atalhos, grupos, t } from '@ondas/core';
 import { useHelpOverlay } from '../hooks/useHelpOverlay';
 import { useWide } from '../hooks/useWide';
 import o from './overlay.module.css';
@@ -26,7 +26,7 @@ export function HelpOverlay() {
       >
         <span className={o.label}>ondas --help</span>
         <button type="button" className={o.close} onClick={closeHelp}>
-          {wide ? '[esc] fechar' : 'fechar'}
+          {t(wide ? 'ui.fecharEsc' : 'ui.fechar')}
         </button>
 
         <div className={o.atalhosCorpo}>

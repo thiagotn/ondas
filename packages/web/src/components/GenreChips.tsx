@@ -1,4 +1,4 @@
-import { genreLabel } from '@ondas/core';
+import { genreLabel, t } from '@ondas/core';
 import s from './shell.module.css';
 
 export interface GenreChipsProps {
@@ -11,7 +11,7 @@ export interface GenreChipsProps {
 export function GenreChips({ options, value, onChange }: GenreChipsProps) {
   return (
     <div className={s.chips}>
-      <span className={s.chipsLabel}>--genero=</span>
+      <span className={s.chipsLabel}>--{t('genero.flag')}=</span>
       {options.map((g) => (
         <button
           key={g}

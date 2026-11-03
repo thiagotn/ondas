@@ -24,7 +24,14 @@ export interface Atalho {
 
 /** A tabela crua, antes da tradução: a ação é a CHAVE, não a frase. */
 interface AtalhoBruto {
+  /** A tecla literal, ou vazia quando ela é palavra e vem de `teclaChave`. */
   tecla: string;
+  /**
+   * Para as "teclas" que são PALAVRA e não símbolo: `segurar` é um gesto, e
+   * `:nº` tem uma abreviação de "número" dentro. As duas mudam de idioma; as
+   * outras (`j/k`, `esc`, `␣`) não mudam em lugar nenhum.
+   */
+  teclaChave?: Chave;
   acao: Chave;
   grupo: GrupoAtalho;
 }
@@ -49,7 +56,7 @@ const TABELA: readonly AtalhoBruto[] = [
 
   { tecla: 'j/k', acao: 'atalho.cursor', grupo: 'ir' },
   { tecla: 'enter', acao: 'atalho.tocarLinha', grupo: 'ir' },
-  { tecla: ':nº', acao: 'atalho.irPorNumero', grupo: 'ir' },
+  { tecla: ':', teclaChave: 'tecla.numero', acao: 'atalho.irPorNumero', grupo: 'ir' },
   { tecla: '/', acao: 'atalho.buscar', grupo: 'ir' },
   { tecla: '1', acao: 'atalho.irHome', grupo: 'ir' },
   { tecla: '2', acao: 'atalho.irBuscar', grupo: 'ir' },
@@ -62,7 +69,7 @@ const TABELA: readonly AtalhoBruto[] = [
   // Um gesto numa tabela de teclas: é irregular, e entra mesmo assim porque
   // esta janela é a única referência do app, e porque segurar a linha é a
   // ÚNICA porta de quem não tem teclado — não há botão na tela.
-  { tecla: 'segurar', acao: 'atalho.segurar', grupo: 'selecionar' },
+  { tecla: '', teclaChave: 'tecla.segurar', acao: 'atalho.segurar', grupo: 'selecionar' },
   { tecla: 'x', acao: 'atalho.marcarLinha', grupo: 'selecionar' },
   // `a` e não `enter`: `enter` já é "tocar a linha marcada", e a mesma tecla
   // listada duas vezes na janela `?` não se explica — ela diria duas coisas
@@ -76,7 +83,7 @@ const TABELA: readonly AtalhoBruto[] = [
   { tecla: '5', acao: 'atalho.conta', grupo: 'janela' },
   { tecla: '7', acao: 'atalho.sobre', grupo: 'janela' },
   { tecla: '8', acao: 'atalho.idiomas', grupo: 'janela' },
-  { tecla: '? ou 6', acao: 'atalho.estaJanela', grupo: 'janela' },
+  { tecla: '?|6', acao: 'atalho.estaJanela', grupo: 'janela' },
   { tecla: 'esc', acao: 'atalho.fecharJanela', grupo: 'janela' },
 
   { tecla: 'o', acao: 'atalho.simularOffline', grupo: 'dev' },
@@ -85,7 +92,15 @@ const TABELA: readonly AtalhoBruto[] = [
 /** A referência completa. Sem `dev`, o grupo `dev` sai inteiro. */
 export function atalhos(dev: boolean): readonly Atalho[] {
   const lista = dev ? TABELA : TABELA.filter((a) => a.grupo !== 'dev');
-  return lista.map((a) => ({ tecla: a.tecla, acao: traduzir(a.acao), grupo: a.grupo }));
+  // `|` separa teclas alternativas, e vira a conjunção do idioma: `? ou 6`
+  // em português, `? or 6` em inglês. Escrevê-la na tabela deixaria um "ou"
+  // português no meio de uma janela em espanhol.
+  const ou = ' ' + traduzir('tecla.ou') + ' ';
+  return lista.map((a) => ({
+    tecla: (a.tecla + (a.teclaChave ? traduzir(a.teclaChave) : '')).split('|').join(ou),
+    acao: traduzir(a.acao),
+    grupo: a.grupo,
+  }));
 }
 
 /**
