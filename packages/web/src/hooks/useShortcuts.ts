@@ -6,6 +6,7 @@ import { libraryStore, playerStore, uiStore } from '../app/stores';
 import { PATHS } from '../routes/paths';
 import { applyTheme } from '../theme/applyTheme';
 import { cmdInputRef } from './cmdInputRef';
+import { useAboutOverlay } from './useAboutOverlay';
 import { useAccountOverlay } from './useAccountOverlay';
 import { useHelpOverlay } from './useHelpOverlay';
 import { usePlayerOverlay } from './usePlayerOverlay';
@@ -27,6 +28,7 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
   const { openPlayer, closePlayer, isPlayerOpen } = usePlayerOverlay();
   const { isAccountOpen, openAccount, closeAccount } = useAccountOverlay();
   const { isHelpOpen, openHelp, closeHelp } = useHelpOverlay();
+  const { isAboutOpen, openAbout, closeAbout } = useAboutOverlay();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -82,6 +84,7 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
         // camada de baixo — invisível enquanto o player era um param, visível
         // agora que fechá-lo é navegar.
         if (ui.gate) ui.closeGate();
+        else if (isAboutOpen) closeAbout();
         else if (isHelpOpen) closeHelp();
         else if (isAccountOpen) closeAccount();
         else if (isPlayerOpen) closePlayer();
@@ -103,7 +106,7 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
 
       // Com um overlay por cima, a lista não está na tela: andar com um cursor
       // invisível deixaria o Enter tocando algo que ninguém viu.
-      const naLista = !isPlayerOpen && !isAccountOpen && !isHelpOpen;
+      const naLista = !isPlayerOpen && !isAccountOpen && !isHelpOpen && !isAboutOpen;
       const janelaDeAtalhos = () => (isHelpOpen ? closeHelp() : openHelp());
 
       // Enter fica FORA do mapa de ações: lá o `preventDefault` é incondicional,
@@ -166,6 +169,7 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
         '4': () => ui.openPicker(themeIndex(ui.themeId)),
         '5': () => (isAccountOpen ? closeAccount() : openAccount()),
         '6': janelaDeAtalhos,
+        '7': () => (isAboutOpen ? closeAbout() : openAbout()),
         '?': janelaDeAtalhos,
         '/': () => {
           // Sem `closePlayer`: a troca de aba já sai de `/t/...`, e fechar o
@@ -183,6 +187,7 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
           else {
             if (isHelpOpen) closeHelp();
             if (isAccountOpen) closeAccount();
+            if (isAboutOpen) closeAbout();
           }
           ui.setCmdOpen(true);
           setTimeout(() => cmdInputRef.current?.focus(), 30);
@@ -201,14 +206,17 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [
+    closeAbout,
     closeAccount,
     closeHelp,
     closePlayer,
     goToTab,
+    isAboutOpen,
     isAccountOpen,
     isHelpOpen,
     isPlayerOpen,
     navigate,
+    openAbout,
     openAccount,
     openHelp,
     openPlayer,

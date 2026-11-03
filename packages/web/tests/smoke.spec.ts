@@ -1016,7 +1016,7 @@ test('busca filtra por artista e mostra a mensagem de grep vazio', async ({ page
   await expect(page.getByText('grep: nenhum resultado para "zzz"')).toBeVisible();
 });
 
-test('abertura toca no boot e volta pelo logo da barra de abas', async ({ page }) => {
+test('abertura toca no boot e volta pela janela do sobre', async ({ page }) => {
   await page.goto('/login');
 
   const splash = page.getByRole('button', { name: 'pular abertura' });
@@ -1027,11 +1027,45 @@ test('abertura toca no boot e volta pelo logo da barra de abas', async ({ page }
   await splash.click();
   await expect(splash).toBeHidden();
 
+  // O logo da barra abre `ondas --about`, e é de lá que a abertura volta: ela
+  // deixou de ter botão próprio quando o logo virou a porta do sobre.
   await page.getByRole('button', { name: /continuar como visitante/ }).click();
-  await page.getByRole('button', { name: 'ondas — rever abertura' }).click();
+  await page.getByRole('button', { name: 'ondas — sobre' }).click();
+  await expect(page.getByRole('dialog', { name: 'ondas --about' })).toBeVisible();
+
+  await page.getByRole('button', { name: '[rever abertura]' }).click();
   await expect(splash).toBeVisible();
+  // A janela sai de cena junto: o splash cobre a tela, e ela reapareceria no fim.
+  await expect(page.getByRole('dialog', { name: 'ondas --about' })).toBeHidden();
   await splash.click();
   await expect(splash).toBeHidden();
+});
+
+test('o logo da barra abre `ondas --about`, e a tecla 7 alterna a janela', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+
+  const sobre = page.getByRole('dialog', { name: 'ondas --about' });
+
+  await page.getByRole('button', { name: 'ondas — sobre' }).click();
+  await expect(page).toHaveURL(/about=1/);
+  await expect(sobre).toBeVisible();
+  await expect(sobre.getByText(/side projects de @thiagotn/)).toBeVisible();
+
+  // Fechar pelo Esc, abrir e fechar pela tecla — ela alterna, como a 5.
+  await page.keyboard.press('Escape');
+  await expect(sobre).toBeHidden();
+  await page.keyboard.press('7');
+  await expect(sobre).toBeVisible();
+  await page.keyboard.press('7');
+  await expect(sobre).toBeHidden();
+
+  // E o voltar do aparelho fecha, que é o motivo de o estado morar na URL.
+  await page.keyboard.press('7');
+  await expect(sobre).toBeVisible();
+  await page.goBack();
+  await expect(sobre).toBeHidden();
 });
 
 test('coluna central no desktop com faixas de ponta a ponta', async ({ page }) => {

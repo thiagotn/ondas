@@ -1,7 +1,7 @@
 import { themeIndex } from '@ondas/core';
 import { Disc, Flame, MagnifyingGlass, Palette } from '@phosphor-icons/react';
-import { useSplash } from '../app/splash';
 import { uiStore, usePlayer, useUi } from '../app/stores';
+import { useAboutOverlay } from '../hooks/useAboutOverlay';
 import { useCurrentTrack } from '../hooks/useCurrentTrack';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { useWide } from '../hooks/useWide';
@@ -66,15 +66,15 @@ export function TabBar() {
   );
 }
 
-/** O logo da barra: acompanha o player e reexibe a abertura ao ser clicado. */
+/** O logo da barra: acompanha o player e abre a janela do sobre ao ser clicado. */
 function TabLogo() {
-  const replay = useSplash((st) => st.replay);
+  const { openAbout } = useAboutOverlay();
   const { t, dur, playing } = usePlayer((st) => st);
   const track = useCurrentTrack();
   const duration = dur || track?.dur || 0;
 
   return (
-    <button type="button" className={s.logo} title="ondas" aria-label="ondas — rever abertura" onClick={replay}>
+    <button type="button" className={s.logo} title="ondas — sobre" aria-label="ondas — sobre" onClick={openAbout}>
       <span className={s.logoMark}>
         <CassetteLogo playing={playing} progress={duration ? t / duration : 0} />
       </span>

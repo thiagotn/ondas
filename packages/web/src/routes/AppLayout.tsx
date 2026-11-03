@@ -4,6 +4,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import * as controller from '../app/controller';
 import { useGuestMode } from '../app/guest';
 import { useSession, useUi } from '../app/stores';
+import { AboutOverlay } from '../components/AboutOverlay';
 import { AccountOverlay } from '../components/AccountOverlay';
 import { BottomBar } from '../components/BottomBar';
 import { FullPlayer } from '../components/FullPlayer';
@@ -14,6 +15,7 @@ import { TabBar } from '../components/TabBar';
 import s from '../components/shell.module.css';
 import { searchInputRef } from '../hooks/searchInputRef';
 import { useCurrentTrack } from '../hooks/useCurrentTrack';
+import { useAboutOverlay } from '../hooks/useAboutOverlay';
 import { useAccountOverlay } from '../hooks/useAccountOverlay';
 import { useHelpOverlay } from '../hooks/useHelpOverlay';
 import { useShortcuts } from '../hooks/useShortcuts';
@@ -32,6 +34,7 @@ export function AppLayout() {
   const gate = useUi((st) => st.gate);
   const { isHelpOpen } = useHelpOverlay();
   const { isAccountOpen } = useAccountOverlay();
+  const { isAboutOpen } = useAboutOverlay();
   const seletorPlaylist = useUi((st) => st.seletorPlaylist);
   const { pathname } = useLocation();
 
@@ -86,6 +89,9 @@ export function AppLayout() {
       {/* Por cima de tudo: é referência passageira, quem abre quer fechar em
           seguida — e é a primeira camada que o Esc tira. */}
       {isHelpOpen && <HelpOverlay />}
+      {/* A camada mais nova, e por isso a primeira que o Esc tira: ela é a
+          única que se abre a partir de dentro de outra tela qualquer. */}
+      {isAboutOpen && <AboutOverlay />}
       {/* Fora da cadeia de params dos outros overlays: ele não é endereço, é um
           passo dentro de um gesto (marquei faixas, estou escolhendo o destino).
           Um `?playlist=1` na URL sobreviveria ao reload com as marcas já

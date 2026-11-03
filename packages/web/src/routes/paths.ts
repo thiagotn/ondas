@@ -25,7 +25,7 @@ export const TAB_PATHS: Record<TabId, string> = {
  * O player cheio NÃO está aqui — ele é um path (`/t/<slug>-<id>`), porque o
  * endereço de uma faixa é o conteúdo em foco, e não um booleano de tela.
  */
-export const OVERLAY_PARAMS = ['account', 'shortcuts'] as const;
+export const OVERLAY_PARAMS = ['account', 'shortcuts', 'about'] as const;
 
 /** Filtros que moram na query da própria aba. */
 export const GENRE_PARAM = 'genre';

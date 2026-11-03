@@ -65,6 +65,7 @@ const TABELA: readonly Atalho[] = [
   { tecla: '0', acao: 'detalhes da faixa que está tocando', grupo: 'janela' },
   { tecla: '4', acao: 'temas', grupo: 'janela' },
   { tecla: '5', acao: 'conta e aparelho', grupo: 'janela' },
+  { tecla: '7', acao: 'sobre o ondas', grupo: 'janela' },
   { tecla: '? ou 6', acao: 'esta janela', grupo: 'janela' },
   { tecla: 'esc', acao: 'fechar a janela de cima', grupo: 'janela' },
 

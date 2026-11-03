@@ -1,11 +1,15 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import pkg from './package.json';
 
 /** bg do Catppuccin Mocha (tema padrão) — o `theme-color` real é trocado em runtime. */
 const DEFAULT_BG = '#1e1e2e';
 
 export default defineConfig({
+  // A versão que a janela `ondas --about` mostra. Vem do `package.json` para
+  // não haver um segundo lugar a lembrar de atualizar.
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   plugins: [
     react(),
     VitePWA({
