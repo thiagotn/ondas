@@ -1,3 +1,4 @@
+import { t as traduzir } from '../i18n/index.js';
 import { createStore } from 'zustand/vanilla';
 import type { Session, User } from '../types.js';
 
@@ -21,7 +22,7 @@ export function createSessionStore(initial: Session = null) {
 }
 
 export function userTag(user: Session): string {
-  return user ? '@' + user.name : 'visitante';
+  return user ? '@' + user.name : traduzir('who.visitante');
 }
 
 /**
@@ -34,10 +35,10 @@ export function userTag(user: Session): string {
  * ali elas dizem o que a conta PERMITE.
  */
 export function planLabel(user: Session): string {
-  if (!user) return 'somente faixas grátis';
-  return user.publico === false ? 'acervo + offline' : 'catálogo completo + offline';
+  if (!user) return traduzir('plano.gratis');
+  return traduzir(user.publico === false ? 'plano.acervo' : 'plano.completo');
 }
 
 export function whoAmI(user: Session): string {
-  return user ? (user as User).name : 'visitante';
+  return user ? (user as User).name : traduzir('who.visitante');
 }

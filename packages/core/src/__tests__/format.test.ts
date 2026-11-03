@@ -17,9 +17,9 @@ describe('fmtTime', () => {
 
 describe('fmtMB', () => {
   it('mostra uma casa decimal', () => {
-    expect(fmtMB(0)).toBe('0.0 MB');
-    expect(fmtMB(5 * 1048576)).toBe('5.0 MB');
-    expect(fmtMB(3_670_016)).toBe('3.5 MB');
+    expect(fmtMB(0)).toBe('0,0 MB');
+    expect(fmtMB(5 * 1048576)).toBe('5,0 MB');
+    expect(fmtMB(3_670_016)).toBe('3,5 MB');
   });
 });
 
@@ -84,11 +84,13 @@ describe('barraDeProgresso', () => {
 
 describe('fmtBytes', () => {
   it('fica em MB abaixo de 1 GB e vira GB acima', () => {
-    expect(fmtBytes(0)).toBe('0.0 MB');
-    expect(fmtBytes(213.3 * 1048576)).toBe('213.3 MB');
+    expect(fmtBytes(0)).toBe('0,0 MB');
+    expect(fmtBytes(213.3 * 1048576)).toBe('213,3 MB');
     // A fronteira exata: 1 GB redondo já é GB, um byte a menos ainda é MB.
-    expect(fmtBytes(1073741824)).toBe('1.0 GB');
-    expect(fmtBytes(1073741823)).toBe('1024.0 MB');
-    expect(fmtBytes(4.2 * 1073741824)).toBe('4.2 GB');
+    expect(fmtBytes(1073741824)).toBe('1,0 GB');
+    // Com `Intl` o milhar ganha separador, que em pt-BR é o ponto. Só aparece
+    // nesta fronteira: acima de 1 GB `fmtBytes` já troca de unidade.
+    expect(fmtBytes(1073741823)).toBe('1.024,0 MB');
+    expect(fmtBytes(4.2 * 1073741824)).toBe('4,2 GB');
   });
 });

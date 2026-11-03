@@ -1,5 +1,7 @@
 /** Formatação e hashing — compartilhado entre web e nativo. */
 
+import { fmtUmDecimal } from './i18n/motor.js';
+
 /** FNV-1a. Mesmo hash do protótipo: semeia waveform e cor de gênero. */
 export function hash(str: string): number {
   let h = 2166136261;
@@ -16,9 +18,16 @@ export function fmtTime(s: number): string {
   return Math.floor(v / 60) + ':' + String(v % 60).padStart(2, '0');
 }
 
-/** Bytes → `X.X MB`. */
+/**
+ * Bytes → `3,5 MB` em pt-BR e es, `3.5 MB` em en.
+ *
+ * Era `toFixed(1)`, que escreve sempre com PONTO — então o app em português
+ * sempre mostrou `3.5 MB`, que é a convenção errada. Não é regressão da
+ * tradução: é um bug que ela expôs, e `Intl` conserta os três idiomas de uma
+ * vez. É a única saída em pt-BR que este trabalho muda de propósito.
+ */
 export function fmtMB(bytes: number): string {
-  return (bytes / 1048576).toFixed(1) + ' MB';
+  return fmtUmDecimal(bytes / 1048576) + ' MB';
 }
 
 /**
@@ -30,7 +39,7 @@ export function fmtMB(bytes: number): string {
  */
 export function fmtBytes(bytes: number): string {
   const gb = bytes / 1073741824;
-  return gb >= 1 ? gb.toFixed(1) + ' GB' : fmtMB(bytes);
+  return gb >= 1 ? fmtUmDecimal(gb) + ' GB' : fmtMB(bytes);
 }
 
 /** Gênero → slug minúsculo sem acento nem separador. */

@@ -1,3 +1,4 @@
+import { t as traduzir } from '../i18n/index.js';
 import { createStore } from 'zustand/vanilla';
 import { DEFAULT_THEME_ID } from '../themes.js';
 import type { Gate, GateKind, ThemeId, WallMode } from '../types.js';
@@ -189,11 +190,11 @@ export function createUiStore(initial?: { themeId?: ThemeId; opacity?: number })
 export function gateCopy(gate: Gate): { title: string; body: string } {
   return gate.kind === 'dl'
     ? {
-        title: 'downloads exigem login',
-        body: `entre na sua conta para salvar "${gate.title}" no aparelho e ouvir sem conexão.`,
+        title: traduzir('gate.download.titulo'),
+        body: traduzir('gate.download.corpo', { faixa: gate.title }),
       }
     : {
-        title: `"${gate.title}" é uma faixa [pro]`,
-        body: 'entre gratuitamente para liberar o catálogo completo — ou continue ouvindo as faixas grátis.',
+        title: traduzir('gate.pro.titulo', { faixa: gate.title }),
+        body: traduzir('gate.pro.corpo'),
       };
 }

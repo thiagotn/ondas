@@ -1,7 +1,7 @@
 import {
   bufferShortLabel,
   fmtTime,
-  LEGENDA,
+  legenda,
   playerMode,
   userTag,
   type Track,
@@ -151,7 +151,7 @@ function StatusLine({ track }: { track: Track | undefined }) {
         <span className={s.spacer} />
         {wide && (
           <span>
-            {LEGENDA.map(([key, label]) => (
+            {legenda().map(([key, label]) => (
               <span key={key}>
                 <span className={s.legendKey}>{key}</span> {label}
                 {'  '}

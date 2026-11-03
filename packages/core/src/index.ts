@@ -1,3 +1,4 @@
+export * from './i18n/index.js';
 export * from './types.js';
 export * from './format.js';
 export * from './share.js';

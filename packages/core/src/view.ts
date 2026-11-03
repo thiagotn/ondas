@@ -1,4 +1,5 @@
 import { fmtBytes, fmtTime } from './format.js';
+import { t as traduzir } from './i18n/index.js';
 import type { Catalog, CatalogSource, LibrarySegment, Session, TabId, Track } from './types.js';
 
 /**
@@ -56,22 +57,14 @@ export function librarySegmentSlug(seg: LibrarySegment): string {
 /**
  * A palavra de cada recorte NA TELA — o chip e a linha do prompt.
  *
- * Separada de `SEGMENT_SLUGS` porque são duas coisas: a URL é inglês e a
- * interface é português, e dois dos quatro ids coincidem com o português por
- * acaso. Enquanto eram dois iguais e um diferente isso cabia num ternário no
- * `promptLine`; com dois diferentes, o ternário escreveria `ondas ls --shared`.
+ * Separada de `SEGMENT_SLUGS` porque são duas coisas: a URL é um id estável e
+ * o chip é palavra de interface, que muda com o idioma. Enquanto o mapa era de
+ * uma língua só isso ficava num objeto aqui; agora mora no catálogo, e a URL
+ * continua parada — ela casa com `Track.source`, que a API Go emite.
  */
-const CHIPS: Record<LibrarySegment, string> = {
-  liked: 'curtidas',
-  playlists: 'playlists',
-  acervo: 'acervo',
-  shared: 'compartilhadas',
-  offline: 'offline',
-};
-
-/** Recorte → a palavra dele na tela (`--curtidas`, `--compartilhadas`…). */
+/** Recorte → a palavra dele na tela (`--curtidas`, `--liked`, `--megusta`…). */
 export function librarySegmentChip(seg: LibrarySegment): string {
-  return CHIPS[seg];
+  return traduzir(`recorte.${seg}`);
 }
 
 /**
@@ -252,9 +245,9 @@ export function promptLine(args: {
     const typed = q.trim().replace(/^#/, '');
     return {
       who,
-      cwd: '~/buscar',
-      cmd: 'ondas search ' + (q ? `"${q}"` : ''),
-      comment: typed ? `${count} resultados` : 'sugestões — digite para filtrar',
+      cwd: traduzir('cwd.search'),
+      cmd: traduzir('cmd.search') + ' ' + (q ? `"${q}"` : ''),
+      comment: typed ? traduzir('prompt.resultados', { n: count }) : traduzir('prompt.sugestoes'),
     };
   }
   if (tab === 'library') {
@@ -264,24 +257,29 @@ export function promptLine(args: {
     if (seg === 'playlists' && playlistNome) {
       return {
         who,
-        cwd: '~/biblioteca',
-        cmd: `ondas ls --playlist="${playlistNome}"`,
-        comment: `${count} itens` + (fora ? ` · ${fora} fora da lista` : ''),
+        cwd: traduzir('cwd.library'),
+        cmd: traduzir('cmd.lsPlaylist', { nome: playlistNome }),
+        comment:
+          traduzir('prompt.itens', { n: count }) +
+          (fora ? ' · ' + traduzir('prompt.foraDaLista', { n: fora }) : ''),
       };
     }
     return {
       who,
-      cwd: '~/biblioteca',
-      cmd: 'ondas ls --' + CHIPS[seg],
+      cwd: traduzir('cwd.library'),
+      cmd: traduzir('cmd.ls', { recorte: librarySegmentChip(seg) }),
       // O índice das playlists conta playlists, e não itens: dizer "3 itens"
       // numa tela de três playlists com trinta faixas seria uma meia-verdade.
-      comment: seg === 'playlists' ? `${count} playlists` : `${count} itens`,
+      comment:
+        seg === 'playlists'
+          ? traduzir('prompt.playlists', { n: count })
+          : traduzir('prompt.itens', { n: count }),
     };
   }
   return {
     who,
-    cwd: '~/em-alta',
-    cmd: `ondas trending --genero=${genre}`,
+    cwd: traduzir('cwd.home'),
+    cmd: traduzir('cmd.trending', { genero: genre }),
     // Enquanto o refetch não volta, a lista na tela é a da sessão anterior:
     // dizer "ao vivo" sem ressalva seria mentira. E quando o acervo entra, a
     // fonte deixa de ser uma só — dizer apenas "audius" esconderia metade.
@@ -296,9 +294,13 @@ export function promptLine(args: {
     // duas vêm da mesma rota e as duas são o que o catálogo público não é — que
     // é o que esta contagem está dizendo.
     comment:
-      `${count} faixas · fonte: ${source ? catalogSourceLabel(source) : '…'}` +
-      (acervo && source !== 'acervo' ? ` + acervo (${acervo})` : '') +
-      (refreshing ? ' · atualizando' : ''),
+      traduzir('prompt.faixas', { n: count }) +
+      ' · ' +
+      traduzir('prompt.fonte', {
+        fonte: source ? catalogSourceLabel(source) : traduzir('prompt.fonteDesconhecida'),
+      }) +
+      (acervo && source !== 'acervo' ? ' ' + traduzir('prompt.maisAcervo', { n: acervo }) : '') +
+      (refreshing ? ' · ' + traduzir('prompt.atualizando') : ''),
   };
 }
 
@@ -310,16 +312,8 @@ export function promptLine(args: {
  * muda com o idioma. Um mapa separa as duas coisas.
  */
 export function catalogSourceLabel(source: CatalogSource): string {
-  return FONTES[source];
+  return traduzir(`fonte.${source}`);
 }
-
-const FONTES: Record<CatalogSource, string> = {
-  audius: 'audius api (ao vivo)',
-  cache: 'metadados em cache local',
-  'demo-offline': 'catálogo demo — api inacessível',
-  demo: 'catálogo demo',
-  acervo: 'só o acervo',
-};
 
 /**
  * Texto de lista vazia, por aba e contexto de sessão.
@@ -330,6 +324,18 @@ const FONTES: Record<CatalogSource, string> = {
  * `--offline` mostraria "vazio — baixe faixas [d]". A frase tem de dizer o que
  * aconteceu de verdade.
  */
+/**
+ * Chrome que as frases de lista vazia citam pelo nome.
+ *
+ * Mora aqui, e não dentro da tradução, porque é o MESMO botão nos três
+ * idiomas: `ondas whoami` é o rótulo da janela de conta e `[+ arquivo]` é o
+ * texto do botão. Digitá-los no catálogo deixaria a frase em espanhol
+ * mandando apertar um botão que não existe com esse nome.
+ */
+const JANELA_CONTA = 'ondas whoami';
+const BOTAO_ARQUIVO = '+ arquivo';
+const BOTAO_PLAYLIST = '+ playlist';
+
 export function emptyText(args: {
   tab: TabId;
   seg: LibrarySegment;
@@ -348,59 +354,58 @@ export function emptyText(args: {
   playlistAberta?: boolean;
 }): string {
   const { tab, seg, q, loading, user, publicOff, hidden, playlistAberta } = args;
-  if (tab === 'search') return `grep: nenhum resultado para "${q}"`;
+  if (tab === 'search') return traduzir('vazio.busca', { termo: q });
   if (tab === 'library') {
     // O recorte tem coisa guardada, e ela está fora da lista porque o catálogo
     // público saiu — não porque não há nada.
     if (publicOff && hidden) {
-      const quantas = hidden === 1 ? '1 faixa aqui vem' : `${hidden} faixas aqui vêm`;
-      return `${quantas} do catálogo público, que está desligado — religue em [ondas whoami].`;
+      // O nome da janela entra como PARÂMETRO e nunca digitado na tradução:
+      // é chrome citado dentro de prosa, e os três idiomas têm de apontar
+      // para o mesmo botão.
+      return traduzir('vazio.publicoDesligado', { n: hidden, janelaConta: JANELA_CONTA });
     }
     // Sem conta a frase não pode mandar apertar [l]: o coração não liga mais
     // para quem não entrou, porque a curtida é da conta e não do aparelho.
     if (seg === 'liked') {
-      return user ? 'vazio — pressione [l] ou o coração para curtir.' : 'curtidas exigem login.';
+      return traduzir(user ? 'vazio.curtidas' : 'vazio.curtidasSemConta');
     }
     if (seg === 'acervo') {
-      return user ? 'vazio — envie um arquivo com [+ arquivo].' : 'o acervo exige login.';
+      return user
+        ? traduzir('vazio.acervo', { botaoArquivo: BOTAO_ARQUIVO })
+        : traduzir('vazio.acervoSemConta');
     }
     // As playlists ficam DEPOIS do ramo de `publicOff` acima de propósito: com
     // o catálogo público desligado, "religue em [ondas whoami]" é mais útil que
     // explicar o decaimento, porque é a frase que tem conserto.
     if (seg === 'playlists') {
-      if (!user) return 'playlists exigem login.';
+      if (!user) return traduzir('vazio.playlistsSemConta');
       // Playlist aberta e vazia na tela, mas com itens guardados: eles são de
       // faixa pública que saiu do catálogo. Sem esta frase a tela mostraria uma
       // playlist vazia que o índice jura ter 7 faixas.
       if (playlistAberta && hidden) {
-        const quantas = hidden === 1 ? '1 faixa desta playlist' : `${hidden} faixas desta playlist`;
-        return `${quantas} não está no catálogo de hoje — faixa pública sai de ~/em-alta com o tempo; a do acervo fica.`;
+        return traduzir('vazio.playlistDecaida', { n: hidden, home: traduzir('cwd.home') });
       }
       // Estas duas frases são o único lugar da tela que ENSINA o gesto. Desde
       // que o botão saiu (ele custava uma linha inteira acima da lista), marcar
       // é segurar a faixa ou teclar `v`, e nada mais anuncia isso para quem só
       // toca — a janela `?` não tem porta no toque.
       return playlistAberta
-        ? 'vazio — segure uma faixa na lista (ou tecle v) para marcar, e use [+ playlist].'
-        : 'nenhuma playlist — segure uma faixa na lista (ou tecle v) para marcar, e crie a primeira.';
+        ? traduzir('vazio.playlistAberta', { botaoPlaylist: BOTAO_PLAYLIST })
+        : traduzir('vazio.nenhumaPlaylist');
     }
     // A quarta porta fechada, na forma das outras três. Com conta a frase não
     // manda fazer nada: compartilhar não é ato de quem recebe.
     if (seg === 'shared') {
-      return user
-        ? 'vazio — ninguém compartilhou faixa com você ainda.'
-        : 'compartilhadas exigem login.';
+      return traduzir(user ? 'vazio.compartilhadas' : 'vazio.compartilhadasSemConta');
     }
-    return user
-      ? 'vazio — baixe faixas [d] ou ative o buffer para ouvir sem rede.'
-      : 'downloads offline exigem login.';
+    return traduzir(user ? 'vazio.offline' : 'vazio.offlineSemConta');
   }
   if (loading) return '';
   // em-alta vazia com o catálogo público desligado não é "nenhuma faixa": é o
   // acervo ainda vazio. A frase genérica mandaria a pessoa procurar o que não
   // existe, em vez de dizer os dois caminhos que ela tem.
-  if (publicOff) return 'o acervo está vazio — envie um arquivo em ~/biblioteca.';
-  return 'nenhuma faixa.';
+  if (publicOff) return traduzir('vazio.acervoNaHome', { biblioteca: traduzir('cwd.library') });
+  return traduzir('vazio.nenhumaFaixa');
 }
 
 /** Linha `fonte:` do painel de buffer do full player. */
@@ -410,11 +415,13 @@ export function bufferSourceLabel(args: {
   hasStream: boolean;
   ahead: number;
 }): string {
-  if (args.cached) return 'arquivo local — toca sem rede';
+  if (args.cached) return traduzir('buffer.local');
   if (args.downloading != null) {
-    return `baixando ${Math.round(args.downloading * 100)}% → disponível offline`;
+    return traduzir('buffer.baixando', { pct: Math.round(args.downloading * 100) });
   }
-  return (args.hasStream ? 'stream · ' : 'prévia · ') + fmtTime(args.ahead) + ' em buffer à frente';
+  return traduzir(args.hasStream ? 'buffer.stream' : 'buffer.previa', {
+    tempo: fmtTime(args.ahead),
+  });
 }
 
 /**
@@ -427,15 +434,17 @@ export function bufferSourceLabel(args: {
  * inventar um seria pior que dizer que não se sabe.
  */
 export function storageLabel(uso: { bytes: number; quota?: number } | null): string {
-  if (!uso) return 'calculando…';
+  if (!uso) return traduzir('espaco.calculando');
   if (uso.quota == null) {
-    return fmtBytes(uso.bytes) + ' usados · o navegador não informa o limite';
+    return traduzir('espaco.semLimite', { usado: fmtBytes(uso.bytes) });
   }
   const livres = Math.max(0, uso.quota - uso.bytes);
-  return `${fmtBytes(livres)} livres de ${fmtBytes(uso.quota)}`;
+  return traduzir('espaco.livres', { livres: fmtBytes(livres), total: fmtBytes(uso.quota) });
 }
 
 /** `buf:` da status line. */
 export function bufferShortLabel(cached: boolean, ahead: number): string {
-  return cached ? 'buf: local' : 'buf: +' + fmtTime(ahead);
+  return cached
+    ? traduzir('buffer.curtoLocal')
+    : traduzir('buffer.curtoAdiante', { tempo: fmtTime(ahead) });
 }

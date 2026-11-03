@@ -1,4 +1,4 @@
-import { atalhos, GRUPOS } from '@ondas/core';
+import { atalhos, grupos } from '@ondas/core';
 import { useHelpOverlay } from '../hooks/useHelpOverlay';
 import { useWide } from '../hooks/useWide';
 import o from './overlay.module.css';
@@ -30,7 +30,7 @@ export function HelpOverlay() {
         </button>
 
         <div className={o.atalhosCorpo}>
-          {GRUPOS.map(([grupo, titulo]) => {
+          {grupos().map(([grupo, titulo]) => {
             const doGrupo = lista.filter((a) => a.grupo === grupo);
             if (!doGrupo.length) return null;
             return (

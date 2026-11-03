@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { atalhos, GRUPOS, LEGENDA } from '../shortcuts.js';
+import { atalhos, grupos, legenda } from '../shortcuts.js';
 
 describe('atalhos', () => {
   it('nenhuma tecla aparece duas vezes', () => {
@@ -17,7 +17,7 @@ describe('atalhos', () => {
   });
 
   it('todo atalho cai num grupo que a janela sabe desenhar', () => {
-    const conhecidos = new Set(GRUPOS.map(([id]) => id));
+    const conhecidos = new Set(grupos().map(([id]) => id));
     for (const a of atalhos(true)) expect(conhecidos.has(a.grupo)).toBe(true);
   });
 
@@ -28,6 +28,6 @@ describe('atalhos', () => {
   });
 
   it('a legenda do rodapé é mais curta que a referência', () => {
-    expect(LEGENDA.length).toBeLessThan(atalhos(false).length);
+    expect(legenda().length).toBeLessThan(atalhos(false).length);
   });
 });
