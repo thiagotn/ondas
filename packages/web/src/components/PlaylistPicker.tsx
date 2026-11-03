@@ -1,3 +1,4 @@
+import { t } from '@ondas/core';
 import { useState } from 'react';
 import * as controller from '../app/controller';
 import { uiStore, useLibrary, useUi } from '../app/stores';
@@ -51,7 +52,7 @@ export function PlaylistPicker() {
                 <span className={o.pickerMark}>{i === idx ? '❯' : ''}</span>
                 <span className={o.pickerName}>{p.nome}</span>
                 <span className={s.jaTem}>
-                  {jaTem ? `${jaTem} já está${jaTem > 1 ? 'ão' : ''} aqui` : `${p.itens.length}`}
+                  {jaTem ? t('playlist.jaAqui', { n: jaTem }) : `${p.itens.length}`}
                 </span>
               </button>
             );
@@ -59,7 +60,7 @@ export function PlaylistPicker() {
 
           {criando ? (
             <CampoDeNome
-              rotulo="nome da playlist"
+              rotulo={t('playlist.nome')}
               onCancelar={() => setCriando(false)}
               onPronto={(nome) => {
                 setCriando(false);
@@ -67,17 +68,13 @@ export function PlaylistPicker() {
               }}
             />
           ) : (
-            <button
-              type="button"
-              className={o.pickerRow}
-              onClick={() => setCriando(true)}
-            >
+            <button type="button" className={o.pickerRow} onClick={() => setCriando(true)}>
               <span className={o.pickerMark} />
-              <span className={o.pickerName}>[nova playlist…]</span>
+              <span className={o.pickerName}>{t('playlist.nova')}</span>
             </button>
           )}
 
-          <div className={o.pickerFooter}>j/k navegar · enter escolher · esc fechar</div>
+          <div className={o.pickerFooter}>{t('playlist.rodapeSeletor')}</div>
         </div>
       </div>
     </div>

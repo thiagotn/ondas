@@ -1,4 +1,4 @@
-import { themeIndex } from '@ondas/core';
+import { t as traduzir, themeIndex } from '@ondas/core';
 import { Disc, Flame, MagnifyingGlass, Palette } from '@phosphor-icons/react';
 import { uiStore, usePlayer, useUi } from '../app/stores';
 import { useAboutOverlay } from '../hooks/useAboutOverlay';
@@ -53,8 +53,8 @@ export function TabBar() {
         {wide && <span className={s.spacer} />}
         <button
           type="button"
-          title="Tema (t ou 4)"
-          aria-label="Trocar tema"
+          title={traduzir('barra.tema')}
+          aria-label={traduzir('barra.trocarTema')}
           className={s.palette}
           onClick={() => uiStore.getState().openPicker(themeIndex(themeId))}
         >
@@ -74,7 +74,13 @@ function TabLogo() {
   const duration = dur || track?.dur || 0;
 
   return (
-    <button type="button" className={s.logo} title="ondas — sobre" aria-label="ondas — sobre" onClick={openAbout}>
+    <button
+      type="button"
+      className={s.logo}
+      title={traduzir('barra.sobre')}
+      aria-label={traduzir('barra.sobre')}
+      onClick={openAbout}
+    >
       <span className={s.logoMark}>
         <CassetteLogo playing={playing} progress={duration ? t / duration : 0} />
       </span>

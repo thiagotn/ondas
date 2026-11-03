@@ -1,3 +1,4 @@
+import { t, tErro, type Params } from '@ondas/core';
 import { PlaylistsError, type Playlist } from '@ondas/core';
 import { playlistsClient } from './services';
 import { libraryStore, sessionStore, uiStore } from './stores';
@@ -71,13 +72,10 @@ export function esquecerPlaylists(): void {
  * estourado —, então ela vai para o toast quando existe. Devolve se deu certo,
  * para quem chamou poder fechar um painel só no sucesso.
  */
-async function escrever(
-  acao: () => Promise<Playlist[]>,
-  aviso: string,
-): Promise<boolean> {
+async function escrever(acao: () => Promise<Playlist[]>, aviso: string): Promise<boolean> {
   const ui = uiStore.getState();
   if (!sessionStore.getState().user) {
-    ui.flash('playlists exigem entrar na conta');
+    ui.flash(t('toast.playlistsExigemConta'));
     return false;
   }
   try {
@@ -87,10 +85,10 @@ async function escrever(
     if (err instanceof PlaylistsError) {
       if (err.semSessao) {
         esquecerPlaylists();
-        ui.flash('sessão expirada — entre de novo');
+        ui.flash(t('toast.sessaoExpirada'));
         return false;
       }
-      ui.flash(err.message);
+      ui.flash(tErro(err.codigo, err.params as Params | undefined) ?? err.message);
       return false;
     }
     // Rede fora é o caso comum do `catch` que sobra, e a frase diz isso em vez
@@ -102,29 +100,23 @@ async function escrever(
 }
 
 export function criar(nome: string): Promise<boolean> {
-  return escrever(() => playlistsClient.criar(nome), 'sem rede — a playlist não foi criada');
+  return escrever(() => playlistsClient.criar(nome), t('semRede.playlistNaoCriada'));
 }
 
 export function renomear(id: string, nome: string): Promise<boolean> {
-  return escrever(() => playlistsClient.renomear(id, nome), 'sem rede — o nome não mudou');
+  return escrever(() => playlistsClient.renomear(id, nome), t('semRede.nomeNaoMudou'));
 }
 
 export function apagar(id: string): Promise<boolean> {
-  return escrever(() => playlistsClient.apagar(id), 'sem rede — a playlist não foi apagada');
+  return escrever(() => playlistsClient.apagar(id), t('semRede.playlistNaoApagada'));
 }
 
 export function adicionar(id: string, ids: readonly string[]): Promise<boolean> {
-  return escrever(
-    () => playlistsClient.aplicar(id, { add: ids }),
-    'sem rede — as faixas não entraram',
-  );
+  return escrever(() => playlistsClient.aplicar(id, { add: ids }), t('semRede.faixasNaoEntraram'));
 }
 
 export function remover(id: string, ids: readonly string[]): Promise<boolean> {
-  return escrever(
-    () => playlistsClient.aplicar(id, { remove: ids }),
-    'sem rede — as faixas não saíram',
-  );
+  return escrever(() => playlistsClient.aplicar(id, { remove: ids }), t('semRede.faixasNaoSairam'));
 }
 
 /**
@@ -138,9 +130,9 @@ export function remover(id: string, ids: readonly string[]): Promise<boolean> {
  */
 export function mover(id: string, ordem: readonly string[]): void {
   const atual = playlists();
-  libraryStore.getState().setPlaylists(
-    atual.map((p) => (p.id === id ? { ...p, itens: [...ordem] } : p)),
-  );
+  libraryStore
+    .getState()
+    .setPlaylists(atual.map((p) => (p.id === id ? { ...p, itens: [...ordem] } : p)));
   pendente = { id, ordem };
   if (agendado) clearTimeout(agendado);
   agendado = setTimeout(() => {
@@ -155,7 +147,7 @@ async function subirOrdem(): Promise<void> {
   pendente = null;
   const ok = await escrever(
     () => playlistsClient.aplicar(subindo.id, { ordem: subindo.ordem }),
-    'sem rede — a ordem não foi salva',
+    t('semRede.ordemNaoSalva'),
   );
   // Falhou: o espelho está com a ordem otimista, que não é a do servidor.
   // Reler é o desfazer, e ele não precisa saber o que foi tentado.

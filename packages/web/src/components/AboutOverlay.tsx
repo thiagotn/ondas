@@ -1,3 +1,4 @@
+import { t } from '@ondas/core';
 import { useSplash } from '../app/splash';
 import { useAboutOverlay } from '../hooks/useAboutOverlay';
 import { useWide } from '../hooks/useWide';
@@ -30,7 +31,7 @@ export function AboutOverlay() {
       >
         <span className={o.label}>ondas --about</span>
         <button type="button" className={o.close} onClick={closeAbout}>
-          {wide ? '[esc] fechar' : 'fechar'}
+          {t(wide ? 'ui.fecharEsc' : 'ui.fechar')}
         </button>
 
         <div className={o.sobreCorpo}>
@@ -39,25 +40,20 @@ export function AboutOverlay() {
               produto já está no rótulo da janela e na frase abaixo. */}
           <span className={`${o.sobreArte} ${o.sobreGlint}`} aria-hidden="true" />
 
-          <p className={o.sobreTexto}>
-            ondas é um player de música com estética de terminal — a fita roda, a
-            lista é a tela, e tudo se faz pelo teclado.
-          </p>
-          <p className={o.sobreTexto}>
-            um dos side projects de @thiagotn, feitos para estudar IA.
-          </p>
+          <p className={o.sobreTexto}>{t('sobre.texto1')}</p>
+          <p className={o.sobreTexto}>{t('sobre.texto2')}</p>
 
           <div className={s.panel}>
             <div className={s.panelRow}>
-              <span className={s.panelLabel}>versão</span>
+              <span className={s.panelLabel}>{t('sobre.versao')}</span>
               <span className={s.panelValue}>{__APP_VERSION__}</span>
             </div>
             <div className={s.panelRow}>
-              <span className={s.panelLabel}>feito com</span>
+              <span className={s.panelLabel}>{t('sobre.feitoCom')}</span>
               <span className={s.panelValue}>react · typescript · vite</span>
             </div>
             <div className={s.panelRow}>
-              <span className={s.panelLabel}>autor</span>
+              <span className={s.panelLabel}>{t('sobre.autor')}</span>
               <span className={s.panelValue}>@thiagotn</span>
               <a
                 className={s.link}
@@ -80,7 +76,7 @@ export function AboutOverlay() {
               replay();
             }}
           >
-            [rever abertura]
+            {t('sobre.reverAbertura')}
           </button>
         </div>
       </div>

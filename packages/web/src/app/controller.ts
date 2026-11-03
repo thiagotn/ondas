@@ -3,6 +3,7 @@ import {
   firstPlayable,
   fmtMB,
   indexOfTrack,
+  librarySegmentChip,
   moverNaOrdem,
   offlineBytes,
   onEnded,
@@ -10,6 +11,7 @@ import {
   prefetchTarget,
   showsPublicCatalog,
   stepIndex,
+  t,
   type QueueContext,
   type ThemeId,
   type Track,
@@ -31,6 +33,9 @@ import { esquecerCurtidas, registrar, sincronizar } from './likes';
 import * as listas from './playlists';
 import { auth, connectivity, engine, offlineStore } from './services';
 import { libraryStore, playerStore, sessionStore, uiStore } from './stores';
+
+/** O rótulo da janela de conta, citado dentro de frase. Ver `view.ts`. */
+const JANELA_CONTA = 'ondas whoami';
 
 /**
  * Orquestra stores, motor de áudio e armazenamento offline — o papel que a
@@ -98,7 +103,7 @@ export async function play(index: number): Promise<void> {
   });
   if (!verdict.ok) {
     if (verdict.reason === 'locked') ui.openGate('play', track.title);
-    else ui.flash('sem rede — faixa não está no aparelho');
+    else ui.flash(t('toast.semRede'));
     return;
   }
 
@@ -164,7 +169,7 @@ export function irParaFaixa(numero: number): Track | undefined {
   const track = faixaPorNumero(tracks, numero);
   const ui = uiStore.getState();
   if (!track) {
-    ui.flash('faixa ' + numero + ' não existe');
+    ui.flash(t('toast.faixaNaoExiste', { numero }));
     return undefined;
   }
   ui.setCursor(track.id);
@@ -232,7 +237,7 @@ export function seekBy(seconds: number): void {
  */
 export function toggleLike(id: string): void {
   if (!sessionStore.getState().user) {
-    uiStore.getState().flash('curtir exige entrar na conta');
+    uiStore.getState().flash(t('toast.curtirExigeConta'));
     return;
   }
   const curtir = !libraryStore.getState().liked[id];
@@ -254,7 +259,7 @@ export function likeCurrent(): void {
  */
 export function marcar(id?: string): void {
   if (!sessionStore.getState().user) {
-    uiStore.getState().flash('playlists exigem entrar na conta');
+    uiStore.getState().flash(t('toast.playlistsExigemConta'));
     return;
   }
   const ui = uiStore.getState();
@@ -294,7 +299,7 @@ export async function adicionarMarcadas(playlistID: string): Promise<void> {
   const nome = listas.playlistPorID(playlistID)?.nome ?? 'playlist';
   if (!(await listas.adicionar(playlistID, ids))) return;
   uiStore.getState().sairDaSelecao();
-  uiStore.getState().flash(`${ids.length === 1 ? '1 faixa' : ids.length + ' faixas'} → ${nome}`);
+  uiStore.getState().flash(t('toast.faixasParaPlaylist', { n: ids.length, nome }));
 }
 
 /**
@@ -309,12 +314,14 @@ export async function criarComMarcadas(nome: string): Promise<void> {
   if (!(await listas.criar(nome))) return;
   const nova = libraryStore.getState().playlists.find((p) => p.nome === nome);
   if (!nova) {
-    uiStore.getState().flash('playlist criada — abra em --playlists');
+    uiStore
+      .getState()
+      .flash(t('toast.playlistCriadaAbra', { recorte: librarySegmentChip('playlists') }));
     return;
   }
   if (!marcadasEmOrdem().length) {
     uiStore.getState().sairDaSelecao();
-    uiStore.getState().flash(`playlist "${nome}" criada`);
+    uiStore.getState().flash(t('toast.playlistCriada', { nome }));
     return;
   }
   await adicionarMarcadas(nova.id);
@@ -326,7 +333,7 @@ export async function removerMarcadas(playlistID: string): Promise<void> {
   if (!ids.length) return;
   if (!(await listas.remover(playlistID, ids))) return;
   uiStore.getState().sairDaSelecao();
-  uiStore.getState().flash(ids.length === 1 ? 'faixa tirada da playlist' : 'faixas tiradas da playlist');
+  uiStore.getState().flash(t('toast.faixasTiradas', { n: ids.length }));
 }
 
 /**
@@ -352,12 +359,13 @@ export function moverNaPlaylist(playlistID: string, dir: 1 | -1): void {
 }
 
 export async function renomearPlaylist(id: string, nome: string): Promise<void> {
-  if (await listas.renomear(id, nome)) uiStore.getState().flash(`playlist → ${nome}`);
+  if (await listas.renomear(id, nome))
+    uiStore.getState().flash(t('toast.playlistRenomeada', { nome }));
 }
 
 export async function apagarPlaylist(id: string): Promise<void> {
   const nome = listas.playlistPorID(id)?.nome ?? '';
-  if (await listas.apagar(id)) uiStore.getState().flash(`playlist "${nome}" apagada`);
+  if (await listas.apagar(id)) uiStore.getState().flash(t('toast.playlistApagada', { nome }));
 }
 
 /** Manda o link da faixa que está tocando (tecla `c` e botão do player). */
@@ -380,19 +388,19 @@ export async function download(track: Track, silent = false): Promise<void> {
   if (lib.cached[track.id]) {
     await offlineStore.remove(track.id);
     libraryStore.getState().unmarkCached(track.id);
-    ui.flash('removida do aparelho');
+    ui.flash(t('toast.removidaDoAparelho'));
     return;
   }
   if (lib.dl[track.id] != null) return;
   if (isOffline()) {
-    ui.flash('conecte-se para baixar');
+    ui.flash(t('toast.conecteParaBaixar'));
     return;
   }
 
   const done = (size: number) => {
     libraryStore.getState().setDl(track.id, null);
     libraryStore.getState().markCached(track.id, size);
-    ui.flash(silent ? 'buffer: próxima faixa salva' : 'salva no aparelho');
+    ui.flash(t(silent ? 'toast.bufferSalvo' : 'toast.salvaNoAparelho'));
   };
 
   // Faixa demo não tem bytes para baixar: progresso encenado, igual ao protótipo.
@@ -424,11 +432,11 @@ export async function download(track: Track, silent = false): Promise<void> {
     // espera sinal, a outra espera uma faxina.
     if (ehCotaExcedida(err)) {
       console.warn('[ondas] sem espaço para baixar:', err);
-      if (!silent) ui.flash('sem espaço no aparelho — limpe downloads em ondas whoami');
+      if (!silent) ui.flash(t('toast.semEspaco', { janelaConta: JANELA_CONTA }));
       return;
     }
     console.warn('[ondas] download falhou:', err);
-    if (!silent) ui.flash('falha no download');
+    if (!silent) ui.flash(t('toast.falhaDownload'));
   }
 }
 
@@ -449,7 +457,7 @@ export function setTheme(id: ThemeId): void {
   applyTheme(id, uiStore.getState().opacity);
   uiStore.getState().setThemeId(id);
   uiStore.getState().closePicker();
-  uiStore.getState().flash('tema → ' + id);
+  uiStore.getState().flash(t('toast.tema', { tema: id }));
 }
 
 export async function logout(): Promise<void> {
@@ -504,7 +512,7 @@ export async function togglePublico(): Promise<void> {
     novo = await auth.setPublico(!ligado);
   } catch (err) {
     console.warn('[ondas] não foi possível salvar a preferência:', err);
-    ui.flash('não foi possível mudar o catálogo');
+    ui.flash(t('toast.falhaCatalogo'));
     return;
   }
 
@@ -537,7 +545,7 @@ export async function togglePublico(): Promise<void> {
 
   sessionStore.getState().setUser(novo);
   void queryClient.invalidateQueries({ queryKey: CATALOG_LOGADO_KEY });
-  ui.flash('catálogo público → ' + (ligado ? 'desligado' : 'ligado'));
+  ui.flash(t(ligado ? 'toast.catalogoDesligado' : 'toast.catalogoLigado'));
 }
 
 /**
@@ -560,14 +568,14 @@ export async function clearDownloads(): Promise<void> {
     await offlineStore.remove(id);
   }
   libraryStore.getState().reconcile(await offlineStore.keys());
-  uiStore.getState().flash('downloads apagados — ' + fmtMB(antes) + ' liberados');
+  uiStore.getState().flash(t('toast.downloadsApagados', { tamanho: fmtMB(antes) }));
 }
 
 export function toggleSimulatedOffline(): void {
   const ui = uiStore.getState();
   const next = !ui.simulatedOffline;
   ui.setSimulatedOffline(next);
-  ui.flash(next ? 'rede desconectada — apenas faixas [off]' : 'rede conectada');
+  ui.flash(t(next ? 'toast.redeDesconectada' : 'toast.redeConectada'));
 }
 
 /**
@@ -602,7 +610,7 @@ export function bootstrap(): () => void {
       }
     }),
     engine.on('error', () => {
-      ui.flash('stream indisponível — pulando faixa');
+      ui.flash(t('toast.streamIndisponivel'));
       step(1);
     }),
     bindMediaSessionActions({
@@ -615,7 +623,7 @@ export function bootstrap(): () => void {
     }),
     connectivity.subscribe((value) => {
       setOnline(value);
-      ui.flash(value ? 'rede conectada' : 'rede desconectada — apenas faixas [off]');
+      ui.flash(t(value ? 'toast.redeConectada' : 'toast.redeDesconectada'));
       // A rede voltou: é a hora de subir o que foi curtido sem ela.
       if (value) void sincronizar();
       // As playlists não têm fila para subir (ver `app/playlists.ts`), mas o

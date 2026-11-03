@@ -1,3 +1,4 @@
+import { t } from '@ondas/core';
 import { useState } from 'react';
 import * as controller from '../app/controller';
 import { uiStore, useLibrary, useSession, useUi } from '../app/stores';
@@ -5,7 +6,7 @@ import s from './playlist.module.css';
 
 export interface SelectionBarProps {
   /**
-   * A playlist ABERTA, quando é o caso. É ela que ganha `[− playlist]` e as
+   * A playlist ABERTA, quando é o caso. É ela que ganha `{t('playlist.remover')}` e as
    * setas de ordem — as duas ações que só existem dentro de uma playlist.
    */
   playlistID?: string;
@@ -40,12 +41,10 @@ export function SelectionBar({ playlistID }: SelectionBarProps) {
   return (
     <>
       <div className={`${s.barra} ${s.barraOn}`}>
-        <span className={s.contador}>
-          {quantas === 1 ? '1 marcada' : `${quantas} marcadas`}
-        </span>
+        <span className={s.contador}>{t('playlist.marcadas', { n: quantas })}</span>
 
         {/* Sem nada marcado os botões de ação sairiam da tela em vez de ficarem
-            cinza: um `[+ playlist]` que não faz nada é pior que a sua ausência. */}
+            cinza: um `{t('playlist.adicionar')}` que não faz nada é pior que a sua ausência. */}
         {quantas > 0 && (
           <>
             <button
@@ -58,7 +57,7 @@ export function SelectionBar({ playlistID }: SelectionBarProps) {
                 else uiStore.getState().abrirSeletorPlaylist();
               }}
             >
-              [+ playlist]
+              {t('playlist.adicionar')}
             </button>
             {playlistID && (
               <button
@@ -66,7 +65,7 @@ export function SelectionBar({ playlistID }: SelectionBarProps) {
                 className={`${s.acao} ${s.acaoRisco}`}
                 onClick={() => void controller.removerMarcadas(playlistID)}
               >
-                [− playlist]
+                {t('playlist.remover')}
               </button>
             )}
             {/* As setas são o caminho do celular, onde não há cursor para o
@@ -77,7 +76,7 @@ export function SelectionBar({ playlistID }: SelectionBarProps) {
                 <button
                   type="button"
                   className={s.seta}
-                  aria-label="Subir na playlist"
+                  aria-label={t('playlist.subir')}
                   onClick={() => controller.moverNaPlaylist(playlistID, -1)}
                 >
                   ↑
@@ -85,7 +84,7 @@ export function SelectionBar({ playlistID }: SelectionBarProps) {
                 <button
                   type="button"
                   className={s.seta}
-                  aria-label="Descer na playlist"
+                  aria-label={t('playlist.descer')}
                   onClick={() => controller.moverNaPlaylist(playlistID, 1)}
                 >
                   ↓
@@ -97,7 +96,7 @@ export function SelectionBar({ playlistID }: SelectionBarProps) {
               className={s.acao}
               onClick={() => uiStore.getState().limparMarcas()}
             >
-              [limpar]
+              {t('playlist.limpar')}
             </button>
           </>
         )}
@@ -111,13 +110,13 @@ export function SelectionBar({ playlistID }: SelectionBarProps) {
             uiStore.getState().sairDaSelecao();
           }}
         >
-          [sair]
+          {t('ui.sair')}
         </button>
       </div>
 
       {criando && (
         <CampoDeNome
-          rotulo="nome da playlist"
+          rotulo={t('playlist.nome')}
           onCancelar={() => setCriando(false)}
           onPronto={(nome) => {
             setCriando(false);

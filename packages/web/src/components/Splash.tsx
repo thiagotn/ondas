@@ -1,3 +1,4 @@
+import { t } from '@ondas/core';
 import { useEffect, useState } from 'react';
 import { useSplash } from '../app/splash';
 import { useCatalog } from '../query/catalog';
@@ -44,7 +45,7 @@ export function Splash() {
       className={s.splash}
       role="button"
       tabIndex={0}
-      aria-label="pular abertura"
+      aria-label={t('splash.pular')}
       onClick={close}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') close();
@@ -56,7 +57,7 @@ export function Splash() {
 
       <div className={s.wordmark}>
         <span className={s.name}>ondas</span>
-        <span className={s.tagline}>lado A · streaming independente</span>
+        <span className={s.tagline}>{t('splash.tagline')}</span>
       </div>
 
       <div className={s.progress}>
@@ -66,7 +67,7 @@ export function Splash() {
         </span>
         <span role="status">
           <span className={s.spinner}>{SPINNER[Math.floor(elapsed / TICK) % SPINNER.length]}</span>{' '}
-          {loading ? 'rebobinando · carregando metadados' : 'pronto ▶'}
+          {t(loading ? 'splash.carregando' : 'splash.pronto')}
         </span>
       </div>
     </div>

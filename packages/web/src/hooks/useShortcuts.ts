@@ -1,4 +1,4 @@
-import { THEMES, themeIndex } from '@ondas/core';
+import { t, THEMES, themeIndex } from '@ondas/core';
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import * as controller from '../app/controller';
@@ -152,7 +152,7 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
           if (libraryStore.getState().playlists.length) ui.abrirSeletorPlaylist();
           // Sem playlist nenhuma o seletor seria um painel vazio; o caminho é o
           // botão `[+ playlist]`, que abre o campo de nome.
-          else ui.flash('nenhuma playlist ainda — use [+ playlist] para criar a primeira');
+          else ui.flash(t('toast.nenhumaPlaylistAinda', { botaoPlaylist: '+ playlist' }));
         },
         // `J`/`K` só fazem sentido dentro de uma playlist, que é a única lista
         // com ordem própria para mexer.

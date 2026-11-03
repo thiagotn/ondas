@@ -1,4 +1,11 @@
-import type { PlayerEngine, PlayerEngineEvents, PlayerEventName, Track, Unsubscribe } from '@ondas/core';
+import { t } from '@ondas/core';
+import type {
+  PlayerEngine,
+  PlayerEngineEvents,
+  PlayerEventName,
+  Track,
+  Unsubscribe,
+} from '@ondas/core';
 
 type Handler = (payload: never) => void;
 
@@ -46,7 +53,7 @@ export class WebPlayerEngine implements PlayerEngine {
       // Sem src o browser dispara `error` ao limpar o elemento: não é falha real.
       if (!a.getAttribute('src')) return;
       this.emit('waiting', false);
-      this.emit('error', new Error('stream indisponível'));
+      this.emit('error', new Error(t('erro.streamIndisponivel')));
     });
   }
 
@@ -120,7 +127,10 @@ export class WebPlayerEngine implements PlayerEngine {
     return Number.isFinite(this.audio.duration) ? this.audio.duration : 0;
   }
 
-  on<E extends PlayerEventName>(event: E, cb: (payload: PlayerEngineEvents[E]) => void): Unsubscribe {
+  on<E extends PlayerEventName>(
+    event: E,
+    cb: (payload: PlayerEngineEvents[E]) => void,
+  ): Unsubscribe {
     const set = this.handlers.get(event) ?? new Set<Handler>();
     set.add(cb as Handler);
     this.handlers.set(event, set);
@@ -135,7 +145,8 @@ export class WebPlayerEngine implements PlayerEngine {
   }
 
   private emit<E extends PlayerEventName>(event: E, payload: PlayerEngineEvents[E]): void {
-    for (const h of this.handlers.get(event) ?? []) (h as (p: PlayerEngineEvents[E]) => void)(payload);
+    for (const h of this.handlers.get(event) ?? [])
+      (h as (p: PlayerEngineEvents[E]) => void)(payload);
   }
 
   private startSim(): void {
@@ -149,7 +160,10 @@ export class WebPlayerEngine implements PlayerEngine {
         this.emit('ended', undefined);
         return;
       }
-      this.simBuf = Math.min(1, Math.max(this.simBuf, (this.simTime + SIM_BUFFER_AHEAD) / this.simDur));
+      this.simBuf = Math.min(
+        1,
+        Math.max(this.simBuf, (this.simTime + SIM_BUFFER_AHEAD) / this.simDur),
+      );
       this.emit('time', this.simTime);
       this.emit('buffer', this.simBuf);
     }, SIM_STEP * 1000);

@@ -1,3 +1,4 @@
+import { t } from '@ondas/core';
 /** Maior lado da imagem guardada. Acima disso o dataURL fica grande demais. */
 const MAX_SIDE = 1600;
 const JPEG_QUALITY = 0.82;
@@ -21,7 +22,7 @@ export function downscaleImage(file: File): Promise<string> {
         canvas.width = Math.round(img.width * k);
         canvas.height = Math.round(img.height * k);
         const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('canvas 2d indisponível');
+        if (!ctx) throw new Error(t('erro.canvasIndisponivel'));
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         resolve(canvas.toDataURL('image/jpeg', JPEG_QUALITY));
       } catch (err) {
@@ -33,7 +34,7 @@ export function downscaleImage(file: File): Promise<string> {
 
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error('não foi possível ler a imagem'));
+      reject(new Error(t('erro.lerImagem')));
     };
 
     img.src = url;

@@ -1,6 +1,7 @@
 import {
   indexOfTrack,
   parseTrackToken,
+  t,
   whoAmI,
   type PromptLine,
   type Session,
@@ -77,18 +78,13 @@ export function TrackRoute() {
     };
   }, [naLista]);
 
-  if (!id) return <Aviso texto="link de faixa inválido." />;
+  if (!id) return <Aviso texto={t('faixa.linkInvalido')} />;
   if (privada) {
-    return (
-      <Aviso
-        texto="faixa privada — ela é do acervo de alguém e só abre com a conta dona."
-        acao="[entrar]"
-      />
-    );
+    return <Aviso texto={t('faixa.privadaAviso')} acao={t('ui.entrar')} />;
   }
   if (naLista) return <HomeRoute />;
   if (busca.isPending || busca.isFetching) return <Resolvendo id={id} user={user} />;
-  return <Aviso texto="faixa não encontrada — o link pode estar velho ou a faixa saiu do ar." />;
+  return <Aviso texto={t('faixa.naoEncontrada')} />;
 }
 
 function Resolvendo({ id, user }: { id: string; user: Session }) {
@@ -110,14 +106,14 @@ function Aviso({ texto, acao }: { texto: string; acao?: string }) {
   const navigate = useNavigate();
   return (
     <div className={s.notice}>
-      <span className={s.noticeLabel}>aviso:</span>
+      <span className={s.noticeLabel}>{t('ui.aviso')}</span>
       <span className={s.noticeText}>{texto}</span>
       <button
         type="button"
         className={s.link}
         onClick={() => navigate(acao ? PATHS.login : PATHS.home)}
       >
-        {acao ?? '[em-alta]'}
+        {acao ?? t('faixa.voltarHome', { home: t('cwd.home').replace('~/', '') })}
       </button>
     </div>
   );

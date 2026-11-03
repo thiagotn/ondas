@@ -548,13 +548,13 @@ test('login libera o catálogo, e a conta sai da biblioteca para `ondas whoami`'
   await expect(page.getByRole('button', { name: /Fita Caseira/ })).toBeVisible();
   // A biblioteca é só biblioteca: plano e ocupação não moram mais nela.
   await expect(page.getByText('catálogo completo + offline')).toBeHidden();
-  await expect(page.getByText('0 faixas · 0.0 MB')).toBeHidden();
+  await expect(page.getByText('0 faixas · 0,0 MB')).toBeHidden();
 
   // Eles moram atrás do próprio nome — aqui o do prompt, no alto.
   await abrirConta(page);
   const conta = page.getByRole('dialog', { name: 'ondas whoami' });
   await expect(conta.getByText('catálogo completo + offline')).toBeVisible();
-  await expect(conta.getByText('0 faixas · 0.0 MB')).toBeVisible();
+  await expect(conta.getByText('0 faixas · 0,0 MB')).toBeVisible();
 
   // Esc fecha uma camada e devolve o endereço.
   await page.keyboard.press('Escape');
@@ -699,7 +699,7 @@ test('conta e aparelho: as duas portas, o buffer e limpar downloads', async ({ p
   await expect(buffer).toHaveAttribute('aria-pressed', 'false');
 
   // Sem nada no aparelho não há o que limpar — botão que não faz nada é ruído.
-  await expect(conta.getByText('0 faixas · 0.0 MB')).toBeVisible();
+  await expect(conta.getByText('0 faixas · 0,0 MB')).toBeVisible();
   await expect(conta.getByRole('button', { name: '[limpar downloads]' })).toBeHidden();
   await page.keyboard.press('Escape');
 
@@ -715,13 +715,13 @@ test('conta e aparelho: as duas portas, o buffer e limpar downloads', async ({ p
 
   // ── e aí sim, em dois toques ─────────────────────────────────────
   await abrirConta(page);
-  await expect(conta.getByText(/^1 faixa · \d+\.\d MB$/)).toBeVisible();
+  await expect(conta.getByText(/^1 faixa · \d+,\d MB$/)).toBeVisible();
   await conta.getByRole('button', { name: '[limpar downloads]' }).click();
   // O primeiro toque só pergunta: apagar não dá para desfazer.
   await expect(conta.getByText('apagar 1?')).toBeVisible();
   await expect(conta.getByText(/^1 faixa ·/)).toBeVisible();
   await conta.getByRole('button', { name: '[sim]' }).click();
-  await expect(conta.getByText('0 faixas · 0.0 MB')).toBeVisible();
+  await expect(conta.getByText('0 faixas · 0,0 MB')).toBeVisible();
   // E os bytes foram embora de verdade: zerar só o índice deixaria os
   // megabytes no aparelho com o painel jurando que não há nada.
   await expect.poll(noCache).toBe(0);
@@ -995,7 +995,7 @@ test('o painel mostra quanto espaço ainda cabe', async ({ page }) => {
 
   // O número que decide se cabe o mix de uma hora é o que SOBRA, não o usado.
   await expect(
-    page.getByRole('dialog', { name: 'ondas whoami' }).getByText('3.0 GB livres de 4.2 GB'),
+    page.getByRole('dialog', { name: 'ondas whoami' }).getByText('3,0 GB livres de 4,2 GB'),
   ).toBeVisible();
 });
 
@@ -2065,7 +2065,9 @@ test('marcar faixas e criar uma playlist com elas', async ({ page }) => {
 
   await page.getByRole('button', { name: '--playlists' }).click();
   await expect(page).toHaveURL('/library/playlists');
-  await expect(page.getByText('# 1 playlists')).toBeVisible();
+  // Era `1 playlists`: a contagem do prompt não tinha singular, e a
+  // pluralização do catálogo passou a ter.
+  await expect(page.getByText('# 1 playlist')).toBeVisible();
   await expect(page.getByRole('button', { name: /treino 1 faixa/ })).toBeVisible();
 });
 
@@ -2141,7 +2143,11 @@ test('a faixa que saiu do catálogo não vira playlist vazia em silêncio', asyn
 
   // O prompt confessa a diferença entre o que ela tem e o que ela mostra.
   await expect(page.getByText('# 0 itens · 2 fora da lista')).toBeVisible();
-  await expect(page.getByText(/2 faixas desta playlist não está no catálogo de hoje/)).toBeVisible();
+  // `não estão`, no plural: a frase antiga grudava o sujeito plural num verbo
+  // no singular, porque só a contagem variava.
+  await expect(
+    page.getByText(/2 faixas desta playlist não estão no catálogo de hoje/),
+  ).toBeVisible();
 });
 
 test('renomear e apagar playlist, com dois toques para apagar', async ({ page }) => {

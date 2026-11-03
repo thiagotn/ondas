@@ -1,4 +1,4 @@
-import { AuthError, themeIndex } from '@ondas/core';
+import { AuthError, t, tErro, themeIndex, type Params } from '@ondas/core';
 import { Palette } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -39,10 +39,14 @@ export function LoginRoute() {
       void carregarPlaylists();
       setPassword('');
       uiStore.getState().closeGate();
-      uiStore.getState().flash(`autenticado como ${user.name} — catálogo completo liberado`);
+      uiStore.getState().flash(t('login.autenticado', { nome: user.name }));
       navigate(PATHS.home);
     } catch (err) {
-      setError(err instanceof AuthError ? err.message : 'não foi possível entrar');
+      setError(
+        err instanceof AuthError
+          ? (tErro(err.codigo, err.params as Params | undefined) ?? err.message)
+          : t('erro.falha_entrar'),
+      );
     } finally {
       setBusy(false);
     }
@@ -66,11 +70,11 @@ export function LoginRoute() {
     >
       <div className={s.topbar}>
         <TrafficLights />
-        <span className={s.topbarTitle}>ondas — login</span>
+        <span className={s.topbarTitle}>{t('login.janela')}</span>
         <button
           type="button"
           className={s.palette}
-          aria-label="Trocar tema"
+          aria-label={t('barra.trocarTema')}
           onClick={() => uiStore.getState().openPicker(themeIndex(themeId))}
         >
           <Palette size={15} />
@@ -86,13 +90,13 @@ export function LoginRoute() {
           </div>
           <div className={s.lockupText}>
             <span className={s.lockupName}>ondas</span>
-            <span className={s.lockupSide}>lado A</span>
+            <span className={s.lockupSide}>{t('login.ladoA')}</span>
           </div>
         </div>
         <div className={s.intro}>
-          ondas v1.0.0 — streaming de música independente
+          {t('login.intro', { versao: __APP_VERSION__ })}
           <br />
-          digite suas credenciais ou continue como visitante.
+          {t('login.introLinha2')}
         </div>
 
         <div className={s.fields}>
@@ -127,17 +131,21 @@ export function LoginRoute() {
               onKeyDown={(e) => e.key === 'Enter' && void submit()}
             />
           </label>
-          {error && <div className={s.error}>error: {error}</div>}
+          {error && (
+            <div className={s.error}>
+              {t('ui.erro')} {error}
+            </div>
+          )}
         </div>
 
         <div className={s.buttons}>
           <button type="button" className={s.primary} onClick={() => void submit()}>
             <span className={s.key}>[enter]</span>
-            entrar — catálogo completo + offline
+            {t('login.entrarCompleto')}
           </button>
           <button type="button" className={s.secondary} onClick={guest}>
             <span className={s.key}>[g]</span>
-            continuar como visitante — só faixas grátis
+            {t('login.visitante')}
           </button>
         </div>
       </div>

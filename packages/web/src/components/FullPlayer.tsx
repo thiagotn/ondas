@@ -4,6 +4,7 @@ import {
   bufferBar,
   bufferSourceLabel,
   fmtTime,
+  t as traduzir,
   type Track,
 } from '@ondas/core';
 import {
@@ -59,7 +60,9 @@ export function FullPlayer({ track }: { track: Track }) {
   return (
     <div className={s.fullscreen}>
       <div className={s.panel}>
-        <span className={s.label}>agora-tocando — #{track.genre}</span>
+        <span className={s.label}>
+          {traduzir('player.agoraTocando')} — #{track.genre}
+        </span>
         <button type="button" className={s.close} onClick={closePlayer}>
           {wide ? '[esc] fechar' : 'fechar'}
         </button>
@@ -82,7 +85,7 @@ export function FullPlayer({ track }: { track: Track }) {
 
           <div className={s.info}>
             <div className={s.infoHead}>
-              <span className={s.infoLabel}>titulo</span>
+              <span className={s.infoLabel}>{traduzir('player.titulo')}</span>
               <h2 className={s.infoTitle}>{track.title}</h2>
               <span className={s.infoArtist}>{track.artist}</span>
             </div>
@@ -112,13 +115,26 @@ export function FullPlayer({ track }: { track: Track }) {
               >
                 <Shuffle size={19} />
               </Keycap>
-              <Keycap keyLabel={dica('p')} ariaLabel="Faixa anterior" onClick={() => controller.step(-1)}>
+              <Keycap
+                keyLabel={dica('p')}
+                ariaLabel="Faixa anterior"
+                onClick={() => controller.step(-1)}
+              >
                 <SkipBack size={19} weight="fill" />
               </Keycap>
-              <Keycap keyLabel={dica('espaço')} active ariaLabel={playing ? 'Pausar' : 'Tocar'} onClick={controller.togglePlay}>
+              <Keycap
+                keyLabel={dica(traduzir('tecla.espaco'))}
+                active
+                ariaLabel={traduzir(playing ? 'acao.pausar' : 'acao.tocar')}
+                onClick={controller.togglePlay}
+              >
                 <PlayIcon playing={playing} waiting={waiting} size={19} />
               </Keycap>
-              <Keycap keyLabel={dica('n')} ariaLabel="Próxima faixa" onClick={() => controller.step(1)}>
+              <Keycap
+                keyLabel={dica('n')}
+                ariaLabel="Próxima faixa"
+                onClick={() => controller.step(1)}
+              >
                 <SkipForward size={19} weight="fill" />
               </Keycap>
               <Keycap
@@ -158,7 +174,7 @@ export function FullPlayer({ track }: { track: Track }) {
 
             <div className={s.buffer}>
               <div className={s.bufferRow}>
-                <span className={s.bufferLabel}>buffer</span>
+                <span className={s.bufferLabel}>{traduzir('conta.buffer')}</span>
                 <span className={s.bufferBar}>
                   <span className={s.bufferPlayed}>{bar.a}</span>
                   <span className={s.bufferAhead}>{bar.b}</span>
@@ -166,7 +182,7 @@ export function FullPlayer({ track }: { track: Track }) {
                 </span>
               </div>
               <div className={s.bufferRow}>
-                <span className={s.bufferLabel}>fonte</span>
+                <span className={s.bufferLabel}>{traduzir('player.fonte')}</span>
                 <span className={cached ? s.sourceLocal : s.sourceRemote}>
                   {bufferSourceLabel({ cached, downloading, hasStream: !!track.stream, ahead })}
                 </span>

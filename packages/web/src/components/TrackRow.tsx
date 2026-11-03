@@ -1,3 +1,4 @@
+import { t } from '@ondas/core';
 import { CheckCircle, DownloadSimple, Heart, ShareNetwork } from '@phosphor-icons/react';
 import { useEffect, useRef } from 'react';
 import type { RowModel } from '../hooks/useTrackRows';
@@ -153,7 +154,7 @@ export function TrackRow({
           [meu] e [de <nome>] se excluem pela mesma régua: as duas marcas
           respondem "de quem é esta faixa", e `minha` já é falso quando há
           dono (ver `useTrackRows`). */}
-      {row.minha && !compact && <span className={`${s.tag} ${s.tagMeu}`}>[meu]</span>}
+      {row.minha && !compact && <span className={`${s.tag} ${s.tagMeu}`}>{t('faixa.meu')}</span>}
       {/* `[de <nome>]` fica NA TELA ESTREITA TAMBÉM, e `[meu]` não. A assimetria
           é de propósito: "é minha" é a suposição padrão de quem abre o próprio
           acervo, então esconder `[meu]` no celular não engana ninguém — já
@@ -161,7 +162,9 @@ export function TrackRow({
           misturada (em-alta e busca), onde o chip do recorte não ajuda. E a
           largura existe: a linha do acervo já abre mão do `#acervo` no compacto
           (ver o gênero acima). */}
-      {row.owner && <span className={`${s.tag} ${s.tagDe}`}>[de {row.owner}]</span>}
+      {row.owner && (
+        <span className={`${s.tag} ${s.tagDe}`}>{t('faixa.de', { dono: row.owner })}</span>
+      )}
       {row.locked && <span className={`${s.tag} ${s.tagPro}`}>[pro]</span>}
       {row.cached && !compact && <span className={`${s.tag} ${s.tagOff}`}>[off]</span>}
       {row.dlLabel && <span className={`${s.tag} ${s.tagDl}`}>[{row.dlLabel}]</span>}
@@ -182,7 +185,7 @@ export function TrackRow({
 
       <button
         type="button"
-        aria-label={row.cached ? 'Remover do aparelho' : 'Baixar para offline'}
+        aria-label={t(row.cached ? 'acao.removerDoAparelho' : 'acao.baixar')}
         className={[
           s.action,
           row.cached ? s.actionCached : '',
@@ -192,17 +195,13 @@ export function TrackRow({
           .join(' ')}
         onClick={() => onDownload(row)}
       >
-        {row.cached ? (
-          <CheckCircle size={17} weight="fill" />
-        ) : (
-          <DownloadSimple size={17} />
-        )}
+        {row.cached ? <CheckCircle size={17} weight="fill" /> : <DownloadSimple size={17} />}
       </button>
 
       {showShare && (
         <button
           type="button"
-          aria-label="Compartilhar"
+          aria-label={t('player.compartilhar')}
           className={s.action}
           onClick={() => onShare(row)}
         >
@@ -214,6 +213,6 @@ export function TrackRow({
 }
 
 function rotuloDeCurtir(row: RowModel): string {
-  if (!row.canLike) return 'Curtir — exige entrar na conta';
-  return row.liked ? 'Descurtir' : 'Curtir';
+  if (!row.canLike) return t('acao.curtirExigeConta');
+  return t(row.liked ? 'acao.descurtir' : 'acao.curtir');
 }

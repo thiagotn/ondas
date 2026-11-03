@@ -1,3 +1,4 @@
+import { t } from '@ondas/core';
 import type { OfflineStore, OfflineUsage } from '@ondas/core';
 
 const CACHE_NAME = 'ondas-offline';
@@ -79,7 +80,7 @@ export class CacheOfflineStore implements OfflineStore {
     // Sem Cache API não existe offline. Antes isto devolvia o tamanho como se
     // tivesse gravado, e a faixa ficava marcada `[off]` sem bytes nenhum
     // atrás (o `reconcile` do boot acabava desfazendo).
-    if (!c) throw new Error('este navegador não guarda faixas offline');
+    if (!c) throw new Error(t('erro.semOffline'));
 
     const res = await fetch(url);
     if (!res.ok || !res.body) throw new Error('download falhou (' + res.status + ')');

@@ -1,3 +1,4 @@
+import { t } from '@ondas/core';
 import type { Playlist } from '@ondas/core';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -33,7 +34,7 @@ function Linha({ playlist }: { playlist: Playlist }) {
     return (
       <div className={s.item}>
         <CampoDeNome
-          rotulo="novo nome"
+          rotulo={t('playlist.novoNome')}
           inicial={playlist.nome}
           onCancelar={() => setRenomeando(false)}
           onPronto={(nome) => {
@@ -47,23 +48,17 @@ function Linha({ playlist }: { playlist: Playlist }) {
 
   return (
     <div className={s.item}>
-      <button
-        type="button"
-        className={s.abrir}
-        onClick={() => navigate(playlistPath(playlist.id))}
-      >
+      <button type="button" className={s.abrir} onClick={() => navigate(playlistPath(playlist.id))}>
         <span className={s.marca}>❯</span>
         <span className={s.nome}>{playlist.nome}</span>
-        <span className={s.quantas}>
-          {playlist.itens.length === 1 ? '1 faixa' : `${playlist.itens.length} faixas`}
-        </span>
+        <span className={s.quantas}>{t('playlist.faixas', { n: playlist.itens.length })}</span>
       </button>
 
       {/* Dois toques para apagar, como o `limpar downloads` do painel de conta:
           não dá para desfazer, e a caixa nativa do navegador destoaria. */}
       {confirmando ? (
         <>
-          <span className={s.contador}>apagar?</span>
+          <span className={s.contador}>{t('playlist.apagar')}</span>
           <button
             type="button"
             className={`${s.acao} ${s.acaoRisco}`}
@@ -72,23 +67,23 @@ function Linha({ playlist }: { playlist: Playlist }) {
               void controller.apagarPlaylist(playlist.id);
             }}
           >
-            [sim]
+            {t('ui.sim')}
           </button>
           <button type="button" className={s.acao} onClick={() => setConfirmando(false)}>
-            [não]
+            {t('ui.nao')}
           </button>
         </>
       ) : (
         <>
           <button type="button" className={s.acao} onClick={() => setRenomeando(true)}>
-            [renomear]
+            {t('playlist.renomear')}
           </button>
           <button
             type="button"
             className={`${s.acao} ${s.acaoRisco}`}
             onClick={() => setConfirmando(true)}
           >
-            [apagar]
+            {t('playlist.apagarBotao')}
           </button>
         </>
       )}

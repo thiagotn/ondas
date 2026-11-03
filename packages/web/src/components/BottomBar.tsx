@@ -3,6 +3,7 @@ import {
   fmtTime,
   legenda,
   playerMode,
+  t as traduzir,
   userTag,
   type Track,
 } from '@ondas/core';
@@ -56,7 +57,7 @@ function PlayerRow({ track }: { track: Track }) {
         <button
           type="button"
           className={s.title}
-          aria-label="Abrir player"
+          aria-label={traduzir('barra.abrirPlayer')}
           onClick={(e) => {
             // Sem isto o clique sobe para a linha e empilha dois `?player=1`.
             e.stopPropagation();
@@ -84,7 +85,7 @@ function PlayerRow({ track }: { track: Track }) {
         <button
           type="button"
           className={s.skip}
-          aria-label="Faixa anterior"
+          aria-label={traduzir('barra.faixaAnterior')}
           onClick={(e) => {
             e.stopPropagation();
             controller.step(-1);
@@ -95,7 +96,7 @@ function PlayerRow({ track }: { track: Track }) {
         <button
           type="button"
           className={s.play}
-          aria-label={playing ? 'Pausar' : 'Tocar'}
+          aria-label={traduzir(playing ? 'acao.pausar' : 'acao.tocar')}
           onClick={(e) => {
             e.stopPropagation();
             controller.togglePlay();
@@ -106,7 +107,7 @@ function PlayerRow({ track }: { track: Track }) {
         <button
           type="button"
           className={s.skip}
-          aria-label="Próxima faixa"
+          aria-label={traduzir('barra.proximaFaixa')}
           onClick={(e) => {
             e.stopPropagation();
             controller.step(1);
@@ -139,7 +140,7 @@ function StatusLine({ track }: { track: Track | undefined }) {
         <button
           type="button"
           className={s.quem}
-          aria-label="Conta e aparelho"
+          aria-label={traduzir('barra.conta')}
           onClick={(e) => {
             e.stopPropagation();
             openAccount();
@@ -167,7 +168,7 @@ function StatusLine({ track }: { track: Track | undefined }) {
             type="button"
             className={`${s.net} ${s.netToggle} ${offline ? s.netOffline : ''}`}
             onClick={controller.toggleSimulatedOffline}
-            title="Simular queda de rede (o)"
+            title={traduzir('barra.simularOffline')}
           >
             ● {offline ? 'offline' : 'online'}
           </button>

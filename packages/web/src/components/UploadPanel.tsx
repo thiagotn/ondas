@@ -1,4 +1,4 @@
-import { barraDeProgresso, dlPct } from '@ondas/core';
+import { barraDeProgresso, dlPct, t } from '@ondas/core';
 import { useRef } from 'react';
 import { useUploads, type ItemEnvio } from '../app/uploads';
 import { useWide } from '../hooks/useWide';
@@ -24,13 +24,11 @@ export function UploadPanel() {
   return (
     <div className={s.panel}>
       <div className={s.panelRow}>
-        <span className={s.panelLabel}>enviar</span>
+        <span className={s.panelLabel}>{t('upload.enviar')}</span>
         <button type="button" className={s.link} onClick={() => input.current?.click()}>
-          [+ arquivo]
+          {t('upload.adicionarArquivo')}
         </button>
-        <span
-          className={`${s.panelFormatos} ${s.panelMuted} ${wide ? '' : s.panelFormatosSolo}`}
-        >
+        <span className={`${s.panelFormatos} ${s.panelMuted} ${wide ? '' : s.panelFormatosSolo}`}>
           mp3 · flac · opus · m4a
         </span>
         {concluidos && (
@@ -76,7 +74,7 @@ function Linha({ item }: { item: ItemEnvio }) {
         <button
           type="button"
           className={s.link}
-          aria-label={`dispensar ${item.nome}`}
+          aria-label={t('faixa.dispensar', { faixa: item.nome })}
           onClick={() => remover(item.id)}
         >
           [x]
@@ -89,7 +87,7 @@ function Linha({ item }: { item: ItemEnvio }) {
 function Estado({ item }: { item: ItemEnvio }) {
   switch (item.estado) {
     case 'preparando':
-      return <span className={s.panelMuted}>preparando…</span>;
+      return <span className={s.panelMuted}>{t('upload.preparando')}</span>;
     case 'enviando':
       return (
         <span
@@ -98,21 +96,19 @@ function Estado({ item }: { item: ItemEnvio }) {
           aria-valuenow={Math.round(item.fracao * 100)}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label={`enviando ${item.nome}`}
+          aria-label={t('upload.enviando', { nome: item.nome })}
         >
           {barraDeProgresso(item.fracao)} {dlPct(item.fracao)}
         </span>
       );
     case 'processando':
       // O arquivo já está no bucket; agora é o worker examinando e subindo.
-      return <span className={u.processando}>processando…</span>;
+      return <span className={u.processando}>{t('upload.processando')}</span>;
     case 'pronto':
-      return <span className={u.pronto}>pronto</span>;
+      return <span className={u.pronto}>{t('upload.pronto')}</span>;
     case 'erro':
       return (
-        <span className={u.erro}>
-          {item.semSessao ? 'sua sessão expirou — entre de novo' : item.erro}
-        </span>
+        <span className={u.erro}>{item.semSessao ? t('upload.sessaoExpirou') : item.erro}</span>
       );
   }
 }

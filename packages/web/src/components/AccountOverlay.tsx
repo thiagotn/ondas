@@ -4,6 +4,7 @@ import {
   planLabel,
   showsPublicCatalog,
   storageLabel,
+  t,
   whoAmI,
   type OfflineUsage,
 } from '@ondas/core';
@@ -57,13 +58,13 @@ export function AccountOverlay() {
       >
         <span className={o.label}>ondas whoami</span>
         <button type="button" className={o.close} onClick={closeAccount}>
-          {wide ? '[esc] fechar' : 'fechar'}
+          {t(wide ? 'ui.fecharEsc' : 'ui.fechar')}
         </button>
 
         <div className={o.contaCorpo}>
           <div className={s.panel}>
             <div className={s.panelRow}>
-              <span className={s.panelLabel}>conta</span>
+              <span className={s.panelLabel}>{t('conta.conta')}</span>
               <span className={s.panelValue}>{whoAmI(user)}</span>
               {user ? (
                 <button
@@ -75,16 +76,16 @@ export function AccountOverlay() {
                     navigate(PATHS.login);
                   }}
                 >
-                  [sair]
+                  {t('ui.sair')}
                 </button>
               ) : (
                 <button type="button" className={s.link} onClick={() => navigate(PATHS.login)}>
-                  [entrar]
+                  {t('ui.entrar')}
                 </button>
               )}
             </div>
             <div className={s.panelRow}>
-              <span className={s.panelLabel}>plano</span>
+              <span className={s.panelLabel}>{t('conta.plano')}</span>
               <span className={s.panelValue}>{planLabel(user)}</span>
             </div>
 
@@ -99,20 +100,16 @@ export function AccountOverlay() {
                 aria-pressed={publico}
                 onClick={() => void controller.togglePublico()}
               >
-                <span className={s.panelLabel}>catálogo</span>
-                <span className={publico ? s.checkOn : s.checkOff}>
-                  {publico ? '[x]' : '[ ]'}
-                </span>
-                <span className={s.panelValue}>
-                  incluir o catálogo público (audius) na lista
-                </span>
+                <span className={s.panelLabel}>{t('conta.catalogo')}</span>
+                <span className={publico ? s.checkOn : s.checkOff}>{publico ? '[x]' : '[ ]'}</span>
+                <span className={s.panelValue}>{t('conta.catalogoPublico')}</span>
               </button>
             )}
           </div>
 
           {/* O rótulo não é enfeite: é o que diz que nada abaixo dele viaja
               junto com a conta. */}
-          <span className={o.contaSecao}># aparelho — vale só neste navegador</span>
+          <span className={o.contaSecao}>{t('conta.aparelho')}</span>
 
           <div className={s.panel}>
             <button
@@ -121,16 +118,15 @@ export function AccountOverlay() {
               aria-pressed={prefetch}
               onClick={() => libraryStore.getState().togglePrefetch()}
             >
-              <span className={s.panelLabel}>buffer</span>
+              <span className={s.panelLabel}>{t('conta.buffer')}</span>
               <span className={prefetch ? s.checkOn : s.checkOff}>{prefetch ? '[x]' : '[ ]'}</span>
-              <span className={s.panelValue}>pré-carregar a próxima faixa no aparelho</span>
+              <span className={s.panelValue}>{t('conta.bufferDesc')}</span>
             </button>
 
             <div className={s.panelRow}>
-              <span className={s.panelLabel}>offline</span>
+              <span className={s.panelLabel}>{t('conta.offline')}</span>
               <span className={s.panelValue}>
-                {count} {count === 1 ? 'faixa' : 'faixas'} ·{' '}
-                {fmtMB(offlineBytes({ cached, sizes }))}
+                {t('playlist.faixas', { n: count })} · {fmtMB(offlineBytes({ cached, sizes }))}
               </span>
               {count > 0 && (
                 <span className={o.contaLimpar}>
@@ -139,7 +135,9 @@ export function AccountOverlay() {
                       tudo aqui. */}
                   {confirmando ? (
                     <>
-                      <span className={o.contaConfirma}>apagar {count}?</span>
+                      <span className={o.contaConfirma}>
+                        {t('conta.apagarQuantas', { n: count })}
+                      </span>
                       <button
                         type="button"
                         className={s.logout}
@@ -148,15 +146,19 @@ export function AccountOverlay() {
                           void controller.clearDownloads();
                         }}
                       >
-                        [sim]
+                        {t('ui.sim')}
                       </button>
-                      <button type="button" className={s.link} onClick={() => setConfirmando(false)}>
-                        [não]
+                      <button
+                        type="button"
+                        className={s.link}
+                        onClick={() => setConfirmando(false)}
+                      >
+                        {t('ui.nao')}
                       </button>
                     </>
                   ) : (
                     <button type="button" className={s.link} onClick={() => setConfirmando(true)}>
-                      [limpar downloads]
+                      {t('conta.limparDownloads')}
                     </button>
                   )}
                 </span>
@@ -164,7 +166,7 @@ export function AccountOverlay() {
             </div>
 
             <div className={s.panelRow}>
-              <span className={s.panelLabel}>espaço</span>
+              <span className={s.panelLabel}>{t('conta.espaco')}</span>
               <span className={s.panelValue}>{storageLabel(espaco)}</span>
             </div>
           </div>
@@ -173,9 +175,7 @@ export function AccountOverlay() {
               porque o áudio do acervo é privado e fica no aparelho. As
               curtidas saíram desta frase quando viraram da conta: sair APAGA
               as deste navegador, e entrar de novo as traz de volta. */}
-          {user && count > 0 && (
-            <span className={o.contaSecao}>sair não apaga os downloads deste aparelho.</span>
-          )}
+          {user && count > 0 && <span className={o.contaSecao}>{t('conta.sairNaoApaga')}</span>}
         </div>
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { t } from '@ondas/core';
 import { forwardRef } from 'react';
 import s from './shell.module.css';
 
@@ -18,10 +19,10 @@ export const SearchBox = forwardRef<HTMLInputElement, SearchBoxProps>(function S
       <input
         ref={ref}
         className={s.searchInput}
-        placeholder="faixa, artista ou #gênero"
+        placeholder={t('busca.placeholder')}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        aria-label="Buscar faixa, artista ou gênero"
+        aria-label={t('busca.aria')}
         autoComplete="off"
         enterKeyHint="search"
       />

@@ -4,6 +4,7 @@ import {
   fmtTime,
   picosLisos,
   reamostrarPicos,
+  t,
   wavePaths,
 } from '@ondas/core';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -77,7 +78,7 @@ export function Waveform({
       // setas, que é o que este controle faz. O elemento continua sendo um
       // `<button>` para chegar o foco e o alvo de toque de graça.
       role="slider"
-      aria-label={label ?? 'Posição da faixa'}
+      aria-label={label ?? t('player.posicao')}
       aria-valuemin={0}
       aria-valuemax={100}
       // `pos` e não `played`: durante o arrasto o valor do controle é o que
@@ -129,9 +130,7 @@ export function Waveform({
       }}
       onKeyDown={(e) => {
         const passo =
-          e.key === 'ArrowRight' ? PASSO_TECLA
-          : e.key === 'ArrowLeft' ? -PASSO_TECLA
-          : 0;
+          e.key === 'ArrowRight' ? PASSO_TECLA : e.key === 'ArrowLeft' ? -PASSO_TECLA : 0;
         if (passo) {
           e.preventDefault();
           e.stopPropagation();

@@ -156,6 +156,189 @@ export const PT_BR = {
   'legenda.numero': 'nº',
   'legenda.atalhos': 'atalhos',
 
+  // ── janelas e botões comuns ──────────────────────────────────
+  'ui.fechar': 'fechar',
+  'ui.fecharEsc': '[esc] fechar',
+  'ui.entrar': '[entrar]',
+  'ui.sair': '[sair]',
+  'ui.sim': '[sim]',
+  'ui.nao': '[não]',
+  'ui.aviso': 'aviso:',
+  'ui.erro': 'error:',
+
+  // ── conta (`ondas whoami`) ───────────────────────────────────
+  'conta.conta': 'conta',
+  'conta.plano': 'plano',
+  'conta.catalogo': 'catálogo',
+  'conta.catalogoPublico': 'incluir o catálogo público (audius) na lista',
+  'conta.aparelho': '# aparelho — vale só neste navegador',
+  'conta.buffer': 'buffer',
+  'conta.bufferDesc': 'pré-carregar a próxima faixa no aparelho',
+  'conta.offline': 'offline',
+  'conta.espaco': 'espaço',
+  'conta.limparDownloads': '[limpar downloads]',
+  'conta.apagarQuantas': 'apagar {n}?',
+  'conta.sairNaoApaga': 'sair não apaga os downloads deste aparelho.',
+
+  // ── rodapé e barra inferior ──────────────────────────────────
+  'barra.abrirPlayer': 'Abrir player',
+  'barra.faixaAnterior': 'Faixa anterior',
+  'barra.proximaFaixa': 'Próxima faixa',
+  'barra.conta': 'Conta e aparelho',
+  'barra.contaComTecla': 'Conta e aparelho (5)',
+  'barra.simularOffline': 'Simular queda de rede (o)',
+  'barra.tema': 'Tema (t ou 4)',
+  'barra.trocarTema': 'Trocar tema',
+  'barra.sobre': 'ondas — sobre',
+  'barra.irPorNumero': 'Ir para a faixa pelo número',
+  'barra.numeroPlaceholder': 'nº da faixa',
+
+  // ── player cheio ─────────────────────────────────────────────
+  'acao.tocar': 'Tocar',
+  'acao.pausar': 'Pausar',
+  'acao.curtir': 'Curtir',
+  'acao.descurtir': 'Descurtir',
+  'acao.curtirExigeConta': 'Curtir — exige entrar na conta',
+  'acao.baixar': 'Baixar para offline',
+  'acao.removerDoAparelho': 'Remover do aparelho',
+
+  'player.titulo': 'titulo',
+  'player.fonte': 'fonte',
+  'player.posicao': 'Posição da faixa',
+  'player.compartilhar': 'Compartilhar',
+  'player.agoraTocando': 'agora-tocando',
+
+  // ── gate de permissão ────────────────────────────────────────
+  'gate.titulo': 'permissão negada',
+  'gate.entrar': 'entrar',
+  'gate.entrarEnter': '[enter] entrar',
+  'gate.agoraNao': 'agora não',
+  'gate.agoraNaoEsc': '[esc] agora não',
+
+  // ── visitante ────────────────────────────────────────────────
+  'visitante.aviso': 'sessão de visitante — faixas [pro] e downloads exigem login.',
+
+  // ── playlists na tela ────────────────────────────────────────
+  'playlist.novoNome': 'novo nome',
+  'playlist.apagar': 'apagar?',
+  'playlist.nome': 'nome da playlist',
+  'playlist.nova': '[nova playlist…]',
+  'playlist.renomear': '[renomear]',
+  'playlist.apagarBotao': '[apagar]',
+  'playlist.jaAqui': { one: '{n} já está aqui', other: '{n} já estão aqui' },
+  'playlist.faixas': { one: '{n} faixa', other: '{n} faixas' },
+  'playlist.marcadas': { one: '{n} marcada', other: '{n} marcadas' },
+  'playlist.adicionar': '[+ playlist]',
+  'playlist.remover': '[− playlist]',
+  'playlist.limpar': '[limpar]',
+  'playlist.subir': 'Subir na playlist',
+  'playlist.descer': 'Descer na playlist',
+  'playlist.rodapeSeletor': 'j/k navegar · enter escolher · esc fechar',
+
+  // ── busca ────────────────────────────────────────────────────
+  'busca.placeholder': 'faixa, artista ou #gênero',
+  'busca.aria': 'Buscar faixa, artista ou gênero',
+
+  // ── abertura ─────────────────────────────────────────────────
+  'splash.pular': 'pular abertura',
+  'splash.tagline': 'lado A · streaming independente',
+  'splash.carregando': 'rebobinando · carregando metadados',
+  'splash.pronto': 'pronto ▶',
+
+  // ── seletor de tema ──────────────────────────────────────────
+  'tema.rodape': 'j/k navegar · enter aplicar · esc fechar · passe o mouse para pré-visualizar',
+  'tema.wallCapa': 'capa-atual',
+  'tema.wallImagem': 'imagem',
+  'tema.wallNenhum': 'nenhum',
+  'tema.enviarImagem': '[enviar imagem…]',
+
+  // ── linha da faixa ───────────────────────────────────────────
+  'faixa.meu': '[meu]',
+  'faixa.de': '[de {dono}]',
+  'faixa.dispensar': 'dispensar {faixa}',
+
+  // ── envio de arquivo ─────────────────────────────────────────
+  'upload.enviar': 'enviar',
+  'upload.preparando': 'preparando…',
+  'upload.enviando': 'enviando {nome}',
+  'upload.processando': 'processando…',
+  'upload.pronto': 'pronto',
+  'upload.sessaoExpirou': 'sua sessão expirou — entre de novo',
+  'upload.adicionarArquivo': '[+ arquivo]',
+
+  // ── login ────────────────────────────────────────────────────
+  'login.janela': 'ondas — login',
+  'login.ladoA': 'lado A',
+  'login.intro': 'ondas v{versao} — streaming de música independente',
+  'login.introLinha2': 'digite suas credenciais ou continue como visitante.',
+  'login.entrarCompleto': 'entrar — catálogo completo + offline',
+  'login.visitante': 'continuar como visitante — só faixas grátis',
+
+  // ── rota da faixa ────────────────────────────────────────────
+  'faixa.voltarHome': '[{home}]',
+  'login.autenticado': 'autenticado como {nome} — catálogo completo liberado',
+  'share.linkCopiadoSimples': 'link copiado',
+  'faixa.linkInvalido': 'link de faixa inválido.',
+  'faixa.naoEncontrada': 'faixa não encontrada — o link pode estar velho ou a faixa saiu do ar.',
+  'faixa.privadaAviso': 'faixa privada — ela é do acervo de alguém e só abre com a conta dona.',
+  'semRede.playlistNaoCriada': 'sem rede — a playlist não foi criada',
+  'semRede.nomeNaoMudou': 'sem rede — o nome não mudou',
+  'semRede.playlistNaoApagada': 'sem rede — a playlist não foi apagada',
+  'semRede.faixasNaoEntraram': 'sem rede — as faixas não entraram',
+  'semRede.faixasNaoSairam': 'sem rede — as faixas não saíram',
+  'semRede.ordemNaoSalva': 'sem rede — a ordem não foi salva',
+  'tecla.espaco': 'espaço',
+  'erro.semOffline': 'este navegador não guarda faixas offline',
+  'erro.streamIndisponivel': 'stream indisponível',
+  'erro.canvasIndisponivel': 'canvas 2d indisponível',
+  'erro.lerImagem': 'não foi possível ler a imagem',
+  'share.linkCopiado': 'link copiado — só você abre esta faixa',
+
+  // ── sobre ────────────────────────────────────────────────────
+  'sobre.versao': 'versão',
+  'sobre.feitoCom': 'feito com',
+  'sobre.autor': 'autor',
+  'sobre.reverAbertura': '[rever abertura]',
+  'sobre.texto1':
+    'ondas é um player de música com estética de terminal — a fita roda, a lista é a tela, e tudo se faz pelo teclado.',
+  'sobre.texto2': 'um dos side projects de @thiagotn, feitos para estudar IA.',
+
+  // ── avisos passageiros (toasts) ──────────────────────────────
+  'toast.semRede': 'sem rede — faixa não está no aparelho',
+  'toast.faixaNaoExiste': 'faixa {numero} não existe',
+  'toast.curtirExigeConta': 'curtir exige entrar na conta',
+  'toast.playlistsExigemConta': 'playlists exigem entrar na conta',
+  'toast.faixasParaPlaylist': {
+    one: '{n} faixa → {nome}',
+    other: '{n} faixas → {nome}',
+  },
+  'toast.playlistCriadaAbra': 'playlist criada — abra em --{recorte}',
+  'toast.playlistCriada': 'playlist "{nome}" criada',
+  'toast.faixasTiradas': {
+    one: 'faixa tirada da playlist',
+    other: 'faixas tiradas da playlist',
+  },
+  'toast.playlistRenomeada': 'playlist → {nome}',
+  'toast.playlistApagada': 'playlist "{nome}" apagada',
+  'toast.removidaDoAparelho': 'removida do aparelho',
+  'toast.conecteParaBaixar': 'conecte-se para baixar',
+  'toast.bufferSalvo': 'buffer: próxima faixa salva',
+  'toast.salvaNoAparelho': 'salva no aparelho',
+  'toast.semEspaco': 'sem espaço no aparelho — limpe downloads em {janelaConta}',
+  'toast.falhaDownload': 'falha no download',
+  'toast.tema': 'tema → {tema}',
+  'toast.falhaCatalogo': 'não foi possível mudar o catálogo',
+  'toast.catalogoLigado': 'catálogo público → ligado',
+  'toast.catalogoDesligado': 'catálogo público → desligado',
+  'toast.downloadsApagados': 'downloads apagados — {tamanho} liberados',
+  'toast.redeConectada': 'rede conectada',
+  'toast.redeDesconectada': 'rede desconectada — apenas faixas [off]',
+  'toast.streamIndisponivel': 'stream indisponível — pulando faixa',
+  'toast.nenhumaPlaylistAinda':
+    'nenhuma playlist ainda — use [{botaoPlaylist}] para criar a primeira',
+  'toast.sessaoExpirada': 'sessão expirada — entre de novo',
+  'toast.falhaLerImagem': 'não foi possível ler a imagem',
+
   // ── erros vindos do servidor, por código ─────────────────────
   // A API manda o código; a frase é escolhida aqui. Ver `erros.go`.
   'erro.acervo_nao_configurado': 'acervo não configurado',

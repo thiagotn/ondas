@@ -1,4 +1,4 @@
-import { BLUR_MAX, OPACITY_MAX, OPACITY_MIN, THEMES, type WallMode } from '@ondas/core';
+import { BLUR_MAX, OPACITY_MAX, OPACITY_MIN, t, THEMES, type WallMode } from '@ondas/core';
 import type { ChangeEvent } from 'react';
 import * as controller from '../app/controller';
 import { uiStore, useUi } from '../app/stores';
@@ -58,9 +58,7 @@ export function ThemePicker() {
             </button>
           ))}
           <BackgroundControls />
-          <div className={s.pickerFooter}>
-            j/k navegar · enter aplicar · esc fechar · passe o mouse para pré-visualizar
-          </div>
+          <div className={s.pickerFooter}>{t('tema.rodape')}</div>
         </div>
       </div>
     </div>
@@ -69,9 +67,9 @@ export function ThemePicker() {
 
 /** Rótulos das origens de wallpaper; `imagem` só aparece quando há uma salva. */
 const WALLS: [WallMode, string][] = [
-  ['capa', 'capa-atual'],
-  ['imagem', 'imagem'],
-  ['nenhum', 'nenhum'],
+  ['capa', 'tema.wallCapa'],
+  ['imagem', 'tema.wallImagem'],
+  ['nenhum', 'tema.wallNenhum'],
 ];
 
 /** Transparência, desfoque e wallpaper — no rodapé do próprio picker. */
@@ -88,7 +86,7 @@ function BackgroundControls() {
     try {
       uiStore.getState().setWallImage(await downscaleImage(file));
     } catch {
-      uiStore.getState().flash('não foi possível ler a imagem');
+      uiStore.getState().flash(t('toast.falhaLerImagem'));
     }
   };
 
@@ -138,7 +136,7 @@ function BackgroundControls() {
             </button>
           ))}
           <label className={s.upload}>
-            [enviar imagem…]
+            {t('tema.enviarImagem')}
             <input type="file" accept="image/*" onChange={(e) => void upload(e)} />
           </label>
         </span>

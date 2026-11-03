@@ -1,4 +1,4 @@
-import { trackUrl, type Track } from '@ondas/core';
+import { t, trackUrl, type Track } from '@ondas/core';
 import { uiStore } from '../app/stores';
 
 /**
@@ -13,7 +13,7 @@ export async function compartilhar(track: Track): Promise<void> {
   const ui = uiStore.getState();
   // O link de faixa própria abre só para quem tem a conta. Avisar na hora de
   // copiar evita a pessoa descobrir isso pelo amigo que recebeu.
-  const recado = track.source === 'acervo' ? 'link copiado — só você abre esta faixa' : 'link copiado';
+  const recado = t(track.source === 'acervo' ? 'share.linkCopiado' : 'share.linkCopiadoSimples');
 
   if (navigator.share) {
     try {

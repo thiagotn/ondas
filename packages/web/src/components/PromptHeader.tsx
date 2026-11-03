@@ -1,3 +1,4 @@
+import { t } from '@ondas/core';
 import type { PromptLine } from '@ondas/core';
 import { useState } from 'react';
 import { uiStore, useUi } from '../app/stores';
@@ -20,8 +21,8 @@ export function PromptHeader({ line }: { line: PromptLine }) {
         <button
           type="button"
           className={`${s.who} ${s.whoBotao}`}
-          aria-label="Conta e aparelho"
-          title="Conta e aparelho (5)"
+          aria-label={t('barra.conta')}
+          title={t('barra.contaComTecla')}
           onClick={openAccount}
         >
           {line.who}@ondas
@@ -61,8 +62,8 @@ function CommandLine() {
         ref={cmdInputRef}
         className={s.cmdInput}
         value={texto}
-        aria-label="Ir para a faixa pelo número"
-        placeholder="nº da faixa"
+        aria-label={t('barra.irPorNumero')}
+        placeholder={t('barra.numeroPlaceholder')}
         inputMode="numeric"
         autoComplete="off"
         onChange={(e) => setTexto(e.target.value)}
