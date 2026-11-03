@@ -8,7 +8,14 @@ import (
 )
 
 type erroResp struct {
+	// A frase em pt-BR. Continua aqui para cliente antigo e para `curl`; a PWA
+	// só cai nela quando não reconhece o `Code`.
 	Error string `json:"error"`
+	// O que aconteceu, estável e sem idioma. Ver `erros.go`.
+	Code string `json:"code,omitempty"`
+	// Números que a frase precisa (um teto, um limite). Vão crus para quem
+	// desenha a tela formatar no locale de quem lê.
+	Params map[string]any `json:"params,omitempty"`
 }
 
 func escreverJSON(w http.ResponseWriter, status int, corpo any) {
@@ -26,9 +33,18 @@ func escreverJSON(w http.ResponseWriter, status int, corpo any) {
 	}
 }
 
-// As mensagens vão em pt-BR porque a PWA as exibe cruas na tela de login.
+// escreverErro responde com a frase em pt-BR E o código correspondente, que
+// sai da tabela em `erros.go`. Mensagem sem código vai só com a frase — é o
+// comportamento de antes, e `TestTodoErroTemCodigo` cobre o esquecimento.
 func escreverErro(w http.ResponseWriter, status int, msg string) {
-	escreverJSON(w, status, erroResp{Error: msg})
+	escreverJSON(w, status, erroResp{Error: msg, Code: codigoPorMensagem[msg]})
+}
+
+// escreverErroCod é escreverErro para o que a tabela não alcança: frase montada
+// com número dentro. O número vai separado, em `params`, porque em en e es ele
+// não cai no mesmo lugar da frase.
+func escreverErroCod(w http.ResponseWriter, status int, cod, msg string, params map[string]any) {
+	escreverJSON(w, status, erroResp{Error: msg, Code: cod, Params: params})
 }
 
 func lerJSON(w http.ResponseWriter, r *http.Request, destino any) bool {

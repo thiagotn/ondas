@@ -225,7 +225,7 @@ describe('promptLine', () => {
         q: '',
         seg: 'liked',
         count: 4,
-        source: 'audius api (ao vivo)',
+        source: 'audius',
       }),
     ).toEqual({
       who: 'visitante',
@@ -246,7 +246,7 @@ describe('promptLine', () => {
         q: '',
         seg: 'liked',
         count: 13,
-        source: 'só o acervo',
+        source: 'acervo',
         acervo: 13,
       }).comment,
     ).toBe('13 faixas · fonte: só o acervo');
@@ -261,7 +261,7 @@ describe('promptLine', () => {
         q: '',
         seg: 'liked',
         count: 24,
-        source: 'audius api (ao vivo)',
+        source: 'audius',
         refreshing: true,
       }).comment,
     ).toBe('24 faixas · fonte: audius api (ao vivo) · atualizando');

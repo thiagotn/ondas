@@ -8,6 +8,8 @@ const ROTA = '/api/playlists';
 interface Resposta {
   playlists?: unknown;
   error?: unknown;
+  code?: unknown;
+  params?: unknown;
 }
 
 /**
@@ -64,7 +66,11 @@ export class HttpPlaylistsService implements PlaylistsService {
 
   async aplicar(
     id: string,
-    mudanca: { add?: readonly string[]; remove?: readonly string[]; ordem?: readonly string[] },
+    mudanca: {
+      add?: readonly string[];
+      remove?: readonly string[];
+      ordem?: readonly string[];
+    },
   ): Promise<Playlist[]> {
     // Só os campos pedidos vão no corpo: o servidor lê com
     // `DisallowUnknownFields` e trata lista ausente como "não mexe", então
@@ -73,7 +79,11 @@ export class HttpPlaylistsService implements PlaylistsService {
   }
 
   private comCorpo(method: string, corpo: unknown): RequestInit {
-    return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) };
+    return {
+      method,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(corpo),
+    };
   }
 
   private pedir(url: string, init: RequestInit): Promise<Response> {
@@ -87,14 +97,20 @@ export class HttpPlaylistsService implements PlaylistsService {
   private async ler(res: Response): Promise<Playlist[]> {
     if (res.status === 401) throw new PlaylistsError('sessão expirada', true);
     if (!res.ok) {
-      // A mensagem do servidor é em pt-BR e dita para ser lida (o nome em uso,
-      // o teto estourado), então ela vai para a tela quando existe.
+      // A frase do servidor (pt-BR) vira RESERVA: o que a tela usa é o
+      // `code`, que ela traduz. Ver `erros.go` na API.
       const corpo = (await res.json().catch(() => ({}))) as Resposta;
       const msg = typeof corpo.error === 'string' && corpo.error ? corpo.error : null;
+      const codigo = typeof corpo.code === 'string' && corpo.code ? corpo.code : undefined;
+      const params =
+        corpo.params && typeof corpo.params === 'object'
+          ? (corpo.params as Record<string, unknown>)
+          : undefined;
       throw new PlaylistsError(
         msg ?? `playlists responderam ${res.status}`,
         false,
         res.status === 409,
+        { codigo, params },
       );
     }
     const corpo = (await res.json()) as Resposta;

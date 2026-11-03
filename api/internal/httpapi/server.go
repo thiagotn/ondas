@@ -220,8 +220,13 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := s.users.Create(r.Context(), req.Email, req.Password)
 	switch {
-	case errors.Is(err, auth.ErrEmailInvalido), errors.Is(err, auth.ErrSenhaCurta):
+	case errors.Is(err, auth.ErrEmailInvalido):
 		escreverErro(w, http.StatusBadRequest, err.Error())
+		return
+	case errors.Is(err, auth.ErrSenhaCurta):
+		// O mínimo vai separado: em en e es ele não cai no mesmo ponto da frase.
+		escreverErroCod(w, http.StatusBadRequest, CodSenhaCurta, err.Error(),
+			map[string]any{"minimo": auth.SenhaMinima})
 		return
 	case errors.Is(err, auth.ErrEmailEmUso):
 		escreverErro(w, http.StatusConflict, err.Error())

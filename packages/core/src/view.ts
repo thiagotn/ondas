@@ -1,5 +1,5 @@
 import { fmtBytes, fmtTime } from './format.js';
-import type { Catalog, LibrarySegment, Session, TabId, Track } from './types.js';
+import type { Catalog, CatalogSource, LibrarySegment, Session, TabId, Track } from './types.js';
 
 /**
  * Os cinco recortes da biblioteca, na ordem em que a tela os mostra.
@@ -213,9 +213,7 @@ export function visibleTracks(v: ListQuery): Track[] {
   // são é `hiddenInSegment`, para o texto de vazio poder dizer.
   if (v.seg === 'playlists') {
     const porID = new Map(v.tracks.map((t) => [t.id, t]));
-    return (v.playlist ?? [])
-      .map((id) => porID.get(id))
-      .filter((t): t is Track => t !== undefined);
+    return (v.playlist ?? []).map((id) => porID.get(id)).filter((t): t is Track => t !== undefined);
   }
   return v.tracks.filter((t) => (v.seg === 'liked' ? v.liked[t.id] : v.cached[t.id]));
 }
@@ -288,8 +286,8 @@ export function promptLine(args: {
     // dizer "ao vivo" sem ressalva seria mentira. E quando o acervo entra, a
     // fonte deixa de ser uma só — dizer apenas "audius" esconderia metade.
     //
-    // Com `só o acervo` a contagem NÃO é anexada: ela já é o número à esquerda,
-    // e `fonte: só o acervo (13)` em `13 faixas` seria a mesma conta duas
+    // Com a origem `acervo` a contagem NÃO é anexada: ela já é o número à
+    // esquerda, e `fonte: só o acervo (13)` em `13 faixas` seria a mesma conta duas
     // vezes. O `+ acervo (N)` existe para dizer quanto da lista misturada vem
     // do acervo, e aqui não há mistura.
     //
@@ -298,11 +296,30 @@ export function promptLine(args: {
     // duas vêm da mesma rota e as duas são o que o catálogo público não é — que
     // é o que esta contagem está dizendo.
     comment:
-      `${count} faixas · fonte: ${source || '…'}` +
-      (acervo && source !== 'só o acervo' ? ` + acervo (${acervo})` : '') +
+      `${count} faixas · fonte: ${source ? catalogSourceLabel(source) : '…'}` +
+      (acervo && source !== 'acervo' ? ` + acervo (${acervo})` : '') +
       (refreshing ? ' · atualizando' : ''),
   };
 }
+
+/**
+ * Código da origem do catálogo → a frase que vai depois de `fonte: `.
+ *
+ * Existe porque `CatalogSource` deixou de ser a própria frase: a comparação em
+ * `promptLine` precisa de um valor estável, e a tela precisa de uma frase que
+ * muda com o idioma. Um mapa separa as duas coisas.
+ */
+export function catalogSourceLabel(source: CatalogSource): string {
+  return FONTES[source];
+}
+
+const FONTES: Record<CatalogSource, string> = {
+  audius: 'audius api (ao vivo)',
+  cache: 'metadados em cache local',
+  'demo-offline': 'catálogo demo — api inacessível',
+  demo: 'catálogo demo',
+  acervo: 'só o acervo',
+};
 
 /**
  * Texto de lista vazia, por aba e contexto de sessão.
@@ -342,9 +359,7 @@ export function emptyText(args: {
     // Sem conta a frase não pode mandar apertar [l]: o coração não liga mais
     // para quem não entrou, porque a curtida é da conta e não do aparelho.
     if (seg === 'liked') {
-      return user
-        ? 'vazio — pressione [l] ou o coração para curtir.'
-        : 'curtidas exigem login.';
+      return user ? 'vazio — pressione [l] ou o coração para curtir.' : 'curtidas exigem login.';
     }
     if (seg === 'acervo') {
       return user ? 'vazio — envie um arquivo com [+ arquivo].' : 'o acervo exige login.';

@@ -1,3 +1,4 @@
+import type { ErroDaApi } from '../types.js';
 import type { Playlist } from '../types.js';
 
 /**
@@ -12,13 +13,19 @@ import type { Playlist } from '../types.js';
  * diria "não foi possível" para algo que tem resposta.
  */
 export class PlaylistsError extends Error {
+  readonly codigo?: string;
+  readonly params?: Record<string, unknown>;
+
   constructor(
     message: string,
     readonly semSessao = false,
     readonly conflito = false,
+    erro?: ErroDaApi,
   ) {
     super(message);
     this.name = 'PlaylistsError';
+    this.codigo = erro?.codigo;
+    this.params = erro?.params;
   }
 }
 
@@ -42,6 +49,10 @@ export interface PlaylistsService {
   apagar(id: string): Promise<Playlist[]>;
   aplicar(
     id: string,
-    mudanca: { add?: readonly string[]; remove?: readonly string[]; ordem?: readonly string[] },
+    mudanca: {
+      add?: readonly string[];
+      remove?: readonly string[];
+      ordem?: readonly string[];
+    },
   ): Promise<Playlist[]>;
 }

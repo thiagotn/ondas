@@ -1,3 +1,4 @@
+import type { ErroDaApi } from '../types.js';
 import { AuthError } from '../ports/auth.js';
 import type { AuthService, Credentials } from '../ports/auth.js';
 import type { KeyValueStore } from '../ports/key-value-store.js';
@@ -21,6 +22,8 @@ interface RespostaUsuario {
 
 interface RespostaErro {
   error?: unknown;
+  code?: unknown;
+  params?: unknown;
 }
 
 /**
@@ -51,11 +54,16 @@ export class HttpAuthService implements AuthService {
     });
 
     if (!res.ok) {
-      // A mensagem da API já vem em pt-BR e é exibida crua na tela de login.
-      throw new AuthError(await mensagemDeErro(res));
+      // A frase da API continua vindo em pt-BR e é a RESERVA; o que a tela
+      // prefere é o código, que ela traduz. Ver `erros.go` na API.
+      const { msg, erro } = await recusa(res);
+      throw new AuthError(msg, erro);
     }
     const user = leUsuario(await res.json());
-    if (!user) throw new AuthError('resposta inesperada do servidor');
+    if (!user)
+      throw new AuthError('resposta inesperada do servidor', {
+        codigo: 'resposta_inesperada',
+      });
     await this.store.set(SESSION_KEY, user);
     return user;
   }
@@ -117,11 +125,19 @@ export class HttpAuthService implements AuthService {
     });
     if (res.status === 401) {
       await this.store.remove(SESSION_KEY);
-      throw new AuthError('sessão expirada');
+      throw new AuthError('sessão expirada', { codigo: 'sessao_expirada' });
     }
-    if (!res.ok) throw new AuthError(await mensagemDeErro(res));
+    if (!res.ok) {
+      // Uma leitura só: `res.json()` consome o corpo, e um segundo `recusa`
+      // cairia no catch e inventaria o erro genérico.
+      const { msg, erro } = await recusa(res);
+      throw new AuthError(msg, erro);
+    }
     const user = leUsuario(await res.json());
-    if (!user) throw new AuthError('resposta inesperada do servidor');
+    if (!user)
+      throw new AuthError('resposta inesperada do servidor', {
+        codigo: 'resposta_inesperada',
+      });
     await this.store.set(SESSION_KEY, user);
     return user;
   }
@@ -153,14 +169,37 @@ function leUsuario(bruto: unknown): User | null {
   return null;
 }
 
-async function mensagemDeErro(res: Response): Promise<string> {
+/**
+ * Lê a recusa da API: a frase (reserva) e o código (o que se traduz).
+ *
+ * Sem JSON — um 502 do proxy — não há código, e o status vira um código local
+ * para a tela não ficar sem o que dizer em en e es.
+ */
+async function recusa(res: Response): Promise<{ msg: string; erro: ErroDaApi }> {
   try {
     const corpo = (await res.json()) as RespostaErro;
-    if (typeof corpo.error === 'string' && corpo.error) return corpo.error;
+    const codigo = typeof corpo.code === 'string' && corpo.code ? corpo.code : undefined;
+    const params =
+      corpo.params && typeof corpo.params === 'object'
+        ? (corpo.params as Record<string, unknown>)
+        : undefined;
+    if (typeof corpo.error === 'string' && corpo.error) {
+      return { msg: corpo.error, erro: { codigo, params } };
+    }
   } catch {
     // Resposta sem JSON (um 502 do proxy, por exemplo).
   }
-  if (res.status === 429) return 'muitas tentativas — espere alguns minutos';
-  if (res.status >= 500) return 'servidor indisponível — tente de novo';
-  return 'não foi possível entrar';
+  if (res.status === 429) {
+    return {
+      msg: 'muitas tentativas — espere alguns minutos',
+      erro: { codigo: 'muitas_tentativas' },
+    };
+  }
+  if (res.status >= 500) {
+    return {
+      msg: 'servidor indisponível — tente de novo',
+      erro: { codigo: 'servidor_indisponivel' },
+    };
+  }
+  return { msg: 'não foi possível entrar', erro: { codigo: 'falha_entrar' } };
 }

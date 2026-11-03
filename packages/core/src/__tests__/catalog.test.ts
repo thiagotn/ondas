@@ -186,7 +186,7 @@ describe('comFaixasAvulsas', () => {
   });
   const catalogo: Catalog = {
     tracks: [faixa('a'), faixa('b')],
-    source: 'catálogo demo',
+    source: 'demo',
     acervo: 1,
   };
 
@@ -202,7 +202,7 @@ describe('comFaixasAvulsas', () => {
   it('preserva a contagem do acervo e a fonte', () => {
     const saida = comFaixasAvulsas(catalogo, [faixa('z')])!;
     expect(saida.acervo).toBe(1);
-    expect(saida.source).toBe('catálogo demo');
+    expect(saida.source).toBe('demo');
   });
 
   it('respeita o teto', () => {
@@ -230,7 +230,7 @@ describe('loadCatalog', () => {
   it('nível 1: api ao vivo, e grava o cache', async () => {
     const writeCache = vi.fn(async () => {});
     const got = await loadCatalog({ remote: remoteOk, readCache: async () => undefined, writeCache });
-    expect(got.source).toBe('audius api (ao vivo)');
+    expect(got.source).toBe('audius');
     expect(got.tracks).toHaveLength(2);
     expect(writeCache).toHaveBeenCalledWith(got.tracks);
   });
@@ -242,7 +242,7 @@ describe('loadCatalog', () => {
       readCache: async () => ({ tracks: cached, savedAt: Date.now() }),
       writeCache: async () => {},
     });
-    expect(got.source).toBe('metadados em cache local');
+    expect(got.source).toBe('cache');
     expect(got.tracks).toEqual(cached);
   });
 
@@ -254,14 +254,14 @@ describe('loadCatalog', () => {
       writeCache: async () => {},
       now: () => agora,
     };
-    expect((await loadCatalog(base)).source).toBe('catálogo demo — api inacessível');
+    expect((await loadCatalog(base)).source).toBe('demo-offline');
 
     // No limite da validade ainda vale.
     const noLimite = {
       ...base,
       readCache: async () => ({ tracks: demoTracks().slice(0, 3), savedAt: agora - CATALOG_CACHE_MAX_AGE_MS }),
     };
-    expect((await loadCatalog(noLimite)).source).toBe('metadados em cache local');
+    expect((await loadCatalog(noLimite)).source).toBe('cache');
   });
 
   it('nível 3: catálogo demo quando não há api nem cache', async () => {
@@ -272,7 +272,7 @@ describe('loadCatalog', () => {
       writeCache: async () => {},
       onError,
     });
-    expect(got.source).toBe('catálogo demo — api inacessível');
+    expect(got.source).toBe('demo-offline');
     expect(got.tracks).toHaveLength(12);
     expect(onError).toHaveBeenCalled();
   });
@@ -283,7 +283,7 @@ describe('loadCatalog', () => {
       readCache: async () => undefined,
       writeCache: async () => {},
     });
-    expect(got.source).toBe('catálogo demo — api inacessível');
+    expect(got.source).toBe('demo-offline');
   });
 
   it('forceDemo encurta a cadeia', async () => {
@@ -294,7 +294,7 @@ describe('loadCatalog', () => {
       writeCache: async () => {},
       forceDemo: true,
     });
-    expect(got.source).toBe('catálogo demo');
+    expect(got.source).toBe('demo');
     expect(remote.trending).not.toHaveBeenCalled();
   });
 
@@ -306,7 +306,7 @@ describe('loadCatalog', () => {
       },
       writeCache: async () => {},
     });
-    expect(got.source).toBe('catálogo demo — api inacessível');
+    expect(got.source).toBe('demo-offline');
   });
 });
 

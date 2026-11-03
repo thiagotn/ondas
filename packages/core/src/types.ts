@@ -122,22 +122,20 @@ export interface Gate {
 }
 
 /**
- * Rótulo da origem dos metadados, exibido no comentário do prompt.
+ * Origem dos metadados, mostrada depois de `fonte: ` no comentário do prompt.
  *
- * São frases inteiras, impressas cruas depois de `fonte: `, e o conjunto é
- * fechado — daí nenhum id pelado entrar aqui.
+ * São CÓDIGOS, e não as frases que aparecem na tela. Eram as frases, e isso não
+ * sobrevivia a mais de um idioma: `view.ts` compara a origem para decidir se
+ * escreve o `+ acervo (N)`, e uma comparação contra texto traduzido passa a dar
+ * falso sem avisar ninguém. O rótulo mora em `i18n`, e o que atravessa o código
+ * é o código.
  *
- * `'só o acervo'` é o único membro que NÃO descreve procedência de metadado
- * público: ele diz que não houve busca pública nenhuma, porque a conta desligou
- * o catálogo (`showsPublicCatalog`). Ele cabe no tipo por ser a mesma coisa do
- * ponto de vista de quem lê a linha — a resposta a "de onde veio esta lista".
+ * `'acervo'` é o único membro que NÃO descreve procedência de metadado público:
+ * ele diz que não houve busca pública nenhuma, porque a conta desligou o
+ * catálogo (`showsPublicCatalog`). Cabe no tipo por ser a mesma coisa do ponto
+ * de vista de quem lê a linha — a resposta a "de onde veio esta lista".
  */
-export type CatalogSource =
-  | 'audius api (ao vivo)'
-  | 'metadados em cache local'
-  | 'catálogo demo — api inacessível'
-  | 'catálogo demo'
-  | 'só o acervo';
+export type CatalogSource = 'audius' | 'cache' | 'demo-offline' | 'demo' | 'acervo';
 
 export interface Catalog {
   tracks: Track[];
@@ -154,3 +152,16 @@ export interface Catalog {
   acervo?: number;
 }
 
+/**
+ * O que a API devolve quando recusa: a frase em pt-BR E um código estável.
+ *
+ * O código é o que atravessa a fronteira — a frase da API só sobrevive como
+ * reserva, para um código que esta versão da PWA ainda não conheça. Ver
+ * `api/internal/httpapi/erros.go`.
+ */
+export interface ErroDaApi {
+  /** Código estável, sem idioma. Vazio em servidor anterior aos códigos. */
+  codigo?: string;
+  /** Números que a frase precisa (um teto, um mínimo). */
+  params?: Record<string, unknown>;
+}

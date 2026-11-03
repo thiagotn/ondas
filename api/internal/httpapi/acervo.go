@@ -92,12 +92,22 @@ type jobJSON struct {
 	Status string `json:"status"`
 	URL    string `json:"url"`
 	Error  string `json:"error,omitempty"`
+	// O mesmo erro, sem idioma. Sai da frase que o worker gravou, pela tabela
+	// de `erros.go` — assim job antigo, gravado antes dos códigos, também
+	// ganha um. Ver `mensagemDeErro` no worker.
+	Code string `json:"code,omitempty"`
 	// Preenchido quando o status é `ready`.
 	TrackID string `json:"trackId,omitempty"`
 }
 
 func paraJobJSON(j *acervo.Job) jobJSON {
-	saida := jobJSON{ID: j.ID, Status: j.Status, URL: j.SourceURL, Error: j.Error}
+	saida := jobJSON{
+		ID:     j.ID,
+		Status: j.Status,
+		URL:    j.SourceURL,
+		Error:  j.Error,
+		Code:   codigoPorMensagem[j.Error],
+	}
 	if j.TrackID != "" {
 		saida.TrackID = prefixoID + j.TrackID
 	}

@@ -101,25 +101,25 @@ export async function loadCatalog(deps: LoadCatalogDeps, options?: TrendingOptio
  */
 async function soAcervo(deps: LoadCatalogDeps, options?: TrendingOptions): Promise<Catalog> {
   const proprias = (await deps.acervo?.(options?.signal)) ?? [];
-  return { tracks: proprias, source: 'só o acervo', acervo: proprias.length };
+  return { tracks: proprias, source: 'acervo', acervo: proprias.length };
 }
 
 /** A cadeia de 3 níveis do catálogo público, intacta. */
 async function resolvePublico(deps: LoadCatalogDeps, options?: TrendingOptions): Promise<Catalog> {
-  if (deps.forceDemo) return { tracks: demoTracks(), source: 'catálogo demo' };
+  if (deps.forceDemo) return { tracks: demoTracks(), source: 'demo' };
   try {
     const tracks = await deps.remote.trending(options);
     if (!tracks.length) throw new Error('catálogo vazio');
     await deps.writeCache(tracks);
-    return { tracks, source: 'audius api (ao vivo)' };
+    return { tracks, source: 'audius' };
   } catch (err) {
     deps.onError?.(err);
     const cached = await deps.readCache().catch(() => undefined);
     const idade = (deps.now?.() ?? Date.now()) - (cached?.savedAt ?? 0);
     if (cached?.tracks.length && idade <= (deps.maxAgeMs ?? CATALOG_CACHE_MAX_AGE_MS)) {
-      return { tracks: cached.tracks, source: 'metadados em cache local' };
+      return { tracks: cached.tracks, source: 'cache' };
     }
-    return { tracks: demoTracks(), source: 'catálogo demo — api inacessível' };
+    return { tracks: demoTracks(), source: 'demo-offline' };
   }
 }
 

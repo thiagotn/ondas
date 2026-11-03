@@ -64,8 +64,12 @@ func (s *Server) erroDePlaylist(w http.ResponseWriter, acao string, err error) {
 	case errors.Is(err, playlists.ErrNomeEmUso):
 		// 409, como o cadastro responde a e-mail em uso.
 		escreverErro(w, http.StatusConflict, err.Error())
-	case errors.Is(err, playlists.ErrDemasiadas), errors.Is(err, playlists.ErrItensDemais):
-		escreverErro(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, playlists.ErrDemasiadas):
+		escreverErroCod(w, http.StatusBadRequest, CodPlaylistLimiteContas, err.Error(),
+			map[string]any{"limite": playlists.MaxPorConta})
+	case errors.Is(err, playlists.ErrItensDemais):
+		escreverErroCod(w, http.StatusBadRequest, CodPlaylistLimiteFaixas, err.Error(),
+			map[string]any{"limite": playlists.MaxItens})
 	default:
 		slog.Error(acao, "erro", err)
 		escreverErro(w, http.StatusInternalServerError, "não foi possível salvar a playlist")

@@ -216,7 +216,10 @@
    Largura do conteúdo, e não `flex: 1`: o campo aceita três dígitos, e esticado
    até a borda o anel de foco do app virava uma caixa atravessando a tela. */
 .cmdInput {
-  width: 11ch;
+  /* O placeholder (`nº da faixa`) já ocupava os 11ch exatos; em en/es ele é
+     mais longo, e um campo que corta o próprio placeholder não se explica. */
+  min-width: 11ch;
+  width: max-content;
   border: 0;
   background: transparent;
   color: var(--color-text);
@@ -376,8 +379,13 @@
   background: var(--color-neutral-900);
 }
 
+/* `min-width` e não `width`: 9ch era a medida das palavras em português
+   (`catálogo`, `offline`), e com três idiomas a coluna passa a ser um
+   orçamento de tradução — `max-content` deixa a mais longa mandar, e o mínimo
+   preserva o alinhamento de hoje em pt-BR. */
 .panelLabel {
-  width: 9ch;
+  min-width: 9ch;
+  width: max-content;
   flex-shrink: 0;
   color: var(--ansi-4);
 }
@@ -410,6 +418,9 @@
   flex-basis: 100%;
   margin-left: calc(9ch + 12px);
 }
+/* Acompanha `.panelLabel`: o recuo é o mínimo dela, não a largura real. Numa
+   linha onde o rótulo traduzido passa de 9ch os dois descolam um pouco, e isso
+   é preferível a medir a coluna em JS. */
 
 .logout {
   min-height: 36px;

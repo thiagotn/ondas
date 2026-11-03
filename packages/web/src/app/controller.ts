@@ -522,7 +522,7 @@ export async function togglePublico(): Promise<void> {
   // escopo público ainda tem a lista misturada da sessão anterior, e substituí-la
   // por uma só do acervo seria jogar fora dado bom para pôr dado pior.
   //
-  // A semente é o acervo, e o rótulo `só o acervo` é verdade no instante em que
+  // A semente é o acervo, e a origem `acervo` é verdade no instante em que
   // ela aparece: é só isso que está na tela. O `invalidateQueries` abaixo busca a
   // versão autoritativa por baixo, e o prompt diz `· atualizando` enquanto isso.
   const chaveNova = catalogKey(true, !ligado);
@@ -530,7 +530,7 @@ export async function togglePublico(): Promise<void> {
     const proprias = tracks.filter((t) => t.source === 'acervo');
     queryClient.setQueryData(chaveNova, {
       tracks: [...proprias],
-      source: 'só o acervo',
+      source: 'acervo',
       acervo: proprias.length,
     });
   }

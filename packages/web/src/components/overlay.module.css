@@ -253,8 +253,12 @@
   overflow: hidden;
 }
 
+/* O pai é `nowrap; overflow: hidden`, então rótulo que não cabe some sem
+   aviso — o modo de falha mais caro de depurar numa tradução. `max-content`
+   tira a tesoura do caminho. */
 .bufferLabel {
-  width: 8ch;
+  min-width: 8ch;
+  width: max-content;
   flex-shrink: 0;
   color: var(--ansi-4);
 }
@@ -659,7 +663,9 @@
    ações sairiam em degrau. */
 .atalhosLinha {
   display: grid;
-  grid-template-columns: 7ch 1fr;
+  /* `minmax` e não `7ch` fixo: a calha foi medida contra `? ou 6`, e em
+     en/es a tecla mais larga pode crescer. */
+  grid-template-columns: minmax(7ch, max-content) 1fr;
   gap: 10px;
   align-items: baseline;
 }

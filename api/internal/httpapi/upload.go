@@ -81,7 +81,8 @@ func (s *Server) pedirVagaDeUpload(w http.ResponseWriter, r *http.Request) {
 	// o tamanho real do objeto, mas deixar o usuário subir 500MB para só
 	// então ouvir "não" seria cruel com o upload dele.
 	if req.Bytes > max {
-		escreverErro(w, http.StatusRequestEntityTooLarge, "arquivo grande demais: o limite é "+megabytes(max))
+		escreverErroCod(w, http.StatusRequestEntityTooLarge, CodArquivoGrandeDemais,
+			"arquivo grande demais: o limite é "+megabytes(max), map[string]any{"limite": max})
 		return
 	}
 
@@ -155,7 +156,8 @@ func (s *Server) finalizarUpload(w http.ResponseWriter, r *http.Request) {
 	// ficar esperando a varredura de abandonados.
 	if max := s.maxUploadBytes(); tamanho > max {
 		s.descartarUpload(r, key)
-		escreverErro(w, http.StatusRequestEntityTooLarge, "arquivo grande demais: o limite é "+megabytes(max))
+		escreverErroCod(w, http.StatusRequestEntityTooLarge, CodArquivoGrandeDemais,
+			"arquivo grande demais: o limite é "+megabytes(max), map[string]any{"limite": max})
 		return
 	}
 

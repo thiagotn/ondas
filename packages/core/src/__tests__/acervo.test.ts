@@ -170,7 +170,7 @@ describe('loadCatalog com as duas fontes', () => {
       writeCache: nadaAGravar,
     });
     expect(cat.tracks).toEqual(publicas);
-    expect(cat.source).toBe('audius api (ao vivo)');
+    expect(cat.source).toBe('audius');
     expect(cat.acervo).toBeUndefined();
   });
 
@@ -184,7 +184,7 @@ describe('loadCatalog com as duas fontes', () => {
     expect(cat.tracks.map((t) => t.id)).toEqual(['acervo:1', 'au1', 'au2']);
     expect(cat.acervo).toBe(1);
     // O rótulo da fonte pública segue dizendo a verdade sobre ela.
-    expect(cat.source).toBe('audius api (ao vivo)');
+    expect(cat.source).toBe('audius');
   });
 
   it('acervo fora do ar não derruba o catálogo público', async () => {
@@ -226,7 +226,7 @@ describe('loadCatalog com as duas fontes', () => {
       acervo: async () => proprias,
     });
     // Cai no demo para a parte pública, mas as faixas próprias continuam lá.
-    expect(cat.source).toBe('catálogo demo — api inacessível');
+    expect(cat.source).toBe('demo-offline');
     expect(cat.tracks[0]!.id).toBe('acervo:1');
     expect(cat.acervo).toBe(1);
   });
@@ -239,7 +239,7 @@ describe('loadCatalog com as duas fontes', () => {
       forceDemo: true,
       acervo: async () => proprias,
     });
-    expect(cat.source).toBe('catálogo demo');
+    expect(cat.source).toBe('demo');
     expect(cat.tracks[0]!.id).toBe('acervo:1');
   });
 
@@ -252,7 +252,7 @@ describe('loadCatalog com as duas fontes', () => {
       acervo: async () => proprias,
     });
     expect(cat.tracks.map((t) => t.id)).toEqual(['acervo:1']);
-    expect(cat.source).toBe('só o acervo');
+    expect(cat.source).toBe('acervo');
     expect(cat.acervo).toBe(1);
   });
 
@@ -285,7 +285,7 @@ describe('loadCatalog com as duas fontes', () => {
       soAcervo: true,
       acervo: async () => proprias,
     });
-    expect(cat.source).toBe('só o acervo');
+    expect(cat.source).toBe('acervo');
     expect(cat.tracks).toEqual(proprias);
   });
 
