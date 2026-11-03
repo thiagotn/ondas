@@ -94,7 +94,18 @@ export function fmtUmDecimal(n: number): string {
  * `params.n` tem dois papéis: escolhe a forma do plural E fica disponível como
  * `{n}` no texto. É a única chave com significado próprio.
  */
-export function resolver(frase: Frase, params?: Params): string {
+export function resolver(frase: Frase | undefined, params?: Params): string {
+  // `frase` indefinida só acontece quando a CHAVE não existe, e o typecheck
+  // impede isso no código — mas não impede num DADO que virou chave. Foi o
+  // que aconteceu: `catalogSourceLabel` monta `fonte.<origem>`, e o catálogo
+  // de 24h guardado no IndexedDB ainda trazia a origem no formato velho
+  // (`'audius api (ao vivo)'`), gerando uma chave inexistente. O `undefined`
+  // estourava dentro do render e levava a tela inteira junto — fundo do tema
+  // e mais nada.
+  //
+  // Nenhuma frase vale uma tela em branco. Aqui ela degrada para vazio, e
+  // quem monta chave a partir de dado valida antes (ver `catalogSourceLabel`).
+  if (frase === undefined) return '';
   const texto = typeof frase === 'string' ? frase : frase[forma(Number(params?.n ?? 0))];
 
   if (!params) return texto;

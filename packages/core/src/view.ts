@@ -326,8 +326,20 @@ export function promptLine(args: {
  * muda com o idioma. Um mapa separa as duas coisas.
  */
 export function catalogSourceLabel(source: CatalogSource): string {
-  return traduzir(`fonte.${source}`);
+  // A origem pode chegar de FORA do código: ela atravessa o IndexedDB no
+  // catálogo que o react-query guarda por 24h, e uma versão anterior
+  // escrevia ali a frase inteira em vez do código. Valida antes de virar
+  // chave — o cache de ontem não pode decidir se a tela desenha.
+  return FONTES_CONHECIDAS.has(source) ? traduzir(`fonte.${source}`) : '';
 }
+
+const FONTES_CONHECIDAS = new Set<string>([
+  'audius',
+  'cache',
+  'demo-offline',
+  'demo',
+  'acervo',
+] satisfies CatalogSource[]);
 
 /**
  * Texto de lista vazia, por aba e contexto de sessão.

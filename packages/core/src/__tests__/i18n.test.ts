@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  catalogSourceLabel,
   definirIdioma,
   emptyText,
   fmtMB,
@@ -124,7 +125,13 @@ describe('o vocabulário de terminal acompanha a prosa', () => {
 
   it('a lista vazia cita o botão pelo nome em qualquer idioma', () => {
     definirIdioma('es');
-    const texto = emptyText({ tab: 'library', seg: 'acervo', q: '', loading: false, user: { name: 'a' } });
+    const texto = emptyText({
+      tab: 'library',
+      seg: 'acervo',
+      q: '',
+      loading: false,
+      user: { name: 'a' },
+    });
     // O nome do botão é parâmetro, então é o MESMO nos três — senão a frase
     // mandaria apertar algo que não existe.
     expect(texto).toContain('[+ arquivo]');
@@ -154,5 +161,43 @@ describe('idioma()', () => {
   it('devolve o que foi fixado', () => {
     definirIdioma('es');
     expect(idioma()).toBe('es');
+  });
+});
+
+/**
+ * O caso que derrubou a produção.
+ *
+ * `Catalog.source` deixou de ser frase e virou código, mas o react-query
+ * guarda o catálogo por 24h no IndexedDB — então, logo depois do deploy, o
+ * app novo recebia a origem no formato velho. `catalogSourceLabel` montava
+ * uma chave inexistente, `t()` devolvia `undefined` e o acesso à forma do
+ * plural estourava DENTRO do render: fundo do tema e mais nada.
+ *
+ * O dado que atravessa disco é entrada externa, mesmo vindo de nós.
+ */
+describe('dado persistido num formato que o código não conhece mais', () => {
+  it('a origem no formato velho não derruba a tela', () => {
+    const velho = 'audius api (ao vivo)' as never;
+    expect(() => catalogSourceLabel(velho)).not.toThrow();
+    expect(catalogSourceLabel(velho)).toBe('');
+  });
+
+  it('nem quando ela chega pelo prompt, que é quem desenha a home', () => {
+    expect(() =>
+      promptLine({
+        tab: 'home',
+        who: 'visitante@ondas',
+        genre: 'tudo',
+        q: '',
+        seg: 'acervo',
+        count: 4,
+        source: 'audius api (ao vivo)' as never,
+      }),
+    ).not.toThrow();
+  });
+
+  it('e a origem conhecida continua virando frase', () => {
+    definirIdioma('pt-BR');
+    expect(catalogSourceLabel('audius')).toBe('audius api (ao vivo)');
   });
 });

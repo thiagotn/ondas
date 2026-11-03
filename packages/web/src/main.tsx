@@ -22,7 +22,15 @@ createRoot(container).render(
   <StrictMode>
     <PersistQueryClientProvider
       client={queryClient}
-      persistOptions={{ persister: queryPersister, maxAge: 24 * 60 * 60_000 }}
+      // `buster`: muda quando o FORMATO do que é guardado muda, e descarta o
+      // cache inteiro em vez de alimentar código novo com dado velho.
+      // `Catalog.source` deixou de ser frase e virou código nesta versão, e
+      // sem isto o catálogo de ontem derrubava a tela de quem já usava o app.
+      persistOptions={{
+        persister: queryPersister,
+        maxAge: 24 * 60 * 60_000,
+        buster: 'source-codigo-1',
+      }}
     >
       <App />
     </PersistQueryClientProvider>
