@@ -56,22 +56,30 @@ function doNavegador(): Locale | null {
  * muda enquanto a página viver — é o que torna seguro o idioma de módulo lá
  * no core (ver `i18n/motor.ts`).
  */
-export function iniciarIdioma(): Locale {
+export function iniciarIdioma(): { locale: Locale; redirecionando: boolean } {
   const doPath = idiomaDoCaminho(location.pathname);
   const escolhido = doPath ?? salvo() ?? doNavegador() ?? 'pt-BR';
 
   // Chegou na raiz, mas o idioma dele não é o da raiz: manda para o endereço
-  // que corresponde. Sem isto o `basename` do router (`/en`) não casaria com
-  // o caminho (`/...`) e a tela não desenharia nada.
+  // que corresponde, porque o `basename` do router (`/en`) não casa com um
+  // caminho sem prefixo.
   //
   // `replace` e não `assign`: o voltar tem de sair do site, e não cair de
   // volta na raiz para ser redirecionado de novo.
+  //
+  // E quem chama NÃO PODE desenhar depois disto. `location.replace` agenda a
+  // navegação, não interrompe o script: montar o React aqui cria uma janela em
+  // que o router tem `basename` de um idioma e a URL ainda é a do outro — e
+  // nessa janela ele não casa rota nenhuma e pinta o fundo do tema e mais
+  // nada. Era transitório num navegador rápido e permanente no app instalado,
+  // que foi onde apareceu. Por isso o retorno diz se vai navegar.
   if (!doPath && escolhido !== 'pt-BR') {
     location.replace(prefixoDe(escolhido) + location.pathname + location.search + location.hash);
+    return { locale: escolhido, redirecionando: true };
   }
 
   definirIdioma(escolhido);
-  return escolhido;
+  return { locale: escolhido, redirecionando: false };
 }
 
 /**
