@@ -156,9 +156,23 @@ export function parseLibrarySegment(
   return LIBRARY_SEGMENTS.find((seg) => SEGMENT_SLUGS[seg] === raw) ?? padrao;
 }
 
+/**
+ * O gênero como se LÊ, e não como se compara.
+ *
+ * `tudo` é sentinela: ele vale no `?genre=` da URL e na comparação de
+ * `visibleTracks`, então o id não pode mudar de idioma. O que muda é a
+ * palavra na tela — e os outros gêneros vêm do Audius em inglês, já prontos.
+ */
+export function genreLabel(genero: string): string {
+  return genero === GENERO_TODOS ? traduzir('genero.tudo') : genero;
+}
+
+/** O gênero que significa "sem filtro". Id, não palavra — ver `genreLabel`. */
+export const GENERO_TODOS = 'tudo';
+
 /** `tudo` + até 8 gêneros presentes no catálogo, na ordem em que aparecem. */
 export function genreOptions(tracks: readonly Track[]): string[] {
-  return ['tudo', ...[...new Set(tracks.map((t) => t.genre))].slice(0, 8)];
+  return [GENERO_TODOS, ...[...new Set(tracks.map((t) => t.genre))].slice(0, 8)];
 }
 
 export interface ListQuery {
@@ -181,7 +195,7 @@ export interface ListQuery {
 /** A lista visível na aba atual. Busca casa título + artista + gênero, ignorando `#` inicial. */
 export function visibleTracks(v: ListQuery): Track[] {
   if (v.tab === 'home') {
-    return v.tracks.filter((t) => v.genre === 'tudo' || t.genre === v.genre);
+    return v.tracks.filter((t) => v.genre === GENERO_TODOS || t.genre === v.genre);
   }
   if (v.tab === 'search') {
     const q = v.q.trim().toLowerCase().replace(/^#/, '');

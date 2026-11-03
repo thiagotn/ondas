@@ -164,6 +164,8 @@ export const ES: Record<Chave, Frase> = {
   'barra.conta': 'Cuenta y dispositivo',
   'barra.contaComTecla': 'Cuenta y dispositivo (5)',
   'barra.simularOffline': 'Simular caída de red (o)',
+  'barra.idioma': 'Idioma (8)',
+  'barra.trocarIdioma': 'Cambiar idioma',
   'barra.tema': 'Tema (t o 4)',
   'barra.trocarTema': 'Cambiar tema',
   'barra.sobre': 'ondas — acerca de',
@@ -217,6 +219,7 @@ export const ES: Record<Chave, Frase> = {
   'splash.carregando': 'rebobinando · cargando metadatos',
   'splash.pronto': 'listo ▶',
 
+  'idioma.rodape': 'j/k navegar · enter cambiar · esc cerrar',
   'tema.rodape': 'j/k navegar · enter aplicar · esc cerrar · pasa el ratón para previsualizar',
   'tema.wallCapa': 'portada-actual',
   'tema.wallImagem': 'imagen',

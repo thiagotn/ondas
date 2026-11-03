@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>ondas</title>
     <meta name="description" content="Ondas — streaming de música independente com estética de terminal." />
+
+    <!--
+      As três versões do site, para o buscador saber que são a MESMA página em
+      idiomas diferentes e não conteúdo duplicado. `x-default` aponta para a
+      raiz, que é onde quem não casa com nenhuma cai — e é o português.
+
+      Os links são relativos porque esta imagem não conhece o próprio domínio:
+      é a mesma restrição que o `nginx.conf` se impõe (`absolute_redirect
+      off`), e o crawler resolve contra a URL corrente.
+    -->
+    <link rel="alternate" hreflang="pt-BR" href="/" />
+    <link rel="alternate" hreflang="en" href="/en/" />
+    <link rel="alternate" hreflang="es" href="/es/" />
+    <link rel="alternate" hreflang="x-default" href="/" />
     <meta name="theme-color" content="#1e1e2e" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -38,6 +52,35 @@
     <link rel="apple-touch-startup-image" media="screen and (device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="/splash/splash-1668x2224.png" />
     <link rel="apple-touch-startup-image" media="screen and (device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="/splash/splash-1668x2388.png" />
     <link rel="apple-touch-startup-image" media="screen and (device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="/splash/splash-2048x2732.png" />
+    <script>
+      /**
+       * O idioma, antes do primeiro paint.
+       *
+       * Um HTML serve os três idiomas, então `lang`, a descrição e o manifest
+       * não podem ser estáticos — e esperar o bundle deixaria o crawler (e o
+       * leitor de tela) vendo `pt-BR` numa página em espanhol. O prefixo do
+       * caminho é a fonte: `/en/...`, `/es/...`, e a raiz é o português.
+       *
+       * Isto duplica a decisão que `app/idioma.ts` toma para o React. A
+       * duplicação é o preço de não ter um build por idioma, e os dois
+       * concordam porque ambos leem a MESMA coisa: o primeiro segmento.
+       */
+      (function () {
+        var m = location.pathname.match(/^\/(en|es)(\/|$)/);
+        if (!m) return;
+        var lang = m[1];
+        document.documentElement.lang = lang;
+        var d = {
+          en: 'Music player with a terminal aesthetic, with offline tracks.',
+          es: 'Reproductor de música con estética de terminal, con pistas offline.',
+        }[lang];
+        var meta = document.querySelector('meta[name="description"]');
+        if (meta && d) meta.setAttribute('content', d);
+        var man = document.querySelector('link[rel="manifest"]');
+        if (man) man.setAttribute('href', '/manifest-' + lang + '.webmanifest');
+      })();
+    </script>
+
     <script>
       /**
        * Aplica o tema salvo antes do primeiro paint: sem isto a tela pisca no

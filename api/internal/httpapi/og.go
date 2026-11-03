@@ -54,6 +54,8 @@ func idDoToken(seg string) (publico string, privado bool, ok bool) {
 }
 
 type dadosOG struct {
+	// O idioma do cartão, do PATH do link (ver `og_i18n.go`).
+	Lang      string
 	Titulo    string
 	Descricao string
 	Capa      string
@@ -65,7 +67,7 @@ type dadosOG struct {
 // Um HTML mínimo. `html/template` e não concatenação: título e artista vêm do
 // Audius, isto é, de terceiro, e vão parar dentro de atributo.
 var tmplOG = template.Must(template.New("og").Parse(`<!doctype html>
-<html lang="pt-BR">
+<html lang="{{.Lang}}">
 <head>
 <meta charset="utf-8">
 <title>{{.Titulo}}</title>
@@ -88,26 +90,33 @@ var tmplOG = template.Must(template.New("og").Parse(`<!doctype html>
 func (s *Server) ogFaixa(w http.ResponseWriter, r *http.Request) {
 	seg := chi.URLParam(r, "seg")
 	id, privado, ok := idDoToken(seg)
-	destino := s.cfg.OrigemPWA + "/t/" + seg
+	// O idioma chega como `?lang=` porque o nginx o arranca do caminho do
+	// link; vazio é pt-BR, que mora na raiz do site.
+	fr := frasesDe(r.URL.Query().Get("lang"))
+	prefixo := ""
+	if fr.Lang != "pt-BR" {
+		prefixo = "/" + fr.Lang
+	}
+	destino := s.cfg.OrigemPWA + prefixo + "/t/" + seg
 
 	// Faixa do acervo: a MESMA resposta para qualquer id, existindo ou não.
 	// Um 404 diferenciado já contaria a um estranho que aquele uuid existe, e
 	// é por isso que nada aqui toca o banco.
 	if privado || !ok {
-		texto := "faixa privada — entre para ouvir."
+		texto := fr.Privada
 		if !ok {
-			texto = "link de faixa inválido."
-			destino = s.cfg.OrigemPWA
+			texto = fr.Invalido
+			destino = s.cfg.OrigemPWA + prefixo
 		}
 		w.Header().Set("X-Robots-Tag", "noindex")
-		s.escreverOG(w, dadosOG{Titulo: "ondas", Descricao: texto, URL: destino}, false)
+		s.escreverOG(w, dadosOG{Lang: fr.Lang, Titulo: "ondas", Descricao: texto, URL: destino}, false)
 		return
 	}
 
 	// Rota pública que faz chamada externa: sem freio ela vira um proxy de
 	// graça para o Audius.
 	if s.ogLimiter != nil && !s.ogLimiter.Permitido(clienteIP(r)) {
-		s.escreverOG(w, dadosOG{Titulo: "ondas", Descricao: semPrevia, URL: destino}, false)
+		s.escreverOG(w, dadosOG{Lang: fr.Lang, Titulo: "ondas", Descricao: fr.SemPrevia, URL: destino}, false)
 		return
 	}
 
@@ -119,7 +128,7 @@ func (s *Server) ogFaixa(w http.ResponseWriter, r *http.Request) {
 			// Erro de rede é nosso problema, não do link; o id não é segredo.
 			slog.Warn("prévia de link sem metadados", "id", id, "erro", err)
 		}
-		s.escreverOG(w, dadosOG{Titulo: "ondas", Descricao: semPrevia, URL: destino}, false)
+		s.escreverOG(w, dadosOG{Lang: fr.Lang, Titulo: "ondas", Descricao: fr.SemPrevia, URL: destino}, false)
 		return
 	}
 
@@ -131,6 +140,7 @@ func (s *Server) ogFaixa(w http.ResponseWriter, r *http.Request) {
 		descricao += fmt.Sprintf(" · %d:%02d", faixa.Duracao/60, faixa.Duracao%60)
 	}
 	s.escreverOG(w, dadosOG{
+		Lang:      fr.Lang,
 		Titulo:    faixa.Titulo,
 		Descricao: descricao,
 		Capa:      faixa.Capa,
@@ -139,8 +149,6 @@ func (s *Server) ogFaixa(w http.ResponseWriter, r *http.Request) {
 		Duracao:   faixa.Duracao,
 	}, true)
 }
-
-const semPrevia = "faixa não encontrada — o link pode estar velho."
 
 // escreverOG é o único lugar da API que responde cacheável: a prévia é
 // pública e não muda. `escreverJSON` força `no-store`, que é o certo para

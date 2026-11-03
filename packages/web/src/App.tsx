@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { idioma } from '@ondas/core';
+import { prefixoDe } from './app/idioma';
 import { bootstrap } from './app/controller';
 import { hydrate } from './app/hydrate';
 import { useSplash } from './app/splash';
 import { useUi } from './app/stores';
 import { Splash } from './components/Splash';
+import { LangPicker } from './components/LangPicker';
 import { ThemePicker } from './components/ThemePicker';
 import { Wallpaper } from './components/Wallpaper';
 import { AppLayout } from './routes/AppLayout';
@@ -19,6 +22,7 @@ import { applyTheme } from './theme/applyTheme';
 export function App() {
   const themeId = useUi((s) => s.themeId);
   const pickerOpen = useUi((s) => s.pickerOpen);
+  const idiomasAberto = useUi((s) => s.idiomasAberto);
   const opacity = useUi((s) => s.opacity);
   const splash = useSplash((s) => s.visible);
   const splashRun = useSplash((s) => s.run);
@@ -35,8 +39,12 @@ export function App() {
     return bootstrap();
   }, []);
 
+  // `basename` e não uma rota `/:lang`: assim TODO path absoluto do app
+  // (`paths.ts`, `trackPath`, os `navigate()`) continua valendo sem saber que
+  // existe idioma, e `useLocation().pathname` chega já sem o prefixo. Em pt-BR
+  // ele é vazio, e nada muda.
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={prefixoDe(idioma())}>
       <Wallpaper />
       <Routes>
         {/* O picker também existe no login, que fica fora do AppLayout. */}
@@ -66,6 +74,8 @@ export function App() {
       </Routes>
       {/* O picker vale para o app e para o login, que fica fora do AppLayout. */}
       {pickerOpen && <ThemePicker />}
+      {/* Como o de tema, e pela mesma razão: vale no app e no login. */}
+      {idiomasAberto && <LangPicker />}
       {/* `key` reinicia o cronômetro quando a abertura é reexibida. */}
       {splash && <Splash key={splashRun} />}
     </BrowserRouter>

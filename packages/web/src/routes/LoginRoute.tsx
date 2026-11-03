@@ -1,5 +1,5 @@
-import { AuthError, t, tErro, themeIndex, type Params } from '@ondas/core';
-import { Palette } from '@phosphor-icons/react';
+import { AuthError, idioma, LOCALES, t, tErro, themeIndex, type Params } from '@ondas/core';
+import { Palette, Translate } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGuestMode } from '../app/guest';
@@ -66,11 +66,31 @@ export function LoginRoute() {
         if (typing) return;
         if (e.key === 'g') guest();
         if (e.key === 't') uiStore.getState().openPicker(themeIndex(themeId));
+        // O idioma precisa ser alcançável AQUI: é a primeira tela de quem não
+        // fala português, e o `useShortcuts` (onde mora o `8`) só existe
+        // dentro do `AppLayout`.
+        if (e.key === '8') {
+          uiStore.getState().setPickIdx(Math.max(0, LOCALES.indexOf(idioma())));
+          uiStore.getState().abrirIdiomas();
+        }
       }}
     >
       <div className={s.topbar}>
         <TrafficLights />
         <span className={s.topbarTitle}>{t('login.janela')}</span>
+        <button
+          type="button"
+          className={s.palette}
+          aria-label={t('barra.trocarIdioma')}
+          title={t('barra.idioma')}
+          onClick={() => {
+            uiStore.getState().setPickIdx(Math.max(0, LOCALES.indexOf(idioma())));
+            uiStore.getState().abrirIdiomas();
+          }}
+        >
+          <Translate size={15} />
+          {idioma()}
+        </button>
         <button
           type="button"
           className={s.palette}

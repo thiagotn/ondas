@@ -1,4 +1,5 @@
 import {
+  genreLabel,
   emptyText,
   genreOptions,
   promptLine,
@@ -34,7 +35,7 @@ export function HomeRoute() {
   const line = promptLine({
     tab: 'home',
     who: whoAmI(user),
-    genre,
+    genre: genreLabel(genre),
     q: '',
     seg: 'liked',
     count: visible.length,

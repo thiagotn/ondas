@@ -767,3 +767,12 @@
   line-height: 1.55;
   text-wrap: pretty;
 }
+
+/* ── seletor de idioma (`ondas +list-langs`) ──────────────────── */
+
+/* A tag que aparece na URL (`en`, `es`), à direita do nome. Alinhada à
+   direita para as três ficarem numa coluna, como os swatches do tema. */
+.langTag {
+  margin-left: auto;
+  color: var(--color-neutral-500);
+}

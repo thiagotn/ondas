@@ -1,4 +1,5 @@
-import { t, trackUrl, type Track } from '@ondas/core';
+import { idioma, t, trackUrl, type Track } from '@ondas/core';
+import { prefixoDe } from '../app/idioma';
 import { uiStore } from '../app/stores';
 
 /**
@@ -9,7 +10,7 @@ import { uiStore } from '../app/stores';
  * porque é API de navegador — o endereço em si é montado pelo `core`.
  */
 export async function compartilhar(track: Track): Promise<void> {
-  const url = trackUrl(track, location.origin);
+  const url = trackUrl(track, location.origin, prefixoDe(idioma()));
   const ui = uiStore.getState();
   // O link de faixa própria abre só para quem tem a conta. Avisar na hora de
   // copiar evita a pessoa descobrir isso pelo amigo que recebeu.

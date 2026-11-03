@@ -187,6 +187,8 @@ export const PT_BR = {
   'barra.conta': 'Conta e aparelho',
   'barra.contaComTecla': 'Conta e aparelho (5)',
   'barra.simularOffline': 'Simular queda de rede (o)',
+  'barra.idioma': 'Idioma (8)',
+  'barra.trocarIdioma': 'Trocar idioma',
   'barra.tema': 'Tema (t ou 4)',
   'barra.trocarTema': 'Trocar tema',
   'barra.sobre': 'ondas — sobre',
@@ -246,6 +248,7 @@ export const PT_BR = {
   'splash.pronto': 'pronto ▶',
 
   // ── seletor de tema ──────────────────────────────────────────
+  'idioma.rodape': 'j/k navegar · enter trocar · esc fechar',
   'tema.rodape': 'j/k navegar · enter aplicar · esc fechar · passe o mouse para pré-visualizar',
   'tema.wallCapa': 'capa-atual',
   'tema.wallImagem': 'imagem',

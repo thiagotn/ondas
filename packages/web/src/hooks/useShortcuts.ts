@@ -1,10 +1,11 @@
-import { t, THEMES, themeIndex } from '@ondas/core';
-import { useEffect } from 'react';
+import { idioma, LOCALES, t, THEMES, themeIndex } from '@ondas/core';
+import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import * as controller from '../app/controller';
 import { libraryStore, playerStore, uiStore } from '../app/stores';
 import { PATHS } from '../routes/paths';
 import { applyTheme } from '../theme/applyTheme';
+import { trocarIdioma } from '../app/idioma';
 import { cmdInputRef } from './cmdInputRef';
 import { useAboutOverlay } from './useAboutOverlay';
 import { useAccountOverlay } from './useAccountOverlay';
@@ -21,6 +22,9 @@ import { useTabNavigation } from './useTabNavigation';
  */
 export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): void {
   const navigate = useNavigate();
+  // O cursor do seletor de idioma vive num ref, e não no store: ele só existe
+  // enquanto a janela está aberta e ninguém mais precisa lê-lo.
+  const idiomaCursor = useRef(0);
   // A playlist aberta sai do ENDEREÇO, não de um estado de tela: é ele que diz
   // se `J`/`K` têm uma ordem para mexer (ver `playlistPath`).
   const { pathname } = useLocation();
@@ -53,6 +57,25 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
           e.preventDefault();
           const alvo = libraryStore.getState().playlists[ui.seletorIdx];
           if (alvo) void controller.adicionarMarcadas(alvo.id);
+        }
+        return;
+      }
+
+      // O seletor de idioma captura o teclado, como o de tema. Antes dele por
+      // ser o mais recente a abrir quando os dois estão de pé.
+      if (ui.idiomasAberto) {
+        if (k === 'Escape' || k === '8') ui.fecharIdiomas();
+        else if (k === 'j' || k === 'ArrowDown' || k === 'k' || k === 'ArrowUp') {
+          e.preventDefault();
+          const dir = k === 'j' || k === 'ArrowDown' ? 1 : -1;
+          idiomaCursor.current =
+            (idiomaCursor.current + dir + LOCALES.length) % LOCALES.length;
+          // Sem pré-visualização: trocar navega, então o cursor só anda aqui e
+          // o componente o lê no próximo quadro.
+          ui.setPickIdx(idiomaCursor.current);
+        } else if (k === 'Enter') {
+          e.preventDefault();
+          trocarIdioma(LOCALES[idiomaCursor.current]!);
         }
         return;
       }
@@ -170,6 +193,11 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
         '5': () => (isAccountOpen ? closeAccount() : openAccount()),
         '6': janelaDeAtalhos,
         '7': () => (isAboutOpen ? closeAbout() : openAbout()),
+        '8': () => {
+          idiomaCursor.current = Math.max(0, LOCALES.indexOf(idioma()));
+          ui.setPickIdx(idiomaCursor.current);
+          ui.abrirIdiomas();
+        },
         '?': janelaDeAtalhos,
         '/': () => {
           // Sem `closePlayer`: a troca de aba já sai de `/t/...`, e fechar o

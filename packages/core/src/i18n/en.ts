@@ -167,6 +167,8 @@ export const EN: Record<Chave, Frase> = {
   'barra.conta': 'Account and device',
   'barra.contaComTecla': 'Account and device (5)',
   'barra.simularOffline': 'Simulate a network drop (o)',
+  'barra.idioma': 'Language (8)',
+  'barra.trocarIdioma': 'Change language',
   'barra.tema': 'Theme (t or 4)',
   'barra.trocarTema': 'Change theme',
   'barra.sobre': 'ondas — about',
@@ -219,6 +221,7 @@ export const EN: Record<Chave, Frase> = {
   'splash.carregando': 'rewinding · loading metadata',
   'splash.pronto': 'ready ▶',
 
+  'idioma.rodape': 'j/k move · enter switch · esc close',
   'tema.rodape': 'j/k move · enter apply · esc close · hover to preview',
   'tema.wallCapa': 'current-cover',
   'tema.wallImagem': 'image',

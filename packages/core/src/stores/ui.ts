@@ -35,6 +35,14 @@ export interface UiState {
   toast: string;
   gate: Gate | null;
   pickerOpen: boolean;
+  /**
+   * A janela de idioma está aberta.
+   *
+   * Campo próprio, como o do tema e pela mesma razão: ela também precisa
+   * existir no `/login`, que fica fora do `AppLayout`, e trocar de idioma não
+   * é um endereço — é uma preferência, e a URL já diz qual é pelo prefixo.
+   */
+  idiomasAberto: boolean;
   pickIdx: number;
   /** Linha de comando do prompt aberta (`:`). */
   cmdOpen: boolean;
@@ -86,6 +94,8 @@ export interface UiState {
   clearToast(): void;
   openGate(kind: GateKind, title: string): void;
   closeGate(): void;
+  abrirIdiomas(): void;
+  fecharIdiomas(): void;
   openPicker(index: number): void;
   closePicker(): void;
   setPickIdx(index: number): void;
@@ -118,6 +128,7 @@ export function createUiStore(initial?: { themeId?: ThemeId; opacity?: number })
     toast: '',
     gate: null,
     pickerOpen: false,
+    idiomasAberto: false,
     pickIdx: 0,
     cmdOpen: false,
     cursorId: null,
@@ -142,6 +153,8 @@ export function createUiStore(initial?: { themeId?: ThemeId; opacity?: number })
     },
     openGate: (kind, title) => set({ gate: { kind, title } }),
     closeGate: () => set({ gate: null }),
+    abrirIdiomas: () => set({ idiomasAberto: true }),
+    fecharIdiomas: () => set({ idiomasAberto: false }),
     openPicker: (pickIdx) => set({ pickerOpen: true, pickIdx }),
     closePicker: () => set({ pickerOpen: false }),
     setPickIdx: (pickIdx) => set({ pickIdx }),

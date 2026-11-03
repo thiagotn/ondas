@@ -75,6 +75,7 @@ const TABELA: readonly AtalhoBruto[] = [
   { tecla: '4', acao: 'atalho.temas', grupo: 'janela' },
   { tecla: '5', acao: 'atalho.conta', grupo: 'janela' },
   { tecla: '7', acao: 'atalho.sobre', grupo: 'janela' },
+  { tecla: '8', acao: 'atalho.idiomas', grupo: 'janela' },
   { tecla: '? ou 6', acao: 'atalho.estaJanela', grupo: 'janela' },
   { tecla: 'esc', acao: 'atalho.fecharJanela', grupo: 'janela' },
 

@@ -82,9 +82,16 @@ export function trackPath(track: FaixaCompartilhavel): string {
   return TRACK_PATH_PREFIX + slugify(`${track.artist} ${track.title}`) + '-' + track.id;
 }
 
-/** O link inteiro, para copiar ou mandar pelo `navigator.share`. */
-export function trackUrl(track: FaixaCompartilhavel, origin: string): string {
-  return origin.replace(/\/+$/, '') + trackPath(track);
+/**
+ * O link inteiro, para copiar ou mandar pelo `navigator.share`.
+ *
+ * `prefixo` é o do idioma (`/en`, `/es`, e vazio em pt-BR). Ele entra AQUI e
+ * não em `trackPath` porque o path interno é o que o router consome, e o
+ * router já conhece o prefixo pelo `basename` — quem precisa dele escrito é
+ * só o link que sai do app.
+ */
+export function trackUrl(track: FaixaCompartilhavel, origin: string, prefixo = ''): string {
+  return origin.replace(/\/+$/, '') + prefixo + trackPath(track);
 }
 
 /**

@@ -1213,7 +1213,7 @@ test('as abas: rótulo inteiro no largo, só ícone no estreito', async ({ page 
     expect(aba.altura).toBeGreaterThanOrEqual(44);
     expect(aba.largura).toBeGreaterThanOrEqual(44);
   }
-  await expect(page.getByText('~/em-alta')).toBeVisible();
+  await expect(page.getByText('~/em-alta').first()).toBeVisible();
 
   // E tomam a barra inteira: o espaçador tem o mesmo `flex: 1` das abas e, se
   // for renderizado aqui, abre uma quarta coluna vazia antes do botão de tema.
@@ -2311,4 +2311,74 @@ test('com a marcação desligada, a lista começa logo abaixo dos chips', async 
 
   // E a barra não existe enquanto o modo está desligado — nem vazia.
   await expect(page.getByRole('button', { name: '[sair]' })).toHaveCount(0);
+});
+
+/**
+ * Os três idiomas.
+ *
+ * pt-BR mora na raiz e é coberto por todo o resto deste arquivo — estes testes
+ * cuidam do que só existe com prefixo: `/en`, `/es`, o `<html lang>`, a troca
+ * e a preferência.
+ */
+test('/en abre em inglês, com o vocabulário de terminal junto', async ({ page }) => {
+  await page.goto('/en/login');
+  await skipSplash(page);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await page.getByRole('button', { name: /continue as a visitor/ }).click();
+
+  // A prosa e o vocabulário de CLI mudam juntos: é a decisão do commit.
+  await expect(page.getByText('~/trending').first()).toBeVisible();
+  await expect(page.getByText(/ondas trending --genre=all/)).toBeVisible();
+
+  // E a URL continua em inglês, como sempre foi — o prefixo só se soma a ela.
+  // Regex: no estreito a aba é só ícone e o nome acessível perde o dígito.
+  await page.getByRole('button', { name: /~\/library/ }).click();
+  await expect(page).toHaveURL(/\/en\/library/);
+});
+
+test('/es abre em espanhol e o número usa vírgula', async ({ page }) => {
+  await page.goto('/es/login');
+  await skipSplash(page);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+  await page.getByRole('button', { name: /continuar como visitante — solo pistas gratis/ }).click();
+  await expect(page.getByText('~/tendencias').first()).toBeVisible();
+});
+
+test('o seletor troca de idioma, e a escolha sobrevive ao reload', async ({ page }) => {
+  // A troca é feita no LOGIN de propósito: é a primeira tela de quem não fala
+  // português, e trocar navega — o modo visitante não atravessa uma navegação
+  // (nunca atravessou um reload).
+  await page.goto('/login');
+  await skipSplash(page);
+
+  // Pelo botão e não pela tecla: no celular não há teclado, e esta é
+  // justamente a porta que precisa existir para quem chega sem entender a tela.
+  await page.getByRole('button', { name: 'Trocar idioma' }).click();
+  const janela = page.getByRole('dialog', { name: 'ondas +list-langs' });
+  await expect(janela).toBeVisible();
+  // Cada idioma aparece no PRÓPRIO idioma: quem abriu isto porque não entende
+  // a tela não procuraria por "inglês".
+  await expect(janela.getByText('english')).toBeVisible();
+  await expect(janela.getByText('español')).toBeVisible();
+
+  await janela.getByRole('button', { name: /english/ }).click();
+  await expect(page).toHaveURL(/\/en\/login/);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.getByRole('button', { name: /continue as a visitor/ })).toBeVisible();
+
+  // E a raiz passa a mandar para o inglês, que é o que prova que a escolha
+  // foi guardada — e não só que a URL mudou.
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/en\/?$/);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+});
+
+test('a janela de atalhos lista a tecla do idioma', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+  await page.keyboard.press('?');
+  const atalhos = page.getByRole('dialog', { name: 'ondas --help' });
+  await expect(atalhos.getByText('idioma')).toBeVisible();
+  await expect(atalhos.getByText('8', { exact: true })).toBeVisible();
 });

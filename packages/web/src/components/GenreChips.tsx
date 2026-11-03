@@ -1,3 +1,4 @@
+import { genreLabel } from '@ondas/core';
 import s from './shell.module.css';
 
 export interface GenreChipsProps {
@@ -19,7 +20,7 @@ export function GenreChips({ options, value, onChange }: GenreChipsProps) {
           aria-pressed={value === g}
           className={value === g ? `${s.chip} ${s.chipActive}` : s.chip}
         >
-          {value === g ? `[${g}]` : g}
+          {value === g ? `[${genreLabel(g)}]` : genreLabel(g)}
         </button>
       ))}
     </div>
