@@ -311,7 +311,11 @@ export const PT_BR = {
   'sobre.texto2': 'um dos side projects de @thiagotn, feitos para estudar IA.',
 
   // ── avisos passageiros (toasts) ──────────────────────────────
-  'toast.semRede': 'sem rede — faixa não está no aparelho',
+  'toast.semRede': 'sem rede — o player retoma quando ela voltar',
+  'toast.playerDesistiu': 'não deu para tocar — toque em play para tentar de novo',
+  'toast.nadaParaTocar': 'nada para tocar à frente',
+  'toast.retomando': 'rede de volta — retomando',
+  'toast.naoComecou': 'o player não começou — toque em play',
   'toast.faixaNaoExiste': 'faixa {numero} não existe',
   'toast.curtirExigeConta': 'curtir exige entrar na conta',
   'toast.playlistsExigemConta': 'playlists exigem entrar na conta',
@@ -339,7 +343,7 @@ export const PT_BR = {
   'toast.catalogoDesligado': 'catálogo público → desligado',
   'toast.downloadsApagados': 'downloads apagados — {tamanho} liberados',
   'toast.redeConectada': 'rede conectada',
-  'toast.redeDesconectada': 'rede desconectada — apenas faixas [off]',
+  'toast.redeDesconectada': 'rede desconectada',
   'toast.streamIndisponivel': 'stream indisponível — pulando faixa',
   'toast.nenhumaPlaylistAinda':
     'nenhuma playlist ainda — use [{botaoPlaylist}] para criar a primeira',

@@ -8,7 +8,6 @@ const tracks = demoTracks();
 const ctx = (over: Partial<QueueContext> = {}): QueueContext => ({
   tracks,
   session: { name: 'thiago' },
-  offline: false,
   cached: {},
   shuffle: false,
   repeat: false,
@@ -29,13 +28,16 @@ describe('stepIndex', () => {
     expect(stepIndex(ctx({ session: null, cur: 3 }), -1)).toBe(1);
   });
 
-  it('offline: pula as que não estão no aparelho', () => {
-    const c = ctx({ cur: 0, offline: true, cached: { demo0: true, demo4: true } });
-    expect(stepIndex(c, 1)).toBe(4);
-  });
-
-  it('offline sem nenhuma faixa local: não há destino', () => {
-    expect(stepIndex(ctx({ offline: true, cached: {} }), 1)).toBe(-1);
+  // A REGRESSÃO QUE CUSTOU A MÚSICA PARAR SOZINHA.
+  //
+  // Faixa que não está no aparelho continua sendo destino, e nada aqui sabe
+  // o que `navigator.onLine` acha. Antes `offline: true` tirava toda faixa
+  // não baixada do caminho: com o Wi-Fi dormindo (tela bloqueada no Android)
+  // o navegador jurava que não havia rede, `stepIndex` não achava destino e o
+  // player emudecia no fim da faixa. Ver `queue.ts` e `access.ts`.
+  it('faixa fora do aparelho continua sendo destino', () => {
+    expect(stepIndex(ctx({ cur: 0, cached: {} }), 1)).toBe(1);
+    expect(stepIndex(ctx({ cur: 0, cached: { demo0: true, demo4: true } }), 1)).toBe(1);
   });
 
   it('shuffle usa o sorteio injetado', () => {
@@ -50,8 +52,9 @@ describe('stepIndex', () => {
 describe('firstPlayable', () => {
   it('é a primeira desbloqueada', () => {
     expect(firstPlayable(ctx({ cur: -1 }))).toBe(0);
-    expect(firstPlayable(ctx({ cur: -1, offline: true, cached: { demo3: true } }))).toBe(3);
-    expect(firstPlayable(ctx({ cur: -1, offline: true, cached: {} }))).toBe(-1);
+    // Sem nada baixado também há primeira: é tocável quem não está bloqueada.
+    expect(firstPlayable(ctx({ cur: -1, cached: {} }))).toBe(0);
+    expect(firstPlayable(ctx({ cur: -1, session: null, cached: {} }))).toBe(0);
   });
 });
 
@@ -64,8 +67,14 @@ describe('onEnded', () => {
     expect(onEnded(ctx({ cur: 4 }))).toEqual({ type: 'play', index: 5 });
   });
 
-  it('para quando nada mais é tocável', () => {
-    expect(onEnded(ctx({ offline: true, cached: {} }))).toEqual({ type: 'stop' });
+  // `stop` ficou para o único caso que ainda o produz: a fila inteira
+  // bloqueada. Falta de rede não entra mais aqui — quem descobre que não há
+  // rede é o elemento de áudio, tentando (ver `access.ts`).
+  it('para só quando a fila inteira está bloqueada', () => {
+    const todasPro = tracks.map((tr) => ({ ...tr, premium: true }));
+    expect(onEnded(ctx({ tracks: todasPro, session: null }))).toEqual({ type: 'stop' });
+    // E a mesma fila, com conta, segue andando.
+    expect(onEnded(ctx({ tracks: todasPro, cur: 4 }))).toEqual({ type: 'play', index: 5 });
   });
 });
 

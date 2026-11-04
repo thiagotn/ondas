@@ -2385,3 +2385,100 @@ test('a janela de atalhos lista a tecla do idioma', async ({ page }) => {
   await expect(atalhos.getByText('idioma')).toBeVisible();
   await expect(atalhos.getByText('8', { exact: true })).toBeVisible();
 });
+
+/**
+ * O INCIDENTE DE 2026-11-03: a música parava sozinha depois de umas três
+ * faixas, com a tela bloqueada.
+ *
+ * A causa não era o áudio: era `navigator.onLine`. O Android põe o Wi-Fi para
+ * dormir com a tela bloqueada, o navegador passa a jurar que não há rede, e o
+ * app tratava isso como verdade — toda faixa não baixada deixava de ser
+ * "tocável", `stepIndex` não achava destino e `onEnded` devolvia `stop`.
+ * Silêncio, sem recado e sem pular. O smart buffer é que dava a folga de uma
+ * faixa (ele baixa a próxima), e é por isso que dava "umas três" em vez de
+ * parar na primeira.
+ *
+ * O teste força a mentira — `onLine` falso com as rotas respondendo — e exige
+ * que o fim da faixa continue levando à seguinte. A faixa do acervo serve um
+ * WAV de 4s de verdade, então o `ended` aqui é um fim de faixa real.
+ */
+test('o navegador dizer que não há rede não para a música no fim da faixa', async ({ page }) => {
+  await logar(page);
+
+  // Todo toast que passar, guardado: o do item 3 é a AUSÊNCIA de um aviso, e
+  // isso não se afirma num instante — o buffer dispara depois do play.
+  await page.evaluate(() => {
+    const vistos: string[] = [];
+    (window as unknown as { __toasts: string[] }).__toasts = vistos;
+    new MutationObserver(() => {
+      const el = document.querySelector('[role="status"]');
+      const texto = el?.textContent?.trim();
+      if (texto && texto !== vistos[vistos.length - 1]) vistos.push(texto);
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
+
+  // A mentira do Wi-Fi dormindo: `onLine` falso, rede funcionando.
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    window.dispatchEvent(new Event('offline'));
+  });
+  // O aviso não promete mais "apenas faixas [off]", porque não é mais verdade:
+  // faixa que não está no aparelho continua tocável.
+  await expect(page.getByRole('status')).toHaveText(/rede desconectada$/);
+
+  // Tocar já é a primeira coisa que o veto impedia: antes isto parava em
+  // "sem rede — faixa não está no aparelho" sem nem tentar a rede.
+  await page.getByRole('button', { name: /^01 Fita Caseira/ }).click();
+  await expect(page.getByText('Fita Caseira — Eu Mesmo')).toBeVisible();
+
+  // O WAV tem 4s: aqui o `ended` é de verdade. A faixa seguinte é a primeira
+  // do catálogo demo, e ela tem de entrar na linha do player.
+  await expect(page.getByText('Maré Baixa — Lia Sombra')).toBeVisible({ timeout: 15000 });
+
+  // ITEM 3: o smart buffer é automático, então ele não fala. A checagem de
+  // rede vinha ANTES do uso do `silent` e ele piscava "conecte-se para
+  // baixar" sozinho, no meio de uma música que estava tocando normalmente.
+  const toasts = await page.evaluate(() => (window as unknown as { __toasts: string[] }).__toasts);
+  expect(toasts.join(' | ')).not.toMatch(/conecte-se para baixar/);
+});
+
+/**
+ * O outro lado do mesmo conserto: quando a rede cai DE VERDADE, o player não
+ * pode desfilar pelo catálogo nem morrer calado.
+ *
+ * Tirar o veto de `navigator.onLine` deixou o `<audio>` ser o juiz de quem tem
+ * rede — e isso precisa de teto, porque `engine.on('error')` chama `step(1)`,
+ * que chama `play`, que erra de novo. Sem contador, uma queda de rede faria o
+ * app atravessar a lista inteira sozinho piscando toast.
+ *
+ * Com só o acervo ligado, a fila tem uma faixa e a falha é de fato seguida: as
+ * faixas demo são playback simulado e nunca erram, então elas salvariam a
+ * sequência e esconderiam o teto.
+ */
+test('falha seguida para o player com recado, e a rede voltando retoma', async ({ page }) => {
+  await logar(page);
+
+  await abrirConta(page);
+  const conta = page.getByRole('dialog', { name: 'ondas whoami' });
+  await conta.getByRole('button', { name: /catálogo/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByText('fonte: só o acervo')).toBeVisible();
+
+  // O áudio passa a falhar — é o que uma queda de rede faz com o elemento.
+  await page.unroute('**/api/acervo/*/audio');
+  await page.route('**/api/acervo/*/audio', (route) => route.abort());
+
+  await page.getByRole('button', { name: /^01 Fita Caseira/ }).click();
+
+  // O player desiste DIZENDO. Antes, `onEnded` punha `playing: false` e calava
+  // — era o telefone no bolso ficando em silêncio sem explicação.
+  await expect(page.getByRole('status')).toHaveText(/toque em play/, { timeout: 20000 });
+
+  // E a volta da rede retoma de onde parou, sem ninguém pedir.
+  await page.unroute('**/api/acervo/*/audio');
+  await page.route('**/api/acervo/*/audio', async (route) =>
+    route.fulfill({ status: 200, contentType: 'audio/wav', body: wavDeSilencio(4) }),
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect(page.getByRole('status')).toHaveText(/retomando/, { timeout: 10000 });
+});

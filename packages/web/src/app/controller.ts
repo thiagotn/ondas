@@ -12,6 +12,7 @@ import {
   showsPublicCatalog,
   stepIndex,
   t,
+  type Chave,
   type QueueContext,
   type ThemeId,
   type Track,
@@ -62,9 +63,67 @@ export function setOnline(next: boolean): void {
   online = next;
 }
 
-/** Offline de verdade, ou a simulação de rede do build de dev. */
+/**
+ * Offline de verdade, ou a simulação de rede do build de dev.
+ *
+ * Isto NÃO decide mais se uma faixa pode tocar (ver `access.ts`): decide o
+ * indicador da barra, se vale disparar um download e qual recado dar quando o
+ * playback falha de fato.
+ */
 export function isOffline(): boolean {
   return !online || (import.meta.env.DEV && uiStore.getState().simulatedOffline);
+}
+
+/**
+ * Quantas faixas seguidas podem falhar antes de o player desistir.
+ *
+ * Sem este teto, uma queda de rede vira um desfile: `engine.on('error')` chama
+ * `step(1)`, que chama `play`, que erra de novo — o app atravessaria o catálogo
+ * inteiro sozinho piscando toast. Três deixa passar uma ou duas faixas
+ * realmente quebradas e segura a queda geral.
+ */
+const LIMITE_DE_FALHAS = 3;
+let falhasSeguidas = 0;
+
+/**
+ * O que o player queria estar fazendo quando desistiu, para retomar quando a
+ * rede voltar. `null` = ninguém está esperando nada.
+ */
+let pendencia: { tipo: 'avancar' | 'retomar'; index: number } | null = null;
+
+/**
+ * Para de tocar DIZENDO que parou.
+ *
+ * O silêncio era o bug: `onEnded` devolvia `stop` e o player só punha
+ * `playing: false`. Quem estava com o telefone no bolso não tinha como saber
+ * que a música tinha acabado ali — e nada retomava quando a rede voltava.
+ */
+function desistir(chave: Chave): void {
+  falhasSeguidas = 0;
+  pendencia = { tipo: 'avancar', index: playerStore.getState().cur };
+  playerStore.getState().patch({ playing: false, waiting: false });
+  uiStore.getState().flash(t(chave));
+}
+
+/**
+ * A rede voltou e o player estava esperando por ela.
+ *
+ * UMA tentativa por queda: a pendência é limpa antes de tentar. Se a retomada
+ * também não começar (autoplay barrado, por exemplo), `play` rearma a
+ * pendência — mas sem gesto nenhum da pessoa isso não vira laço, porque cada
+ * rearme precisa de um novo evento de rede.
+ */
+async function retomar(): Promise<void> {
+  const alvo = pendencia;
+  pendencia = null;
+  if (!alvo) return;
+  // O destino primeiro, o anúncio depois: sem isto a tela dizia "retomando" e
+  // não retomava nada quando não havia faixa para onde ir.
+  const destino =
+    alvo.tipo === 'retomar' && alvo.index >= 0 ? alvo.index : stepIndex(queueContext(), 1);
+  if (destino < 0) return;
+  uiStore.getState().flash(t('toast.retomando'));
+  await play(destino);
 }
 
 function queueContext(): QueueContext {
@@ -73,7 +132,6 @@ function queueContext(): QueueContext {
   return {
     tracks,
     session: sessionStore.getState().user,
-    offline: isOffline(),
     cached: lib.cached,
     shuffle: player.shuffle,
     repeat: player.repeat,
@@ -96,14 +154,9 @@ export async function play(index: number): Promise<void> {
   if (!track) return;
   const lib = libraryStore.getState();
   const ui = uiStore.getState();
-  const verdict = playability(track, index, {
-    session: sessionStore.getState().user,
-    offline: isOffline(),
-    cached: lib.cached,
-  });
+  const verdict = playability(track, index, { session: sessionStore.getState().user });
   if (!verdict.ok) {
-    if (verdict.reason === 'locked') ui.openGate('play', track.title);
-    else ui.flash(t('toast.semRede'));
+    ui.openGate('play', track.title);
     return;
   }
 
@@ -117,8 +170,11 @@ export async function play(index: number): Promise<void> {
   let src = track.stream;
   if (cached && track.stream) {
     const local = await offlineStore.get(track.id);
+    // A cópia local sumiu (faxina do navegador, cota): vale a URL remota. Havia
+    // aqui um `else if (isOffline()) src = ''`, e `src` vazio não é "sem
+    // fonte" — é o playback SIMULADO, que fingia tocar uma faixa real em
+    // silêncio. Tentar a rede e falhar com recado é melhor que isso.
     if (local) src = local;
-    else if (isOffline()) src = '';
   } else if (!track.stream) {
     // Faixa demo: sem áudio, playback simulado.
     src = '';
@@ -127,6 +183,20 @@ export async function play(index: number): Promise<void> {
   engine.load(track, src);
   setMediaMetadata(track);
   await engine.play();
+
+  // `WebPlayerEngine.play()` engole a recusa do navegador (autoplay barrado é
+  // uma promise rejeitada, não um evento de erro), e a tela só voltava para
+  // PAUSE sem dizer por quê. A promise do `play()` resolve quando o som
+  // começa, então ainda estar pausado aqui significa que não começou.
+  //
+  // `curId === track.id` é a guarda contra `n` apertado duas vezes rápido: o
+  // `play()` da faixa abandonada rejeita com `AbortError`, e sem isto a tela
+  // diria "não começou" por cima da faixa que já está tocando.
+  if (engine.isPaused() && playerStore.getState().curId === track.id) {
+    playerStore.getState().patch({ playing: false, waiting: false });
+    ui.flash(t('toast.naoComecou'));
+    pendencia = { tipo: 'retomar', index };
+  }
 
   if (lib.prefetch && sessionStore.getState().user) void prefetchNext(index);
 }
@@ -393,7 +463,11 @@ export async function download(track: Track, silent = false): Promise<void> {
   }
   if (lib.dl[track.id] != null) return;
   if (isOffline()) {
-    ui.flash(t('toast.conecteParaBaixar'));
+    // `silent` é o buffer automático, que ninguém pediu — então não há o que
+    // avisar. A checagem de rede estava ANTES de qualquer uso da flag, e o
+    // buffer "silencioso" piscava "conecte-se para baixar" sozinho, no meio de
+    // uma música que estava tocando normalmente.
+    if (!silent) ui.flash(t('toast.conecteParaBaixar'));
     return;
   }
 
@@ -595,6 +669,11 @@ export function bootstrap(): () => void {
     engine.on('buffer', (buf) => playerStore.getState().patch({ buf })),
     engine.on('waiting', (waiting) => playerStore.getState().patch({ waiting })),
     engine.on('playing', (playing) => {
+      // Som saindo = a sequência de falhas acabou, e ninguém mais espera rede.
+      if (playing) {
+        falhasSeguidas = 0;
+        pendencia = null;
+      }
       playerStore.getState().patch({ playing, waiting: false });
       setMediaPlaybackState(playing);
     }),
@@ -606,10 +685,22 @@ export function bootstrap(): () => void {
       } else if (action.type === 'play') {
         void play(action.index);
       } else {
-        playerStore.getState().patch({ playing: false });
+        // Nada tocável à frente — hoje isso só acontece com a fila inteira
+        // bloqueada, porque falta de rede deixou de bloquear faixa. Não arma
+        // espera de rede: a rede voltar não desbloqueia faixa [pro].
+        playerStore.getState().patch({ playing: false, waiting: false });
+        ui.flash(t('toast.nadaParaTocar'));
       }
     }),
     engine.on('error', () => {
+      falhasSeguidas += 1;
+      if (falhasSeguidas >= LIMITE_DE_FALHAS) {
+        // Aqui `isOffline()` ganha o papel que lhe cabe: não vetar playback,
+        // só escolher o recado. Se o navegador diz que não há rede, a promessa
+        // de retomar é honesta; se ele diz que há, o problema é outro.
+        desistir(isOffline() ? 'toast.semRede' : 'toast.playerDesistiu');
+        return;
+      }
       ui.flash(t('toast.streamIndisponivel'));
       step(1);
     }),
@@ -626,6 +717,8 @@ export function bootstrap(): () => void {
       ui.flash(t(value ? 'toast.redeConectada' : 'toast.redeDesconectada'));
       // A rede voltou: é a hora de subir o que foi curtido sem ela.
       if (value) void sincronizar();
+      // E de retomar a música, se ela parou justamente por falta de rede.
+      if (value && pendencia) void retomar();
       // As playlists não têm fila para subir (ver `app/playlists.ts`), mas o
       // espelho pode ter perdido uma escrita recusada por falta de rede.
       if (value) void listas.carregarPlaylists();

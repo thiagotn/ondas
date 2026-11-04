@@ -5,7 +5,12 @@ import type { Session, Track } from './types.js';
 export interface QueueContext {
   tracks: readonly Track[];
   session: Session;
-  offline: boolean;
+  /**
+   * O que já está no aparelho. Só o pré-carregamento lê isto: desde que
+   * `navigator.onLine` deixou de vetar playback (ver `access.ts`), estar ou
+   * não baixada não muda se a faixa é tocável — muda apenas se vale baixá-la
+   * de novo.
+   */
   cached: Readonly<Record<string, boolean>>;
   shuffle: boolean;
   repeat: boolean;
@@ -52,13 +57,20 @@ function caminho(ctx: QueueContext): number[] {
   return indices.length ? indices : ctx.tracks.map((_, i) => i);
 }
 
-/** Tocável: não bloqueada e, se estamos offline, presente no aparelho. */
+/**
+ * Tocável: não bloqueada. Nada mais.
+ *
+ * Havia aqui um segundo teste — offline e não baixada, não é tocável — e ele
+ * é a causa de a música parar sozinha no fim de uma faixa. Com o Wi-Fi
+ * dormindo (tela bloqueada no Android), `navigator.onLine` vira `false`, toda
+ * faixa não baixada deixa de ser tocável, `stepIndex` não encontra destino e
+ * `onEnded` devolve `stop`: silêncio, sem recado, sem pular. Ver `access.ts`
+ * para o raciocínio inteiro.
+ */
 export function isPlayable(ctx: QueueContext, index: number): boolean {
   const tr = ctx.tracks[index];
   if (!tr) return false;
-  if (isLocked(tr, index, ctx.session, ctx.options)) return false;
-  if (ctx.offline && !ctx.cached[tr.id]) return false;
-  return true;
+  return !isLocked(tr, index, ctx.session, ctx.options);
 }
 
 /** Primeira faixa tocável da fila (ou da lista, sem fila), ou -1 se nenhuma serve. */

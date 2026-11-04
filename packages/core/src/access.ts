@@ -24,18 +24,27 @@ export function canDownload(session: Session): boolean {
   return !!session;
 }
 
-export type PlayDenial = 'locked' | 'not-cached';
+export type PlayDenial = 'locked';
 
 export interface PlayabilityContext {
   session: Session;
-  offline: boolean;
-  cached: Readonly<Record<string, boolean>>;
   options?: AccessOptions;
 }
 
 /**
- * Pode tocar? `locked` abre o gate de permissão; `not-cached` é só um toast
- * (sem rede e a faixa não está no aparelho).
+ * Pode tocar? Só o acesso decide — `locked` abre o gate de permissão.
+ *
+ * **Estar offline não entra aqui, e isso é deliberado.** Havia uma segunda
+ * recusa, `not-cached`: sem rede e sem a faixa no aparelho, nem tentava. O
+ * problema é a fonte dessa informação — na web ela é `navigator.onLine`, que
+ * dá falso negativo. O Android põe o Wi-Fi para dormir com a tela bloqueada e
+ * o navegador passa a jurar que não há rede enquanto há.
+ *
+ * O resultado era o player parar no fim de uma faixa e não ter para onde ir,
+ * porque nada mais era "tocável" (ver `queue.ts`). Quem sabe se há rede é o
+ * elemento de áudio, tentando: ele tem o próprio evento de erro, e quem chama
+ * trata a falha. `navigator.onLine` ficou para o indicador da barra e para não
+ * disparar download à toa — não para recusar playback.
  */
 export function playability(
   track: Track,
@@ -43,6 +52,5 @@ export function playability(
   ctx: PlayabilityContext,
 ): { ok: true } | { ok: false; reason: PlayDenial } {
   if (isLocked(track, index, ctx.session, ctx.options)) return { ok: false, reason: 'locked' };
-  if (ctx.offline && !ctx.cached[track.id]) return { ok: false, reason: 'not-cached' };
   return { ok: true };
 }

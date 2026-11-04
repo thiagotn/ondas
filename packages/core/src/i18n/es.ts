@@ -277,7 +277,11 @@ export const ES: Record<Chave, Frase> = {
     'ondas es un reproductor de música con estética de terminal — la cinta gira, la lista es la pantalla, y todo se hace con el teclado.',
   'sobre.texto2': 'uno de los side projects de @thiagotn, hechos para estudiar IA.',
 
-  'toast.semRede': 'sin red — la pista no está en el dispositivo',
+  'toast.semRede': 'sin red — el player sigue cuando vuelva',
+  'toast.playerDesistiu': 'no se pudo tocar — toca play para intentar de nuevo',
+  'toast.nadaParaTocar': 'nada para tocar a continuación',
+  'toast.retomando': 'red de vuelta — retomando',
+  'toast.naoComecou': 'el player no arrancó — toca play',
   'toast.faixaNaoExiste': 'la pista {numero} no existe',
   'toast.curtirExigeConta': 'dar me gusta exige iniciar sesión',
   'toast.playlistsExigemConta': 'las listas exigen iniciar sesión',
@@ -305,7 +309,7 @@ export const ES: Record<Chave, Frase> = {
   'toast.catalogoDesligado': 'catálogo público → apagado',
   'toast.downloadsApagados': 'descargas borradas — {tamanho} liberados',
   'toast.redeConectada': 'red conectada',
-  'toast.redeDesconectada': 'red desconectada — solo pistas [off]',
+  'toast.redeDesconectada': 'red desconectada',
   'toast.streamIndisponivel': 'stream no disponible — saltando pista',
   'toast.nenhumaPlaylistAinda':
     'ninguna lista todavía — usa [{botaoPlaylist}] para crear la primera',

@@ -40,19 +40,21 @@ describe('canDownload', () => {
 
 describe('playability', () => {
   it('nega faixa [pro] para visitante com motivo locked', () => {
-    expect(playability(t(2), 2, { session: null, offline: false, cached: {} })).toEqual({
+    expect(playability(t(2), 2, { session: null })).toEqual({
       ok: false,
       reason: 'locked',
     });
   });
 
-  it('offline: só toca o que está no aparelho', () => {
-    const ctx = { session: { name: 'thiago' }, offline: true, cached: { demo0: true } };
-    expect(playability(t(0), 0, ctx).ok).toBe(true);
-    expect(playability(t(1), 1, ctx)).toEqual({ ok: false, reason: 'not-cached' });
+  // Estar sem rede não é mais motivo de recusa: a fonte dessa informação na
+  // web é `navigator.onLine`, que dá falso negativo (Wi-Fi dormindo com a tela
+  // bloqueada). Quem descobre que não há rede é o elemento de áudio, tentando.
+  it('não recusa faixa fora do aparelho — nem sem rede', () => {
+    expect(playability(t(0), 0, { session: { name: 'thiago' } }).ok).toBe(true);
+    expect(playability(t(1), 1, { session: { name: 'thiago' } }).ok).toBe(true);
   });
 
-  it('online e desbloqueada: libera', () => {
-    expect(playability(t(1), 1, { session: null, offline: false, cached: {} }).ok).toBe(true);
+  it('desbloqueada: libera', () => {
+    expect(playability(t(1), 1, { session: null }).ok).toBe(true);
   });
 });
