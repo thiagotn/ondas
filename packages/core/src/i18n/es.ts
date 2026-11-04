@@ -282,6 +282,7 @@ export const ES: Record<Chave, Frase> = {
   'toast.nadaParaTocar': 'nada para tocar a continuación',
   'toast.retomando': 'red de vuelta — retomando',
   'toast.naoComecou': 'el player no arrancó — toca play',
+  'toast.versaoNova': 'versión nueva — recarga cuando quieras',
   'toast.faixaNaoExiste': 'la pista {numero} no existe',
   'toast.curtirExigeConta': 'dar me gusta exige iniciar sesión',
   'toast.playlistsExigemConta': 'las listas exigen iniciar sesión',

@@ -33,10 +33,29 @@ registerRoute(
   }),
 );
 
-self.addEventListener('install', () => {
-  void self.skipWaiting();
+/**
+ * A troca de versão é decidida pela PÁGINA, não aqui.
+ *
+ * Havia um `skipWaiting()` no install, e com `registerType: 'autoUpdate'` a
+ * biblioteca recarregava a página assim que este SW ativasse — ~1s depois de
+ * abrir, o tempo de pré-cachear os arquivos do shell. A abertura rodava duas
+ * vezes, e um deploy no meio de uma faixa calava o player sem recado.
+ *
+ * Agora o SW novo espera, e `app/atualizacao.ts` manda `SKIP_WAITING` quando
+ * sabe que é seguro. Sem a mensagem, a versão nova entra no próximo boot, que
+ * é o comportamento padrão do navegador.
+ */
+self.addEventListener('message', (event) => {
+  const dado: unknown = event.data;
+  if ((dado as { type?: unknown } | null)?.type === 'SKIP_WAITING') void self.skipWaiting();
 });
 
+/**
+ * `clients.claim()` assume a página JÁ ABERTA depois de ativar. É o que faz o
+ * `controllerchange` disparar nela — e é por esse evento que a página se
+ * recarrega, para não seguir rodando um build cujos chunks o
+ * `cleanupOutdatedCaches()` acabou de apagar.
+ */
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });

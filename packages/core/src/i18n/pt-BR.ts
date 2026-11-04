@@ -316,6 +316,7 @@ export const PT_BR = {
   'toast.nadaParaTocar': 'nada para tocar à frente',
   'toast.retomando': 'rede de volta — retomando',
   'toast.naoComecou': 'o player não começou — toque em play',
+  'toast.versaoNova': 'versão nova — recarregue quando quiser',
   'toast.faixaNaoExiste': 'faixa {numero} não existe',
   'toast.curtirExigeConta': 'curtir exige entrar na conta',
   'toast.playlistsExigemConta': 'playlists exigem entrar na conta',

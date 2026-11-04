@@ -284,6 +284,7 @@ export const EN: Record<Chave, Frase> = {
   'toast.nadaParaTocar': 'nothing to play next',
   'toast.retomando': 'network back — resuming',
   'toast.naoComecou': 'the player did not start — press play',
+  'toast.versaoNova': 'new version — reload whenever you like',
   'toast.faixaNaoExiste': 'track {numero} does not exist',
   'toast.curtirExigeConta': 'liking requires signing in',
   'toast.playlistsExigemConta': 'playlists require signing in',

@@ -2482,3 +2482,49 @@ test('falha seguida para o player com recado, e a rede voltando retoma', async (
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await expect(page.getByRole('status')).toHaveText(/retomando/, { timeout: 10000 });
 });
+
+/**
+ * A abertura não pode rodar duas vezes quando o app troca de versão.
+ *
+ * A recarga em si é necessária: ao ativar, o SW novo apaga os chunks do build
+ * velho (`cleanupOutdatedCaches`), e a página que continuasse rodando pediria
+ * arquivo que não existe mais. O que não era aceitável é ela chegar sem aviso —
+ * com `registerType: 'autoUpdate'` a biblioteca recarregava sozinha ~1s depois
+ * de abrir, e quem via o app pela segunda vez num dia de deploy via a abertura
+ * inteira duas vezes. Pior: com uma música tocando, a recarga calava o player.
+ *
+ * Forçar um SW novo aqui exigiria um segundo build, então o teste ataca a
+ * decisão e não o encanamento: a marca em `sessionStorage` é exatamente o
+ * estado em que a página chega depois da recarga de versão (ver
+ * `app/atualizacao.ts`), e é ela que a abertura consulta.
+ */
+test('a recarga que troca de versão não repete a abertura', async ({ page }) => {
+  const abertura = page.getByRole('button', { name: 'pular abertura' });
+
+  // Boot normal: a abertura aparece.
+  await page.goto('/');
+  await expect(abertura).toBeVisible();
+  await skipSplash(page);
+  await expect(page.getByText('ondas — login')).toBeVisible();
+
+  // A marca que `atualizacao.ts` grava imediatamente antes de mandar o
+  // `SKIP_WAITING` — quem recarrega é o listener de `controlling` da
+  // biblioteca, e ele não avisa antes.
+  await page.evaluate(() => sessionStorage.setItem('ondas:recarga-de-versao', '1'));
+  await page.reload();
+
+  // O login visível prova que o React montou; a abertura e as rotas montam no
+  // mesmo quadro, então aqui a decisão da abertura já está tomada — não é uma
+  // asserção que passa por a tela ainda estar vazia.
+  await expect(page.getByText('ondas — login')).toBeVisible();
+
+  // `toHaveCount(0)` com janela curta, e NÃO `toBeHidden`: a abertura fecha
+  // sozinha no teto de 4,5s, então um `toBeHidden` com os 5s de padrão passa
+  // mesmo quando ela rodou inteira. Foi exatamente assim que este teste passou
+  // contra o código antigo na primeira tentativa de falsificá-lo.
+  await expect(abertura).toHaveCount(0, { timeout: 1000 });
+
+  // E a marca vale para UMA carga: o boot seguinte tem abertura de novo.
+  await page.reload();
+  await expect(abertura).toBeVisible();
+});

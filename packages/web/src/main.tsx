@@ -1,20 +1,22 @@
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { registerSW } from 'virtual:pwa-register';
 import { App } from './App';
 import { Desastre } from './components/Desastre';
+import { iniciarAtualizacao } from './app/atualizacao';
 import { iniciarIdioma } from './app/idioma';
 import { queryClient, queryPersister } from './query/client';
 import './styles/global.css';
-
-// Em dev o SW fica fora do caminho; em produção atualiza sozinho.
-if (import.meta.env.PROD) registerSW({ immediate: true });
 
 // Antes de qualquer render: o catálogo e o `<html lang>` têm de estar certos
 // no primeiro quadro, senão a tela pisca em português e corrige depois.
 const { locale, redirecionando } = iniciarIdioma();
 document.documentElement.lang = locale;
+
+// Em dev o SW fica fora do caminho. Depois do idioma porque o aviso de versão
+// nova é frase traduzida, e `t()` precisa do idioma já definido; e nada de
+// registrar quando a página está de partida para outro endereço.
+if (import.meta.env.PROD && !redirecionando) iniciarAtualizacao();
 
 const container = document.getElementById('root');
 if (!container) throw new Error('#root não encontrado');

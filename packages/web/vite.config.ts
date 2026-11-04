@@ -17,7 +17,13 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
-      registerType: 'autoUpdate',
+      // `prompt`, e não `autoUpdate`: em `autoUpdate` a própria biblioteca
+      // chama `window.location.reload()` quando um SW novo ativa. Com o
+      // `skipWaiting()` que havia no `sw.ts`, isso caía ~1s depois de abrir e
+      // a abertura rodava duas vezes — pior, um deploy no meio de uma música
+      // recarregava a página e calava o player. Quem decide a hora agora é
+      // `app/atualizacao.ts`.
+      registerType: 'prompt',
       // O registro é feito em `main.tsx`, então nada é injetado no HTML.
       injectRegister: null,
       injectManifest: {
