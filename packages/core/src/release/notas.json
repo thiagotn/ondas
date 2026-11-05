@@ -1,5 +1,31 @@
 [
   {
+    "versao": "1.1.1",
+    "data": "2026-11-05",
+    "itens": [
+      {
+        "pt-BR": "a próxima faixa continua sendo guardada no aparelho mesmo quando o celular jura que está sem rede — é o que faz a música não parar na troca, com a tela desligada",
+        "en": "the next track keeps being saved to the device even when the phone swears it is offline — that is what keeps the music from stopping between tracks with the screen off",
+        "es": "la siguiente pista se sigue guardando en el aparato aunque el teléfono jure que no hay red — es lo que evita que la música se corte al cambiar de pista con la pantalla apagada"
+      },
+      {
+        "pt-BR": "quando o som não começa, o player insiste algumas vezes antes de desistir, em vez de emudecer no primeiro tropeço",
+        "en": "when the sound does not start, the player keeps trying a few times before giving up, instead of going quiet at the first stumble",
+        "es": "cuando el sonido no empieza, el player insiste algunas veces antes de rendirse, en vez de callarse al primer tropiezo"
+      },
+      {
+        "pt-BR": "acender a tela volta a tocar o que tinha parado, sem precisar esperar a rede cair e voltar",
+        "en": "turning the screen on resumes what had stopped, with no need to wait for the network to drop and come back",
+        "es": "encender la pantalla vuelve a sonar lo que se había detenido, sin esperar a que la red se caiga y vuelva"
+      },
+      {
+        "pt-BR": "a tela de bloqueio deixou de dizer que está tocando quando o som já tinha parado",
+        "en": "the lock screen stopped claiming it is playing when the sound had already stopped",
+        "es": "la pantalla de bloqueo dejó de decir que está sonando cuando el sonido ya había parado"
+      }
+    ]
+  },
+  {
     "versao": "1.1.0",
     "data": "2026-11-05",
     "itens": [

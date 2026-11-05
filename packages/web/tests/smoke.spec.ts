@@ -2592,3 +2592,179 @@ test('a recarga que troca de versão não repete a abertura', async ({ page }) =
   await page.reload();
   await expect(abertura).toBeVisible();
 });
+
+/**
+ * O INCIDENTE DE 2026-11-05: a música parou na troca de faixa, com a tela
+ * desligada — de novo, e já com o conserto de 2026-11-03 instalado.
+ *
+ * Aquele conserto tirou a mentira do `navigator.onLine` do caminho de TOCAR e
+ * a deixou no de BAIXAR. Com o Wi-Fi dormindo, o smart buffer se desligava
+ * sozinho: a próxima faixa deixava de ir para o aparelho e cada troca passava
+ * a apostar que o rádio acordaria a tempo. Na quarta troca não acordou.
+ *
+ * Estes quatro testes cobrem as quatro peças do conserto. Todos reprovam com
+ * o código anterior.
+ */
+
+/** Grava todo toast que passar: `TOAST_MS` é 3,2s e as esperas aqui são maiores. */
+async function gravarToasts(page: Page) {
+  await page.evaluate(() => {
+    const vistos: string[] = [];
+    (window as unknown as { __toasts: string[] }).__toasts = vistos;
+    new MutationObserver(() => {
+      const el = document.querySelector('[role="status"]');
+      const texto = el?.textContent?.trim();
+      if (texto && texto !== vistos[vistos.length - 1]) vistos.push(texto);
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
+}
+
+const toastsVistos = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __toasts: string[] }).__toasts.join(' | '));
+
+/**
+ * Faz o navegador recusar o `play()` as próximas `n` vezes.
+ *
+ * É a recusa de verdade: uma promise rejeitada, não um evento de `error` no
+ * elemento — o elemento fica intacto e a chamada seguinte toca normalmente.
+ * Tem de ser `addInitScript`, porque o `new Audio()` nasce no boot do app.
+ */
+async function armarRecusaDePlay(page: Page) {
+  await page.addInitScript(() => {
+    const original = HTMLMediaElement.prototype.play;
+    const w = window as unknown as { __recusar: number; __tentativas: number };
+    w.__recusar = 0;
+    w.__tentativas = 0;
+    HTMLMediaElement.prototype.play = function () {
+      w.__tentativas++;
+      if (w.__recusar > 0) {
+        w.__recusar--;
+        return Promise.reject(new DOMException('recusado pelo teste', 'NotAllowedError'));
+      }
+      return original.call(this);
+    };
+  });
+}
+
+const recusar = (page: Page, n: number) =>
+  page.evaluate((v) => ((window as unknown as { __recusar: number }).__recusar = v), n);
+const tentativas = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __tentativas: number }).__tentativas);
+
+/** Só o acervo na lista: as faixas demo são playback simulado e nunca recusam. */
+async function soOAcervo(page: Page) {
+  await abrirConta(page);
+  await page
+    .getByRole('dialog', { name: 'ondas whoami' })
+    .getByRole('button', { name: /catálogo/ })
+    .click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByText('fonte: só o acervo')).toBeVisible();
+}
+
+/** A mentira do Wi-Fi dormindo: `onLine` falso, rede funcionando. */
+async function mentirQueNaoHaRede(page: Page) {
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    window.dispatchEvent(new Event('offline'));
+  });
+  await expect(page.getByRole('status')).toHaveText(/rede desconectada$/);
+}
+
+test('o buffer não acredita no navegador quando ele diz que não há rede', async ({ page }) => {
+  semearCompartilhada(page);
+  // Contar os pedidos da SEGUNDA faixa: o stream da primeira também bate em
+  // `/audio`, então o filtro é pelo id. Isto é a prova direta de que foi a
+  // rede, e não um marcador qualquer na tela.
+  const pedidos: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('33333333')) pedidos.push(r.url());
+  });
+
+  await logar(page);
+  await soOAcervo(page);
+  await mentirQueNaoHaRede(page);
+
+  await page.getByRole('button', { name: /^01 Fita Caseira/ }).click();
+
+  // A segunda faixa entra no aparelho SOZINHA, com o navegador jurando que
+  // não há rede. Antes, `download()` saía na checagem e nem um pedido saía.
+  await expect(page.getByRole('button', { name: 'Remover do aparelho' })).toBeVisible({
+    timeout: 15000,
+  });
+  expect(pedidos.length).toBeGreaterThan(0);
+});
+
+test('uma recusa do navegador não cala a música', async ({ page }) => {
+  await armarRecusaDePlay(page);
+  await logar(page);
+  await gravarToasts(page);
+  // O WAV padrão tem 4s e o `ended` cairia no meio das asserções.
+  await page.unroute('**/api/acervo/*/audio');
+  await page.route('**/api/acervo/*/audio', async (route) =>
+    route.fulfill({ status: 200, contentType: 'audio/wav', body: wavDeSilencio(30) }),
+  );
+
+  await recusar(page, 1);
+  await page.getByRole('button', { name: /^01 Fita Caseira/ }).click();
+
+  // O player insiste e o som sai. Antes, uma recusa só já virava PAUSE com
+  // recado — e, com a tela desligada, silêncio até alguém pegar o telefone.
+  await expect(page.getByText('PLAY', { exact: true })).toBeVisible({ timeout: 10000 });
+  expect(await tentativas(page)).toBe(2);
+  expect(await toastsVistos(page)).not.toMatch(/não começou/);
+});
+
+/**
+ * A outra metade do par: insistir TEM FIM. Sem isto, alguém "consertaria" a
+ * insistência com um `while (true)` e o teste acima continuaria passando.
+ */
+test('insistir tem fim, e o player para dizendo', async ({ page }) => {
+  await armarRecusaDePlay(page);
+  await logar(page);
+  await gravarToasts(page);
+
+  await recusar(page, 99);
+  await page.getByRole('button', { name: /^01 Fita Caseira/ }).click();
+
+  await expect(page.getByRole('status')).toHaveText(/toque em play/, { timeout: 20000 });
+  // Quatro: a primeira, mais uma por espera de `ESPERAS_ATE_DESISTIR`.
+  expect(await tentativas(page)).toBe(4);
+  await expect(page.getByText('PAUSE', { exact: true })).toBeVisible();
+});
+
+/**
+ * E o que faltava em 2026-11-05: a pendência nascia presa ao evento `online`,
+ * que a página em segundo plano não recebe. Quando a tela acende,
+ * `navigator.onLine` já voltou a ser `true` e nenhum `online` dispara — a
+ * música ficava esperando um aviso que nunca vinha.
+ */
+test('voltar para a tela retoma o que a rede não retomou', async ({ page }) => {
+  await armarRecusaDePlay(page);
+  await logar(page);
+  await gravarToasts(page);
+  await page.unroute('**/api/acervo/*/audio');
+  await page.route('**/api/acervo/*/audio', async (route) =>
+    route.fulfill({ status: 200, contentType: 'audio/wav', body: wavDeSilencio(30) }),
+  );
+
+  const verPagina = (estado: 'hidden' | 'visible') =>
+    page.evaluate((v) => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, estado);
+
+  await recusar(page, 99);
+  await page.getByRole('button', { name: /^01 Fita Caseira/ }).click();
+  await expect(page.getByRole('status')).toHaveText(/toque em play/, { timeout: 15000 });
+
+  // O telefone no bolso, e depois a tela acendendo. `navigator.onLine` é
+  // `true` o tempo todo e NENHUM evento `online` é despachado: é isso que
+  // prova que quem retomou foi a visibilidade.
+  await verPagina('hidden');
+  await recusar(page, 0);
+  await verPagina('visible');
+
+  await expect(page.getByText('PLAY', { exact: true })).toBeVisible({ timeout: 10000 });
+  expect(await toastsVistos(page)).toMatch(/continuando de onde parou/);
+});

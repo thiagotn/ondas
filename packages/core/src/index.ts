@@ -7,6 +7,7 @@ export * from './shortcuts.js';
 export * from './themes.js';
 export * from './access.js';
 export * from './queue.js';
+export * from './retomada.js';
 export * from './waveform.js';
 export * from './view.js';
 export { themeCssVars, themeResolvedColors } from './theme/tokens.js';

@@ -18,6 +18,27 @@ const keyOf = (id: string) => '/offline/' + id;
  * `NS_ERROR_DOM_QUOTA_REACHED`. Quem chama só quer saber se a mensagem é
  * "sem espaço" ou "sem rede" — são saídas diferentes para a pessoa.
  */
+/**
+ * Sem o primeiro byte neste tempo, o rádio não está lá.
+ *
+ * Isto nasceu junto com o buffer deixar de consultar `navigator.onLine`: ele
+ * passou a tentar baixar em cenários onde antes nem começava, e um `fetch` nu
+ * numa rede dormindo fica pendurado sem erro nenhum. Enquanto ele pendura, o
+ * controller trata a faixa como "já em download" e não tenta de novo pelo
+ * resto da sessão — e o cano aberto ainda disputa banda com o stream que está
+ * tocando, que é a última coisa que se quer num rádio em economia de energia.
+ */
+const ESPERA_PRIMEIRO_BYTE_MS = 15_000;
+
+/**
+ * Já começou, mas parou de chegar: o cano morreu em silêncio.
+ *
+ * O relógio é de INATIVIDADE, rearmado a cada pedaço — e não um prazo total,
+ * que estouraria sozinho num set de uma hora em link lento e transformaria o
+ * conserto em regressão.
+ */
+const ESPERA_ENTRE_PEDACOS_MS = 20_000;
+
 export function ehCotaExcedida(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   return err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED';
@@ -82,38 +103,60 @@ export class CacheOfflineStore implements OfflineStore {
     // atrás (o `reconcile` do boot acabava desfazendo).
     if (!c) throw new Error(t('erro.semOffline'));
 
-    const res = await fetch(url);
-    if (!res.ok || !res.body) throw new Error('download falhou (' + res.status + ')');
-    const total = Number(res.headers.get('content-length')) || 0;
+    // Cão de guarda: cada pedaço que chega rearma o relógio, e o silêncio
+    // derruba o `fetch`. Quem chama trata o `AbortError` como qualquer outra
+    // falha de download — o buffer silencioso tenta de novo na faixa seguinte,
+    // porque o `catch` do controller limpa o progresso.
+    const abortador = new AbortController();
+    let relogio: ReturnType<typeof setTimeout> | undefined;
+    const rearmar = (ms: number) => {
+      clearTimeout(relogio);
+      relogio = setTimeout(() => abortador.abort(), ms);
+    };
 
-    let recebidos = 0;
-    let ultimoAviso = 0;
-    const contador = new TransformStream<Uint8Array, Uint8Array>({
-      transform(pedaco, controlador) {
-        recebidos += pedaco.byteLength;
-        // Sem content-length, 6 MB serve de régua otimista (como no protótipo).
-        if (onProgress && Date.now() - ultimoAviso > 150) {
-          ultimoAviso = Date.now();
-          onProgress(total ? recebidos / total : Math.min(0.95, recebidos / 6e6));
-        }
-        controlador.enqueue(pedaco);
-      },
-    });
-
-    const corpo = new Response(res.body.pipeThrough(contador), {
-      headers: { 'content-type': res.headers.get('content-type') || 'audio/mpeg' },
-    });
     try {
-      await c.put(keyOf(id), corpo);
-    } catch (err) {
-      // Cota estourada no meio da gravação: a entrada não serve para nada, e
-      // deixá-la faria o `reconcile` do boot jurar que a faixa está no
-      // aparelho. Apagar antes de propagar.
-      await c.delete(keyOf(id)).catch(() => {});
-      throw err;
+      rearmar(ESPERA_PRIMEIRO_BYTE_MS);
+      const res = await fetch(url, { signal: abortador.signal });
+      if (!res.ok || !res.body) throw new Error('download falhou (' + res.status + ')');
+      const total = Number(res.headers.get('content-length')) || 0;
+
+      let recebidos = 0;
+      let ultimoAviso = 0;
+      const contador = new TransformStream<Uint8Array, Uint8Array>({
+        transform(pedaco, controlador) {
+          rearmar(ESPERA_ENTRE_PEDACOS_MS);
+          recebidos += pedaco.byteLength;
+          // Sem content-length, 6 MB serve de régua otimista (como no protótipo).
+          if (onProgress && Date.now() - ultimoAviso > 150) {
+            ultimoAviso = Date.now();
+            onProgress(total ? recebidos / total : Math.min(0.95, recebidos / 6e6));
+          }
+          controlador.enqueue(pedaco);
+        },
+        flush() {
+          // O último byte chegou: gravar em disco pode demorar, e derrubar a
+          // gravação por "inatividade de rede" seria perder o download no fim.
+          clearTimeout(relogio);
+        },
+      });
+
+      const corpo = new Response(res.body.pipeThrough(contador), {
+        headers: { 'content-type': res.headers.get('content-type') || 'audio/mpeg' },
+      });
+      try {
+        await c.put(keyOf(id), corpo);
+      } catch (err) {
+        // Cota estourada no meio da gravação: a entrada não serve para nada, e
+        // deixá-la faria o `reconcile` do boot jurar que a faixa está no
+        // aparelho. Apagar antes de propagar.
+        await c.delete(keyOf(id)).catch(() => {});
+        throw err;
+      }
+      onProgress?.(1);
+      return recebidos;
+    } finally {
+      clearTimeout(relogio);
     }
-    onProgress?.(1);
-    return recebidos;
   }
 
   async remove(id: string): Promise<void> {

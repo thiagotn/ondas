@@ -12,7 +12,9 @@ import {
   showsPublicCatalog,
   stepIndex,
   t,
+  valeRetomar,
   type Chave,
+  type Pendencia,
   type QueueContext,
   type ThemeId,
   type Track,
@@ -25,6 +27,7 @@ import {
   setMediaPosition,
 } from '../platform/mediaSession';
 import { compartilhar } from '../platform/share';
+import { aoVoltarParaATela } from '../platform/visibilidade';
 import { applyTheme, storeTheme } from '../theme/applyTheme';
 import { queryClient } from '../query/client';
 import { CATALOG_LOGADO_KEY, catalogKey } from '../query/catalog';
@@ -78,18 +81,45 @@ export function isOffline(): boolean {
  * Quantas faixas seguidas podem falhar antes de o player desistir.
  *
  * Sem este teto, uma queda de rede vira um desfile: `engine.on('error')` chama
- * `step(1)`, que chama `play`, que erra de novo — o app atravessaria o catálogo
- * inteiro sozinho piscando toast. Três deixa passar uma ou duas faixas
- * realmente quebradas e segura a queda geral.
+ * `avancar(1)`, que chama `tocarFaixa`, que erra de novo — o app atravessaria
+ * o catálogo inteiro sozinho piscando toast. Três deixa passar uma ou duas
+ * faixas realmente quebradas e segura a queda geral.
  */
 const LIMITE_DE_FALHAS = 3;
 let falhasSeguidas = 0;
 
 /**
- * O que o player queria estar fazendo quando desistiu, para retomar quando a
- * rede voltar. `null` = ninguém está esperando nada.
+ * O que o player queria estar fazendo quando parou, para retomar quando der —
+ * a rede voltando, ou a tela acendendo. `null` = ninguém espera nada.
+ *
+ * Quando ela ainda vale é regra do `core` (`valeRetomar`), não daqui.
  */
-let pendencia: { tipo: 'avancar' | 'retomar'; index: number } | null = null;
+let pendencia: Pendencia | null = null;
+
+/**
+ * Para de tocar e CONTA para a tela de bloqueio.
+ *
+ * Os três caminhos que calam o player mexiam só na store, e a notificação do
+ * Android seguia dizendo "tocando" sobre o silêncio — com um botão de pause
+ * para um som que não existe mais.
+ */
+function pararNaTela(): void {
+  playerStore.getState().patch({ playing: false, waiting: false });
+  setMediaPlaybackState(false);
+}
+
+/**
+ * Qualquer comando vindo da pessoa: barra, teclado, fone, tela de bloqueio.
+ *
+ * O que o automático armou não sobrevive a um gesto. Sem isto, `falhasSeguidas`
+ * só zerava quando saía som — duas falhas antigas, distantes na sessão, mais
+ * uma nova fechavam o teto — e uma pendência esquecida podia ressuscitar uma
+ * faixa velha no primeiro evento de rede.
+ */
+function gestoDaPessoa(): void {
+  falhasSeguidas = 0;
+  pendencia = null;
+}
 
 /**
  * Para de tocar DIZENDO que parou.
@@ -100,30 +130,39 @@ let pendencia: { tipo: 'avancar' | 'retomar'; index: number } | null = null;
  */
 function desistir(chave: Chave): void {
   falhasSeguidas = 0;
-  pendencia = { tipo: 'avancar', index: playerStore.getState().cur };
-  playerStore.getState().patch({ playing: false, waiting: false });
+  pendencia = { tipo: 'avancar', index: playerStore.getState().cur, em: Date.now() };
+  pararNaTela();
   uiStore.getState().flash(t(chave));
 }
 
 /**
- * A rede voltou e o player estava esperando por ela.
+ * Alguma coisa avisou que é hora de tentar de novo: a rede voltou, ou a tela
+ * acendeu.
  *
- * UMA tentativa por queda: a pendência é limpa antes de tentar. Se a retomada
- * também não começar (autoplay barrado, por exemplo), `play` rearma a
+ * UMA tentativa por aviso: a pendência é limpa antes de tentar. Se a retomada
+ * também não começar (autoplay barrado, por exemplo), `tocarFaixa` rearma a
  * pendência — mas sem gesto nenhum da pessoa isso não vira laço, porque cada
- * rearme precisa de um novo evento de rede.
+ * rearme precisa de um novo aviso.
  */
-async function retomar(): Promise<void> {
+async function retomar(chave: Chave): Promise<void> {
   const alvo = pendencia;
   pendencia = null;
-  if (!alvo) return;
+  // Quem diz se isto ainda é o que a pessoa queria é o `core`: pendência
+  // velha caducou, e player que já voltou a tocar não pode ser reiniciado do
+  // `0:00` só porque alguém acendeu a tela.
+  //
+  // "Tocando" aqui é `playing` da store, e NÃO `!engine.isPaused()`: um
+  // elemento a quem se pediu `play()` e cuja fonte morreu continua com
+  // `paused === false` — ele está "querendo tocar" sem som nenhum sair. Só o
+  // evento `playing` do elemento conta, e é dele que a store vem.
+  if (!valeRetomar(alvo, Date.now(), playerStore.getState().playing)) return;
   // O destino primeiro, o anúncio depois: sem isto a tela dizia "retomando" e
   // não retomava nada quando não havia faixa para onde ir.
   const destino =
     alvo.tipo === 'retomar' && alvo.index >= 0 ? alvo.index : stepIndex(queueContext(), 1);
   if (destino < 0) return;
-  uiStore.getState().flash(t('toast.retomando'));
-  await play(destino);
+  uiStore.getState().flash(t(chave));
+  await tocarFaixa(destino);
 }
 
 function queueContext(): QueueContext {
@@ -149,7 +188,64 @@ export function currentTrack(): Track | undefined {
   return cur >= 0 ? tracks[cur] : undefined;
 }
 
-export async function play(index: number): Promise<void> {
+/**
+ * As esperas antes de cada nova tentativa de começar, em ms. Uma espera por
+ * recomeço — a primeira tentativa não espera, então são quatro no total.
+ *
+ * Curtas de propósito. A página em segundo plano **sem áudio tocando** perde a
+ * isenção de throttling do navegador — e é exatamente a situação aqui, porque
+ * o som parou. Um `setTimeout` de 30s ali pode simplesmente não acontecer; o
+ * que passar deste teto é coberto por `aoVoltarParaATela`.
+ */
+const ESPERAS_ATE_DESISTIR = [400, 1500, 4000] as const;
+
+const esperar = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** O que houve com a tentativa de fazer o som sair. */
+type Comeco = 'tocou' | 'abandonada' | 'desistiu';
+
+/**
+ * Insiste até o som sair, a faixa mudar, ou acabar a paciência.
+ *
+ * Uma tentativa só era o que transformava um tropeço de meio segundo em
+ * silêncio até alguém pegar o telefone: a recusa do navegador em segundo plano
+ * é TRANSITÓRIA — no incidente de 2026-11-05 a pessoa apertou play e a mesma
+ * faixa tocou na hora.
+ *
+ * Isto mora no controller, e não no engine, porque a guarda é `curId`: saber
+ * qual faixa é a de agora é conhecimento de domínio, e o motor de áudio
+ * continua burro.
+ */
+async function comecar(track: Track): Promise<Comeco> {
+  for (let i = 0; ; i++) {
+    await engine.play();
+    // A promise do `play()` resolve quando o som começa, então ainda estar
+    // pausado aqui significa que não começou.
+    if (!engine.isPaused()) return 'tocou';
+    // A faixa mudou embaixo de nós: `n` apertado duas vezes, ou o handler de
+    // `error` já pulou. Esta tentativa não é mais nossa — sem esta guarda a
+    // tela diria "não começou" por cima da faixa que já está tocando.
+    if (playerStore.getState().curId !== track.id) return 'abandonada';
+    const espera = ESPERAS_ATE_DESISTIR[i];
+    if (espera === undefined) return 'desistiu';
+    // Entre uma tentativa e outra o estado é BUF, não PAUSE: o `catch` do
+    // engine acabou de emitir `playing:false`, e piscar PAUSE enquanto ainda
+    // se tenta seria mentira ao contrário. A tela de bloqueio não é tocada.
+    playerStore.getState().patch({ playing: true, waiting: true });
+    await esperar(espera);
+    // E de novo, colada no `engine.play()` do próximo giro: sem isto, o
+    // perdedor de uma corrida acordaria da espera e daria play na faixa do
+    // vencedor.
+    if (playerStore.getState().curId !== track.id) return 'abandonada';
+  }
+}
+
+/**
+ * Toca a faixa do índice. É o caminho AUTOMÁTICO — fim de faixa, retomada,
+ * avanço por erro. Gesto da pessoa entra por `play`, que limpa o que o
+ * automático armou antes de chegar aqui.
+ */
+async function tocarFaixa(index: number): Promise<void> {
   const track = tracks[index];
   if (!track) return;
   const lib = libraryStore.getState();
@@ -182,39 +278,58 @@ export async function play(index: number): Promise<void> {
 
   engine.load(track, src);
   setMediaMetadata(track);
-  await engine.play();
 
   // `WebPlayerEngine.play()` engole a recusa do navegador (autoplay barrado é
   // uma promise rejeitada, não um evento de erro), e a tela só voltava para
-  // PAUSE sem dizer por quê. A promise do `play()` resolve quando o som
-  // começa, então ainda estar pausado aqui significa que não começou.
-  //
-  // `curId === track.id` é a guarda contra `n` apertado duas vezes rápido: o
-  // `play()` da faixa abandonada rejeita com `AbortError`, e sem isto a tela
-  // diria "não começou" por cima da faixa que já está tocando.
-  if (engine.isPaused() && playerStore.getState().curId === track.id) {
-    playerStore.getState().patch({ playing: false, waiting: false });
+  // PAUSE sem dizer por quê.
+  if ((await comecar(track)) === 'desistiu') {
+    pararNaTela();
     ui.flash(t('toast.naoComecou'));
-    pendencia = { tipo: 'retomar', index };
+    pendencia = { tipo: 'retomar', index, em: Date.now() };
   }
 
+  // Incondicional de propósito: se a faixa NÃO começou, pôr os bytes dela no
+  // aparelho é a melhor jogada que existe para a retomada seguinte.
   if (lib.prefetch && sessionStore.getState().user) void prefetchNext(index);
+}
+
+/**
+ * Toca a faixa do índice por ordem da pessoa — toque na linha, Enter no
+ * cursor, link direto.
+ */
+export async function play(index: number): Promise<void> {
+  gestoDaPessoa();
+  await tocarFaixa(index);
 }
 
 export function togglePlay(): void {
   const player = playerStore.getState();
+  gestoDaPessoa();
   if (player.cur < 0) {
     const first = firstPlayable(queueContext());
-    if (first >= 0) void play(first);
+    if (first >= 0) void tocarFaixa(first);
     return;
   }
+  // `engine.play()`, e não `tocarFaixa(cur)`: um pause/play no meio da faixa
+  // não pode recarregar a `src` e perder a posição.
   if (engine.isPaused()) void engine.play();
   else engine.pause();
 }
 
-export function step(dir: 1 | -1): void {
+/**
+ * Anda na fila sem gesto nenhum — é por aqui que o handler de `error` pula a
+ * faixa quebrada. Não zera `falhasSeguidas`: zerar aqui destruiria o teto,
+ * porque é justamente a sequência de avanços automáticos que ele conta.
+ */
+function avancar(dir: 1 | -1): void {
   const next = stepIndex(queueContext(), dir);
-  if (next >= 0) void play(next);
+  if (next >= 0) void tocarFaixa(next);
+}
+
+/** `n`/`p`, os botões do player e os do fone: gesto da pessoa. */
+export function step(dir: 1 | -1): void {
+  gestoDaPessoa();
+  avancar(dir);
 }
 
 /** Ids das linhas que estão na tela, em ordem. */
@@ -462,12 +577,18 @@ export async function download(track: Track, silent = false): Promise<void> {
     return;
   }
   if (lib.dl[track.id] != null) return;
-  if (isOffline()) {
-    // `silent` é o buffer automático, que ninguém pediu — então não há o que
-    // avisar. A checagem de rede estava ANTES de qualquer uso da flag, e o
-    // buffer "silencioso" piscava "conecte-se para baixar" sozinho, no meio de
-    // uma música que estava tocando normalmente.
-    if (!silent) ui.flash(t('toast.conecteParaBaixar'));
+  // Só quem pediu com o dedo é barrado por `navigator.onLine` — e avisado.
+  //
+  // O BUFFER AUTOMÁTICO TENTA, e isto é a lição de 2026-11-04 aplicada ao
+  // lugar que ficou de fora. Aquele conserto tirou a mentira do
+  // `navigator.onLine` do caminho de TOCAR e a deixou aqui, no de BAIXAR —
+  // justamente a rede de segurança que faz a troca de faixa não depender do
+  // rádio. Com o Wi-Fi dormindo (tela bloqueada no Android) o buffer se
+  // desligava sozinho, e cada troca passava a apostar que o rádio acordaria a
+  // tempo. Em 2026-11-05 ele não acordou. Quem descobre que não há rede é o
+  // `fetch`, falhando — e falha de buffer já é silenciosa (ver o `catch`).
+  if (!silent && isOffline()) {
+    ui.flash(t('toast.conecteParaBaixar'));
     return;
   }
 
@@ -683,12 +804,12 @@ export function bootstrap(): () => void {
         engine.seek(0);
         void engine.play();
       } else if (action.type === 'play') {
-        void play(action.index);
+        void tocarFaixa(action.index);
       } else {
         // Nada tocável à frente — hoje isso só acontece com a fila inteira
         // bloqueada, porque falta de rede deixou de bloquear faixa. Não arma
         // espera de rede: a rede voltar não desbloqueia faixa [pro].
-        playerStore.getState().patch({ playing: false, waiting: false });
+        pararNaTela();
         ui.flash(t('toast.nadaParaTocar'));
       }
     }),
@@ -702,10 +823,15 @@ export function bootstrap(): () => void {
         return;
       }
       ui.flash(t('toast.streamIndisponivel'));
-      step(1);
+      avancar(1);
     }),
     bindMediaSessionActions({
-      play: () => void engine.play(),
+      // Pelo `togglePlay`/`step`, e não direto no engine: o botão da tela de
+      // bloqueio é gesto da pessoa como qualquer outro, e precisa limpar o
+      // que o automático armou.
+      play: () => {
+        if (engine.isPaused()) togglePlay();
+      },
       pause: () => engine.pause(),
       next: () => step(1),
       prev: () => step(-1),
@@ -718,10 +844,21 @@ export function bootstrap(): () => void {
       // A rede voltou: é a hora de subir o que foi curtido sem ela.
       if (value) void sincronizar();
       // E de retomar a música, se ela parou justamente por falta de rede.
-      if (value && pendencia) void retomar();
+      if (value && pendencia) void retomar('toast.retomando');
       // As playlists não têm fila para subir (ver `app/playlists.ts`), mas o
       // espelho pode ter perdido uma escrita recusada por falta de rede.
       if (value) void listas.carregarPlaylists();
+    }),
+    // O OUTRO momento de tentar de novo, e o que faltava em 2026-11-05: a
+    // pendência nascia presa a um evento que a página em segundo plano não
+    // recebe. Quando a tela acende, `navigator.onLine` já voltou a ser `true`
+    // e nenhum `online` dispara por uma mudança ocorrida enquanto a página
+    // estava parada — a música ficava esperando um aviso que nunca vinha.
+    //
+    // Só a pendência: `sincronizar` e `carregarPlaylists` ficam de fora, senão
+    // cada foco de aba viraria dois pedidos à API.
+    aoVoltarParaATela(() => {
+      if (pendencia) void retomar('toast.continuando');
     }),
   ];
   setOnline(connectivity.isOnline());

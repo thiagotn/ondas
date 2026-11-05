@@ -323,6 +323,7 @@ export const PT_BR = {
   'toast.playerDesistiu': 'não deu para tocar — toque em play para tentar de novo',
   'toast.nadaParaTocar': 'nada para tocar à frente',
   'toast.retomando': 'rede de volta — retomando',
+  'toast.continuando': 'continuando de onde parou',
   'toast.naoComecou': 'o player não começou — toque em play',
   'toast.versaoNova': 'versão nova — recarregue quando quiser',
   'toast.faixaNaoExiste': 'faixa {numero} não existe',

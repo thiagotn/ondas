@@ -286,6 +286,7 @@ export const EN: Record<Chave, Frase> = {
   'toast.playerDesistiu': 'could not play — press play to try again',
   'toast.nadaParaTocar': 'nothing to play next',
   'toast.retomando': 'network back — resuming',
+  'toast.continuando': 'picking up where it stopped',
   'toast.naoComecou': 'the player did not start — press play',
   'toast.versaoNova': 'new version — reload whenever you like',
   'toast.faixaNaoExiste': 'track {numero} does not exist',

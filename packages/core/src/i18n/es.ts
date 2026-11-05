@@ -284,6 +284,7 @@ export const ES: Record<Chave, Frase> = {
   'toast.playerDesistiu': 'no se pudo tocar — toca play para intentar de nuevo',
   'toast.nadaParaTocar': 'nada para tocar a continuación',
   'toast.retomando': 'red de vuelta — retomando',
+  'toast.continuando': 'continuando donde paró',
   'toast.naoComecou': 'el player no arrancó — toca play',
   'toast.versaoNova': 'versión nueva — recarga cuando quieras',
   'toast.faixaNaoExiste': 'la pista {numero} no existe',

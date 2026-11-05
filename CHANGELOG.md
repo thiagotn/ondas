@@ -7,6 +7,13 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.1.1 — 2026-11-05
+
+- a próxima faixa continua sendo guardada no aparelho mesmo quando o celular jura que está sem rede — é o que faz a música não parar na troca, com a tela desligada
+- quando o som não começa, o player insiste algumas vezes antes de desistir, em vez de emudecer no primeiro tropeço
+- acender a tela volta a tocar o que tinha parado, sem precisar esperar a rede cair e voltar
+- a tela de bloqueio deixou de dizer que está tocando quando o som já tinha parado
+
 ## 1.1.0 — 2026-11-05
 
 - a janela do sobre ficou centrada, com o github no próprio @thiagotn do texto e a tabela só com versão e tecnologias

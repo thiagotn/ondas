@@ -87,8 +87,12 @@ export class WebPlayerEngine implements PlayerEngine {
     }
     try {
       await this.audio.play();
-    } catch {
-      // Autoplay barrado ou faixa inválida: a UI volta para PAUSE.
+    } catch (err) {
+      // Autoplay barrado, `src` morto, ou `AbortError` de troca rápida de
+      // faixa. O `catch` era vazio e sem binding, e o incidente de 2026-11-05
+      // não deixou migalha nenhuma de QUAL recusa foi — a única pista que
+      // existe sobre o que o Chrome faz com a tela desligada sai daqui.
+      console.warn('[ondas] play() recusado:', err);
       this.emit('playing', false);
       this.emit('waiting', false);
     }
