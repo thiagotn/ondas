@@ -10,6 +10,7 @@ import {
   LOCALES,
   promptLine,
   t,
+  tAoRedor,
   tErro,
 } from '../index.js';
 import { EN } from '../i18n/en.js';
@@ -154,6 +155,26 @@ describe('erro da API', () => {
   it('código desconhecido devolve null — quem chama cai na frase do servidor', () => {
     expect(tErro('um_erro_que_ainda_nao_existe')).toBeNull();
     expect(tErro(undefined)).toBeNull();
+  });
+});
+
+describe('frase partida em volta de um marcador', () => {
+  it('o nome do autor sai do meio da frase nos três idiomas', () => {
+    for (const l of LOCALES) {
+      definirIdioma(l);
+      const [antes, depois] = tAoRedor('sobre.texto2', 'autor');
+      // Remontada, ela é a frase inteira: o corte não come nem inventa texto.
+      expect(antes + '@thiagotn' + depois, l).toBe(t('sobre.texto2', { autor: '@thiagotn' }));
+      expect(antes + depois, l).not.toContain('{autor}');
+      // Em espanhol o nome não cai no mesmo lugar que em português — é por isso
+      // que o marcador mora no catálogo e não no componente.
+      expect(antes, l).not.toBe('');
+    }
+  });
+
+  it('marcador ausente devolve a frase toda — a tela perde o link, não o texto', () => {
+    definirIdioma('pt-BR');
+    expect(tAoRedor('sobre.texto1', 'autor')).toEqual([t('sobre.texto1'), '']);
   });
 });
 

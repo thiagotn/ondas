@@ -1,7 +1,7 @@
 ---
 title: "Ondas, decisão por decisão: índice da série"
 date: 2026-10-19
-description: "Um player de música em PWA com API própria, destrinchado em treze documentos: por que cada ferramenta foi escolhida, o que foi descartado e o que cada decisão custou."
+description: "Um player de música em PWA com API própria, destrinchado em quatorze documentos: por que cada ferramenta foi escolhida, o que foi descartado e o que cada decisão custou."
 slug: "ondas-serie-engenharia"
 draft: true
 tags:
@@ -57,6 +57,7 @@ A razão teste/produção em `core` é 0,91:1. Nos dois pacotes Go de maior risc
 | 11 | [Forma de onda](11-forma-de-onda.md) | Como desenhar o áudio de verdade em 200 bytes, e por que a barra lisa é a resposta honesta |
 | 12 | [DevOps e GitOps](12-devops-gitops.md) | O que o CI pode e não pode tocar, e por que ele não fala com o cluster |
 | 13 | [QA](13-qa.md) | A disciplina de tirar a correção para ver se o teste reclama — e as quatro vezes em que ele não reclamou |
+| 14 | [Versionamento e releases](14-versionamento-e-releases.md) | Por que a nota de versão é a fonte, e não o subproduto, de cada entrega |
 
 ## Três jeitos de ler
 
@@ -64,7 +65,7 @@ A razão teste/produção em `core` é 0,91:1. Nos dois pacotes Go de maior risc
 prováveis e a resposta curta. Lidos em sequência, os blocos do 03, 08, 09 e 10 cobrem quase todo
 system design de backend; os do 04, 05, 06 e 07 cobrem frontend.
 - **Por frente.** Frontend é 04 a 07; backend é 08 a 11; infra é 03 e 12; produto é 01; qualidade
-é 13. O 02 atravessa tudo.
+é 13 e 14. O 02 atravessa tudo.
 - **Pela curiosidade.** Os três documentos com os melhores achados de produção são o 10 (duas
 sessões do Postgres se atropelando num rollout), o 11 (uma medição de PSNR decidindo um parâmetro do
 ffmpeg) e o 13 (um teste que passava mesmo sem a correção que ele deveria travar).

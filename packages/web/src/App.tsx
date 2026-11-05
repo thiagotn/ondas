@@ -11,6 +11,7 @@ import { LangPicker } from './components/LangPicker';
 import { ThemePicker } from './components/ThemePicker';
 import { Wallpaper } from './components/Wallpaper';
 import { AppLayout } from './routes/AppLayout';
+import { ChangelogRoute } from './routes/ChangelogRoute';
 import { HomeRoute } from './routes/HomeRoute';
 import { LibraryRoute } from './routes/LibraryRoute';
 import { LoginRoute } from './routes/LoginRoute';
@@ -25,7 +26,6 @@ export function App() {
   const idiomasAberto = useUi((s) => s.idiomasAberto);
   const opacity = useUi((s) => s.opacity);
   const splash = useSplash((s) => s.visible);
-  const splashRun = useSplash((s) => s.run);
 
   // Tokens completos do tema (o script do index.html só aplica o essencial).
   // A opacidade entra aqui porque muda os tokens `-a`: mexer no slider
@@ -66,6 +66,11 @@ export function App() {
               Fica DENTRO do layout porque quem chega por ele precisa do app
               inteiro: abas, rodapé e o player. */}
           <Route path="/t/:link" element={<TrackRoute />} />
+          {/* As notas de versão, abertas pela linha da versão em `ondas
+              --about`. Dentro do layout como as outras: quem chega por um link
+              direto cai no app inteiro, com abas e rodapé, e não numa página
+              solta sem saída. */}
+          <Route path={PATHS.changelog} element={<ChangelogRoute />} />
           {/* Normaliza em vez de mentir: antes `/qualquer-coisa` desenhava a
               home com o endereço errado na barra — e os paths em português
               ficaram todos aqui. */}
@@ -76,8 +81,7 @@ export function App() {
       {pickerOpen && <ThemePicker />}
       {/* Como o de tema, e pela mesma razão: vale no app e no login. */}
       {idiomasAberto && <LangPicker />}
-      {/* `key` reinicia o cronômetro quando a abertura é reexibida. */}
-      {splash && <Splash key={splashRun} />}
+      {splash && <Splash />}
     </BrowserRouter>
   );
 }

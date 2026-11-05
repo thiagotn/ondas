@@ -13,12 +13,14 @@ export const ES: Record<Chave, Frase> = {
   'cwd.home': '~/tendencias',
   'cwd.search': '~/buscar',
   'cwd.library': '~/biblioteca',
+  'cwd.changelog': '~/notas',
   'who.visitante': 'visitante',
 
   'cmd.trending': 'ondas trending --{flag}={genero}',
   'cmd.search': 'ondas search',
   'cmd.ls': 'ondas ls --{recorte}',
   'cmd.lsPlaylist': 'ondas ls --playlist="{nome}"',
+  'cmd.changelog': 'ondas --changelog',
 
   'recorte.liked': 'megusta',
   'recorte.playlists': 'listas',
@@ -38,6 +40,7 @@ export const ES: Record<Chave, Frase> = {
   'prompt.fonteDesconhecida': '…',
   'prompt.maisAcervo': '+ archivo ({n})',
   'prompt.atualizando': 'actualizando',
+  'prompt.changelog': { one: '{n} versión entregada', other: '{n} versiones entregadas' },
 
   'fonte.audius': 'audius api (en vivo)',
   'fonte.cache': 'metadatos en caché local',
@@ -271,11 +274,11 @@ export const ES: Record<Chave, Frase> = {
 
   'sobre.versao': 'versión',
   'sobre.feitoCom': 'hecho con',
-  'sobre.autor': 'autor',
-  'sobre.reverAbertura': '[ver intro de nuevo]',
+  'sobre.notas': '[notas de la versión]',
   'sobre.texto1':
     'ondas es un reproductor de música con estética de terminal — la cinta gira, la lista es la pantalla, y todo se hace con el teclado.',
-  'sobre.texto2': 'uno de los side projects de @thiagotn, hechos para estudiar IA.',
+  'sobre.texto2': 'uno de los side projects de {autor}, hechos para estudiar IA.',
+  'changelog.atual': '[en uso]',
 
   'toast.semRede': 'sin red — el player sigue cuando vuelva',
   'toast.playerDesistiu': 'no se pudo tocar — toca play para intentar de nuevo',

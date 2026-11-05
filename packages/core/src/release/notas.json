@@ -1,0 +1,54 @@
+[
+  {
+    "versao": "1.1.0",
+    "data": "2026-11-05",
+    "itens": [
+      {
+        "pt-BR": "a janela do sobre ficou centrada, com o github no próprio @thiagotn do texto e a tabela só com versão e tecnologias",
+        "en": "the about window is centered now, with GitHub behind the @thiagotn in the text and only version and tech left in the table",
+        "es": "la ventana de acerca de quedó centrada, con GitHub en el propio @thiagotn del texto y la tabla solo con versión y tecnologías"
+      },
+      {
+        "pt-BR": "página nova com as notas de cada versão, a um clique do sobre",
+        "en": "a new page with the notes for every version, one click from about",
+        "es": "página nueva con las notas de cada versión, a un clic de acerca de"
+      },
+      {
+        "pt-BR": "a bandeira de cada idioma no lugar do ícone de tradução",
+        "en": "each language's flag in place of the translation icon",
+        "es": "la bandera de cada idioma en lugar del icono de traducción"
+      },
+      {
+        "pt-BR": "trocar de versão não recarrega mais a página por conta própria — e a abertura deixou de rodar duas vezes",
+        "en": "a version change no longer reloads the page on its own — and the intro stopped playing twice",
+        "es": "cambiar de versión ya no recarga la página por su cuenta — y la intro dejó de sonar dos veces"
+      },
+      {
+        "pt-BR": "o navegador dizer que não há rede não cala mais a música",
+        "en": "the browser claiming there is no network no longer silences the music",
+        "es": "que el navegador diga que no hay red ya no calla la música"
+      },
+      {
+        "pt-BR": "a tela que vai embora não é mais desenhada, e nunca mais aparece preto sem explicação",
+        "en": "the screen on its way out is no longer drawn, and black with no explanation is gone",
+        "es": "la pantalla que se va ya no se dibuja, y nunca más aparece negro sin explicación"
+      },
+      {
+        "pt-BR": "o catálogo guardado ontem não derruba mais a tela de hoje",
+        "en": "yesterday's cached catalog no longer takes down today's screen",
+        "es": "el catálogo guardado ayer ya no tumba la pantalla de hoy"
+      }
+    ]
+  },
+  {
+    "versao": "1.0.0",
+    "data": "2026-10-16",
+    "itens": [
+      {
+        "pt-BR": "primeira versão: player com estética de terminal, acervo próprio, playlists, curtidas, faixas offline e link de faixa",
+        "en": "first release: terminal-styled player, own archive, playlists, likes, offline tracks and shareable track links",
+        "es": "primera versión: reproductor con estética de terminal, archivo propio, playlists, me gusta, pistas offline y enlace de pista"
+      }
+    ]
+  }
+]

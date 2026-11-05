@@ -1,0 +1,77 @@
+/* Notas de versão (`ondas --changelog`): a saída de um comando, não um blog.
+
+   Sem caixa e sem borda de painel de propósito — a tela já está dentro do
+   prompt, e o que se lê aqui é texto corrido com um cabeçalho por release, como
+   um `git log --oneline` leria. */
+
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.secao {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* `baseline` e não `center`: a versão é maior que a data e a marca, e alinhar
+   pelo meio deixaria os três textos dançando entre si. */
+.cabecalho {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.versao {
+  color: var(--color-accent-300);
+}
+
+.data {
+  color: var(--color-neutral-600);
+  font-size: 13px;
+  /* A coluna de datas é monoespaçada por natureza, mas o `tabular-nums` garante
+     o alinhamento nos temas cuja fonte tem numeral proporcional de fallback. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* A versão que está rodando agora. Verde do ANSI, a mesma cor que o app usa
+   para "isto está ligado" nas outras telas. */
+.atual {
+  color: var(--ansi-2);
+  font-size: 12px;
+}
+
+.itens {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* O marcador é desenhado aqui, e não pelo `list-style`: um `-` do mesmo tamanho
+   da fonte do app encosta na coluna do texto como numa lista de terminal, e o
+   `padding-left` mantém a segunda linha recuada sob a primeira em vez de voltar
+   para debaixo do traço. */
+.item {
+  position: relative;
+  padding-left: 2ch;
+  color: var(--color-neutral-300);
+  font-size: 13px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.item::before {
+  content: '-';
+  position: absolute;
+  left: 0;
+  color: var(--color-neutral-600);
+}

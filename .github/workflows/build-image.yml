@@ -56,6 +56,12 @@ jobs:
       - name: Typecheck
         run: pnpm -r typecheck
 
+      # A nota de versão é a fonte: ela escreve a versão dos pacotes e gera o
+      # CHANGELOG. Este passo não escreve nada — só falha quando algum dos dois
+      # está fora de sincronia, ou seja, quando `pnpm release` não foi rodado.
+      - name: Versão e CHANGELOG em sincronia com a nota
+        run: pnpm release --check
+
       - name: Testes de domínio (Vitest em @ondas/core)
         run: pnpm test
 

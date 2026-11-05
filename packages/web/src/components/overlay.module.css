@@ -759,13 +759,30 @@
   }
 }
 
+/* Centrado, e não à esquerda como o resto das janelas: estas duas frases são
+   legenda da arte acima delas, e lidas em bloco com ela. O painel abaixo
+   continua alinhado à esquerda — ele é tabela, não texto. */
 .sobreTexto {
   margin: 0;
   align-self: stretch;
   color: var(--color-neutral-400);
   font-size: 13px;
   line-height: 1.55;
+  text-align: center;
   text-wrap: pretty;
+}
+
+/* O `@thiagotn` da frase, que agora é o link do github. Classe própria porque
+   o `.link` do shell tem `min-height: 32px` e um alvo de toque de botão: no
+   meio de uma frase ele empurraria a linha. Aqui o alvo é a palavra. */
+.sobreAutor {
+  color: var(--color-accent-300);
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+}
+
+.sobreAutor:hover {
+  color: var(--color-accent-100);
 }
 
 /* ── seletor de idioma (`ondas +list-langs`) ──────────────────── */

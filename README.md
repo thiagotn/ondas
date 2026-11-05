@@ -25,8 +25,9 @@ pnpm preview    # serve o build em :4173 (service worker ativo)
 | Script | O que faz |
 | --- | --- |
 | `pnpm typecheck` | `tsc --noEmit` nos dois pacotes |
-| `pnpm test` | Vitest em `core` (216 testes) |
+| `pnpm test` | Vitest em `core` (325 testes) |
 | `pnpm test:e2e` | Playwright na web (build + preview + smoke) |
+| `pnpm release` | propaga a versão da nota para os `package.json` e gera o `CHANGELOG.md` (`--check` só confere) |
 | `pnpm --filter @ondas/web splash` | regenera as telas de abertura do iOS a partir do `splash.svg` da marca |
 
 Antes do primeiro `test:e2e`: `pnpm --filter @ondas/web exec playwright install chromium`.
@@ -34,10 +35,22 @@ Antes do primeiro `test:e2e`: `pnpm --filter @ondas/web exec playwright install 
 Variáveis de ambiente (opcionais, em `packages/web/.env.local`):
 
 - `VITE_FORCE_DEMO=true` — pula a API e usa o catálogo demo de 12 faixas.
-- `VITE_SHOW_SPLASH=false` — desliga a abertura no boot (o logo da barra de abas
-  continua reexibindo-a sob demanda).
+- `VITE_SHOW_SPLASH=false` — desliga a abertura no boot, que é o único momento
+  em que ela roda (não há como revê-la depois).
 - `VITE_DEFAULT_OPACITY=0.85` — opacidade inicial do fundo (0,3–1) para quem
   ainda não escolheu uma; o valor salvo pelo usuário sempre tem prioridade.
+
+## Versões
+
+A versão é incrementada a cada entrega, por SemVer, e vem acompanhada de nota. A fonte é
+[`packages/core/src/release/notas.json`](./packages/core/src/release/notas.json) — uma entrada por
+release, nos três idiomas —, e dela `pnpm release` tira três coisas: a versão dos três
+`package.json` (é o `__APP_VERSION__` que o `ondas --about` mostra), o
+[`CHANGELOG.md`](./CHANGELOG.md) e a página `/changelog` do próprio app, linkada pela linha da
+versão no sobre.
+
+O ritual está em [`CLAUDE.md`](./CLAUDE.md); o raciocínio, em
+[`docs/engenharia/14-versionamento-e-releases.md`](./docs/engenharia/14-versionamento-e-releases.md).
 
 ## API do acervo (`api/`, Go)
 
@@ -324,8 +337,9 @@ não redirecionam: uso pessoal, e um endereço a menos para manter.
 | `/library/<recorte>` | `liked`, `playlists`, `archive`, `shared` ou `offline` — nessa ordem na tela; `/library` vale `archive` com conta e `liked` sem ela — e o que não é um dos cinco cai no mesmo padrão (`defaultLibrarySegment`, `parseLibrarySegment`) |
 | `/library/playlists/<id>` | as faixas de uma playlist, na ordem dela; um id que não existe cai no índice |
 | `/t/<slug>-<id>` | a faixa: o link que se manda E o player cheio aberto |
+| `/changelog` | as notas de versão, abertas pela linha da versão em `ondas --about` |
 | `/login` | fora do `AppLayout`, é a única tela sem abas |
-| `?account=1` / `?shortcuts=1` | os dois overlays que não são conteúdo, no `useOverlayParam` |
+| `?account=1` / `?shortcuts=1` / `?about=1` | os overlays que não são conteúdo, no `useOverlayParam` |
 
 Qualquer outro path **normaliza** para `/` em vez de desenhar a home com o endereço errado na
 barra. Quem decide o recorte, o chip e o termo é a URL, e não um estado de tela — então cada um

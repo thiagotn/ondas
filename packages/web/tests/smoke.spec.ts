@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
 
 /**
@@ -9,6 +10,24 @@ async function blockAudius(page: Page) {
   await page.route('**/api.audius.co/**', (route) => route.abort());
   await page.route('**/*.audius.co/**', (route) => route.abort());
 }
+
+/**
+ * Um JSON do repositório. Lido com `fs`, e não por `import`: o runner carrega os
+ * specs como ESM (o pacote é `type: module`), e ali um `import` de JSON exige
+ * atributo de importação — que o transform do Playwright não repassa.
+ */
+function lerJson(rel: string): unknown {
+  return JSON.parse(readFileSync(new URL(rel, import.meta.url), 'utf8'));
+}
+
+/** A versão que o app mostra: a mesma que `pnpm release` escreve no pacote. */
+const VERSAO = (lerJson('../package.json') as { version: string }).version;
+
+/** A nota de versão de onde a página `/changelog` é desenhada. */
+const NOTAS = lerJson('../../core/src/release/notas.json') as {
+  versao: string;
+  itens: Record<string, string>[];
+}[];
 
 /**
  * Forma de onda de mentira com relevo conhecido: metade no teto, metade em
@@ -1016,7 +1035,12 @@ test('busca filtra por artista e mostra a mensagem de grep vazio', async ({ page
   await expect(page.getByText('grep: nenhum resultado para "zzz"')).toBeVisible();
 });
 
-test('abertura toca no boot e volta pela janela do sobre', async ({ page }) => {
+/**
+ * A abertura roda no boot, e só ali: o `[rever abertura]` do `ondas --about`
+ * saiu, e com ele a única porta para revê-la. O que resta é o que esta tela
+ * sempre prometeu — aparecer ao chegar e sair de cena num toque.
+ */
+test('a abertura toca no boot, e um toque a pula', async ({ page }) => {
   await page.goto('/login');
 
   const splash = page.getByRole('button', { name: 'pular abertura' });
@@ -1027,18 +1051,13 @@ test('abertura toca no boot e volta pela janela do sobre', async ({ page }) => {
   await splash.click();
   await expect(splash).toBeHidden();
 
-  // O logo da barra abre `ondas --about`, e é de lá que a abertura volta: ela
-  // deixou de ter botão próprio quando o logo virou a porta do sobre.
+  // E entrar no app não a traz de volta: ela não roda duas vezes na sessão.
   await page.getByRole('button', { name: /continuar como visitante/ }).click();
-  await page.getByRole('button', { name: 'ondas — sobre' }).click();
-  await expect(page.getByRole('dialog', { name: 'ondas --about' })).toBeVisible();
-
-  await page.getByRole('button', { name: '[rever abertura]' }).click();
-  await expect(splash).toBeVisible();
-  // A janela sai de cena junto: o splash cobre a tela, e ela reapareceria no fim.
-  await expect(page.getByRole('dialog', { name: 'ondas --about' })).toBeHidden();
-  await splash.click();
   await expect(splash).toBeHidden();
+  await page.getByRole('button', { name: 'ondas — sobre' }).click();
+  const sobre = page.getByRole('dialog', { name: 'ondas --about' });
+  await expect(sobre).toBeVisible();
+  await expect(sobre.getByRole('button', { name: '[rever abertura]' })).toHaveCount(0);
 });
 
 test('o logo da barra abre `ondas --about`, e a tecla 7 alterna a janela', async ({ page }) => {
@@ -1053,6 +1072,12 @@ test('o logo da barra abre `ondas --about`, e a tecla 7 alterna a janela', async
   await expect(sobre).toBeVisible();
   await expect(sobre.getByText(/side projects de @thiagotn/)).toBeVisible();
 
+  // O `@thiagotn` da frase É o link do github — a linha de autor do painel, que
+  // repetia o nome e carregava um `[github]` solto, saiu.
+  const autor = sobre.getByRole('link', { name: '@thiagotn' });
+  await expect(autor).toHaveAttribute('href', 'https://github.com/thiagotn');
+  await expect(sobre.getByText('autor', { exact: true })).toHaveCount(0);
+
   // Fechar pelo Esc, abrir e fechar pela tecla — ela alterna, como a 5.
   await page.keyboard.press('Escape');
   await expect(sobre).toBeHidden();
@@ -1066,6 +1091,45 @@ test('o logo da barra abre `ondas --about`, e a tecla 7 alterna a janela', async
   await expect(sobre).toBeVisible();
   await page.goBack();
   await expect(sobre).toBeHidden();
+});
+
+/**
+ * A versão deixa de ser um número solto: a linha dela no sobre leva às notas.
+ *
+ * A versão esperada sai do `package.json` — o mesmo lugar de onde o Vite monta
+ * o `__APP_VERSION__` que a tela mostra, e onde `pnpm release` a escreve a cada
+ * entrega. Fixar `1.1.0` aqui faria o teste quebrar na próxima entrega, que é
+ * exatamente quando ele precisa continuar valendo.
+ */
+test('a linha da versão no sobre leva às notas daquela versão', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+  await page.getByRole('button', { name: /continuar como visitante/ }).click();
+
+  await page.keyboard.press('7');
+  const sobre = page.getByRole('dialog', { name: 'ondas --about' });
+  await expect(sobre.getByText(VERSAO, { exact: true })).toBeVisible();
+
+  await sobre.getByRole('link', { name: '[notas da versão]' }).click();
+  await expect(page).toHaveURL(/\/changelog$/);
+  // A janela foi embora com a navegação: o `?about=1` saiu do endereço.
+  await expect(sobre).toBeHidden();
+
+  await expect(page.getByText('ondas --changelog')).toBeVisible();
+  await expect(page.getByText(`v${VERSAO}`, { exact: true })).toBeVisible();
+  // A versão que está rodando é a marcada.
+  await expect(page.getByText('[em uso]')).toBeVisible();
+  // E o que a tela escreve é o que está na nota, item por item: a página lê o
+  // MESMO arquivo de onde saem o `CHANGELOG.md` e a versão dos pacotes.
+  await expect(page.getByText(NOTAS[0]!.itens[0]!['pt-BR']!)).toBeVisible();
+
+  // O endereço é servido pelo fallback de SPA, e não como arquivo: recarregar
+  // devolve 200 com o HTML do app, e não um 404. Quem estava como visitante cai
+  // no login porque o modo visitante dura só a sessão (ver `app/guest.ts`) — o
+  // que importa aqui é que o servidor entregou o app, não um erro.
+  const recarga = await page.reload();
+  expect(recarga?.status()).toBe(200);
+  await expect(page.getByRole('button', { name: /continuar como visitante/ })).toBeVisible();
 });
 
 test('coluna central no desktop com faixas de ponta a ponta', async ({ page }) => {

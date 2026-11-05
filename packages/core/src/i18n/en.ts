@@ -16,12 +16,14 @@ export const EN: Record<Chave, Frase> = {
   'cwd.home': '~/trending',
   'cwd.search': '~/search',
   'cwd.library': '~/library',
+  'cwd.changelog': '~/notes',
   'who.visitante': 'visitor',
 
   'cmd.trending': 'ondas trending --{flag}={genero}',
   'cmd.search': 'ondas search',
   'cmd.ls': 'ondas ls --{recorte}',
   'cmd.lsPlaylist': 'ondas ls --playlist="{nome}"',
+  'cmd.changelog': 'ondas --changelog',
 
   'recorte.liked': 'liked',
   'recorte.playlists': 'playlists',
@@ -41,6 +43,7 @@ export const EN: Record<Chave, Frase> = {
   'prompt.fonteDesconhecida': '…',
   'prompt.maisAcervo': '+ archive ({n})',
   'prompt.atualizando': 'refreshing',
+  'prompt.changelog': { one: '{n} release shipped', other: '{n} releases shipped' },
 
   'fonte.audius': 'audius api (live)',
   'fonte.cache': 'locally cached metadata',
@@ -273,11 +276,11 @@ export const EN: Record<Chave, Frase> = {
 
   'sobre.versao': 'version',
   'sobre.feitoCom': 'built with',
-  'sobre.autor': 'author',
-  'sobre.reverAbertura': '[replay intro]',
+  'sobre.notas': '[release notes]',
   'sobre.texto1':
     'ondas is a music player with a terminal aesthetic — the tape rolls, the list is the screen, and everything is done from the keyboard.',
-  'sobre.texto2': 'one of @thiagotn\u2019s side projects, built to study AI.',
+  'sobre.texto2': 'one of {autor}\u2019s side projects, built to study AI.',
+  'changelog.atual': '[running]',
 
   'toast.semRede': 'no network — the player resumes when it is back',
   'toast.playerDesistiu': 'could not play — press play to try again',

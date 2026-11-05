@@ -1,7 +1,7 @@
 ---
 title: "Ondas, decision by decision: series index"
 date: 2026-10-19
-description: "A music PWA with its own API, taken apart across thirteen documents: why each tool was chosen, what was rejected, and what every decision cost."
+description: "A music PWA with its own API, taken apart across fourteen documents: why each tool was chosen, what was rejected, and what every decision cost."
 slug: "ondas-engineering-series"
 draft: true
 tags:
@@ -57,6 +57,7 @@ The test-to-production ratio in `core` is 0.91:1. In the two riskiest Go package
 | 11 | [Waveform](11-forma-de-onda.en.md) | How to draw real audio in 200 bytes, and why a flat bar is the honest answer |
 | 12 | [DevOps and GitOps](12-devops-gitops.en.md) | What CI can and cannot touch, and why it never talks to the cluster |
 | 13 | [QA](13-qa.en.md) | The discipline of removing the fix to see whether the test complains — and the four times it did not |
+| 14 | [Versioning and releases](14-versionamento-e-releases.en.md) | Why the release note is the source of every delivery, not its by-product |
 
 ## Three ways to read this
 
@@ -64,7 +65,7 @@ The test-to-production ratio in `core` is 0.91:1. In the two riskiest Go package
 likely questions and short answers. Read in sequence, the blocks from 03, 08, 09 and 10 cover almost
 all of backend system design; those from 04, 05, 06 and 07 cover the frontend.
 - **By discipline.** Frontend is 04 through 07; backend is 08 through 11; infrastructure is 03 and
-12; product is 01; quality is 13. Document 02 cuts across everything.
+12; product is 01; quality is 13 and 14. Document 02 cuts across everything.
 - **For the war stories.** The three documents with the best production findings are 10 (two
 Postgres sessions tripping over each other during a rollout), 11 (a PSNR measurement deciding an
 ffmpeg parameter) and 13 (a test that passed even without the fix it was meant to guard).

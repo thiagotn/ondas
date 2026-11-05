@@ -18,3 +18,4 @@ export * from './auth/index.js';
 export * from './likes/index.js';
 export * from './playlists/index.js';
 export * from './stores/index.js';
+export * from './release/index.js';

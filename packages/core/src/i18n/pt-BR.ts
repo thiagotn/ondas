@@ -23,12 +23,14 @@ export const PT_BR = {
   'cwd.home': '~/em-alta',
   'cwd.search': '~/buscar',
   'cwd.library': '~/biblioteca',
+  'cwd.changelog': '~/notas',
   'who.visitante': 'visitante',
 
   'cmd.trending': 'ondas trending --{flag}={genero}',
   'cmd.search': 'ondas search',
   'cmd.ls': 'ondas ls --{recorte}',
   'cmd.lsPlaylist': 'ondas ls --playlist="{nome}"',
+  'cmd.changelog': 'ondas --changelog',
 
   // Os recortes da biblioteca, como aparecem no chip e no comando.
   'recorte.liked': 'curtidas',
@@ -50,6 +52,7 @@ export const PT_BR = {
   'prompt.fonteDesconhecida': '…',
   'prompt.maisAcervo': '+ acervo ({n})',
   'prompt.atualizando': 'atualizando',
+  'prompt.changelog': { one: '{n} versão entregue', other: '{n} versões entregues' },
 
   // ── de onde veio a lista ─────────────────────────────────────
   'fonte.audius': 'audius api (ao vivo)',
@@ -304,11 +307,16 @@ export const PT_BR = {
   // ── sobre ────────────────────────────────────────────────────
   'sobre.versao': 'versão',
   'sobre.feitoCom': 'feito com',
-  'sobre.autor': 'autor',
-  'sobre.reverAbertura': '[rever abertura]',
+  'sobre.notas': '[notas da versão]',
   'sobre.texto1':
     'ondas é um player de música com estética de terminal — a fita roda, a lista é a tela, e tudo se faz pelo teclado.',
-  'sobre.texto2': 'um dos side projects de @thiagotn, feitos para estudar IA.',
+  // `{autor}` fica no catálogo, e não no componente, porque é no meio da frase
+  // que o nome cai — e a posição dele muda com o idioma. Quem o troca pelo link
+  // do github é `tAoRedor` (ver `i18n/index.ts`).
+  'sobre.texto2': 'um dos side projects de {autor}, feitos para estudar IA.',
+
+  // ── notas de versão (`ondas --changelog`) ────────────────────
+  'changelog.atual': '[em uso]',
 
   // ── avisos passageiros (toasts) ──────────────────────────────
   'toast.semRede': 'sem rede — o player retoma quando ela voltar',

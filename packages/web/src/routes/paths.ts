@@ -11,6 +11,13 @@ export const PATHS = {
   search: '/search',
   library: '/library',
   login: '/login',
+  /**
+   * As notas de versão. Path e não param de overlay porque é tela de conteúdo:
+   * dá para mandar o endereço a alguém, e o voltar sai dela em vez de fechar
+   * uma janela. Não é aba — `tabForPath` devolve `undefined` aqui, como em
+   * `/t/...`, e nenhuma aba acende.
+   */
+  changelog: '/changelog',
 } as const;
 
 export const TAB_PATHS: Record<TabId, string> = {
