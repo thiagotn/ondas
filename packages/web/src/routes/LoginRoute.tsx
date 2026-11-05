@@ -1,5 +1,14 @@
-import { AuthError, idioma, LOCALES, t, tErro, themeIndex, type Params } from '@ondas/core';
-import { Palette, Translate } from '@phosphor-icons/react';
+import {
+  AuthError,
+  BANDEIRAS,
+  idioma,
+  LOCALES,
+  t,
+  tErro,
+  themeIndex,
+  type Params,
+} from '@ondas/core';
+import { Palette } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGuestMode } from '../app/guest';
@@ -88,7 +97,9 @@ export function LoginRoute() {
             uiStore.getState().abrirIdiomas();
           }}
         >
-          <Translate size={15} />
+          <span className={s.bandeira} aria-hidden="true">
+            {BANDEIRAS[idioma()]}
+          </span>
           {idioma()}
         </button>
         <button

@@ -41,6 +41,16 @@
   color: var(--color-accent-200);
 }
 
+/* Ver `.bandeira` em `components/shell.module.css`: mesma regra, outro módulo —
+   esta janela tem a barra própria. */
+.bandeira {
+  /* A JetBrains Mono não tem bandeira: sem esta pilha o navegador escolhe o
+     fallback que quiser e a altura da linha dança entre sistemas. */
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  font-size: 14px;
+  line-height: 1;
+}
+
 .content {
   flex: 1;
   padding: 28px 20px;

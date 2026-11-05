@@ -135,6 +135,18 @@
   color: var(--color-accent-200);
 }
 
+/* A bandeira do idioma, no lugar do ícone genérico de tradução.
+   Emoji não obedece `color`, então o tamanho é tudo que se controla daqui — e
+   no Windows não há glifo de bandeira em fonte nenhuma: lá o navegador escreve
+   as duas letras do país, que herdam a cor do botão e ficam legíveis. */
+.bandeira {
+  /* A JetBrains Mono não tem bandeira: sem esta pilha o navegador escolhe o
+     fallback que quiser e a altura da linha dança entre sistemas. */
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  font-size: 15px;
+  line-height: 1;
+}
+
 /* ── conteúdo ─────────────────────────────────────────────────── */
 .main {
   flex: 1;

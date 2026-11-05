@@ -1,5 +1,5 @@
-import { idioma, t as traduzir, themeIndex } from '@ondas/core';
-import { Disc, Flame, MagnifyingGlass, Palette, Translate } from '@phosphor-icons/react';
+import { BANDEIRAS, idioma, t as traduzir, themeIndex } from '@ondas/core';
+import { Disc, Flame, MagnifyingGlass, Palette } from '@phosphor-icons/react';
 import { uiStore, usePlayer, useUi } from '../app/stores';
 import { useAboutOverlay } from '../hooks/useAboutOverlay';
 import { useCurrentTrack } from '../hooks/useCurrentTrack';
@@ -63,7 +63,11 @@ export function TabBar() {
           className={s.palette}
           onClick={() => uiStore.getState().abrirIdiomas()}
         >
-          <Translate size={16} />
+          {/* A bandeira é decoração: o botão já se anuncia pelo `aria-label`,
+              e no largo a tag do idioma está escrita ao lado. */}
+          <span className={s.bandeira} aria-hidden="true">
+            {BANDEIRAS[idioma()]}
+          </span>
           {wide && idioma()}
         </button>
         <button

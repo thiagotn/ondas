@@ -776,3 +776,15 @@
   margin-left: auto;
   color: var(--color-neutral-500);
 }
+
+/* A bandeira da linha. Largura fixa porque os nomes dos idiomas têm de alinhar
+   entre si — e no Windows, onde o glifo vira duas letras, a coluna continua do
+   mesmo tamanho. */
+.langBandeira {
+  /* A JetBrains Mono não tem bandeira: sem esta pilha o navegador escolhe o
+     fallback que quiser e a altura da linha dança entre sistemas. */
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  width: 2.5ch;
+  font-size: 15px;
+  line-height: 1;
+}

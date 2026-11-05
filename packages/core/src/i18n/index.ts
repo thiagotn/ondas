@@ -4,6 +4,7 @@ import { idioma, resolver, type Frase, type Locale, type Params } from './motor.
 import { PT_BR, type Chave } from './pt-BR.js';
 
 export {
+  BANDEIRAS,
   definirIdioma,
   fmtNumero,
   fmtUmDecimal,

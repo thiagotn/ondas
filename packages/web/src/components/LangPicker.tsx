@@ -1,4 +1,4 @@
-import { idioma, LOCALES, NOMES_DE_IDIOMA, t } from '@ondas/core';
+import { BANDEIRAS, idioma, LOCALES, NOMES_DE_IDIOMA, t } from '@ondas/core';
 import { trocarIdioma } from '../app/idioma';
 import { uiStore, useUi } from '../app/stores';
 import o from './overlay.module.css';
@@ -45,6 +45,11 @@ export function LangPicker() {
             >
               <span className={o.pickerMark}>
                 {locale === atual ? '●' : i === cursor ? '❯' : ''}
+              </span>
+              {/* `aria-hidden`: o nome do idioma ao lado já diz tudo, e sem
+                  isto o leitor de tela anunciaria "bandeira do Brasil". */}
+              <span className={o.langBandeira} aria-hidden="true">
+                {BANDEIRAS[locale]}
               </span>
               <span className={o.pickerName}>{NOMES_DE_IDIOMA[locale]}</span>
               {/* A tag BCP-47 ao lado do nome: é ela que aparece na URL. */}

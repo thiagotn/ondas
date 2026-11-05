@@ -25,6 +25,27 @@ export const NOMES_DE_IDIOMA: Record<Locale, string> = {
   es: 'español',
 };
 
+/**
+ * A bandeira de cada idioma, para o botão da barra e as linhas do seletor.
+ *
+ * Bandeira não é idioma — `en` é falado em dezenas de países e `es` em vinte —,
+ * então o par aqui é ESCOLHA de produto, e não tradução: Brasil para `pt-BR`,
+ * que já é regional no próprio código; Estados Unidos para `en`; Espanha para
+ * `es`.
+ *
+ * E há um limite de plataforma que não tem conserto no nosso lado: **o Windows
+ * não desenha bandeira em fonte nenhuma.** Chrome e Edge lá mostram as duas
+ * letras do país (`BR`, `US`, `ES`) no lugar do glifo. É legível, combina com a
+ * estética de terminal, e foi aceito de olhos abertos. O nome do idioma e a tag
+ * BCP-47 continuam escritos ao lado, então nada depende da bandeira para ser
+ * entendido.
+ */
+export const BANDEIRAS: Record<Locale, string> = {
+  'pt-BR': '🇧🇷',
+  en: '🇺🇸',
+  es: '🇪🇸',
+};
+
 /** Uma frase, ou as duas formas que o plural precisa. */
 export type Frase = string | { readonly one: string; readonly other: string };
 
