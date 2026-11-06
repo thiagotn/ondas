@@ -1110,7 +1110,24 @@ test('a linha da versão no sobre leva às notas daquela versão', async ({ page
   const sobre = page.getByRole('dialog', { name: 'ondas --about' });
   await expect(sobre.getByText(VERSAO, { exact: true })).toBeVisible();
 
-  await sobre.getByRole('link', { name: '[notas da versão]' }).click();
+  // O link fica na MESMA linha do número, e tem de ficar na mesma altura dele.
+  // Os 32px de alvo de toque do `.link` eram desenhados para `<button>`, onde o
+  // navegador centra o conteúdo sozinho; neste `<a>` a linha encostava no topo
+  // da caixa e subia ~7px em relação ao `1.1.1` ao lado.
+  //
+  // A medida é do TEXTO, por um `Range`, e não da caixa: a caixa do link já era
+  // centrada na linha — era o que estava dentro dela que não era.
+  const notas = sobre.getByRole('link', { name: '[notas da versão]' });
+  const meioDoLink = await notas.evaluate((el) => {
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    const { y, height } = r.getBoundingClientRect();
+    return y + height / 2;
+  });
+  const numero = (await sobre.getByText(VERSAO, { exact: true }).boundingBox())!;
+  expect(Math.abs(meioDoLink - (numero.y + numero.height / 2))).toBeLessThan(2);
+
+  await notas.click();
   await expect(page).toHaveURL(/\/changelog$/);
   // A janela foi embora com a navegação: o `?about=1` saiu do endereço.
   await expect(sobre).toBeHidden();

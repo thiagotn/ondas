@@ -272,7 +272,14 @@
   color: var(--color-neutral-300);
 }
 
+/* Os 32px são alvo de toque, não espaço acima do texto. Num `<button>` o
+   navegador centra o conteúdo dentro deles sozinho; num `<a>` não — a linha
+   fica no topo da caixa e sobe ~7px em relação ao que estiver ao lado, que foi
+   o desalinho do `[notas da versão]` com o `1.1.1` no `--about`. O `inline-flex`
+   centra nos dois, e é por isso que ele vem antes do `min-height`. */
 .link {
+  display: inline-flex;
+  align-items: center;
   min-height: 32px;
   border: 0;
   background: transparent;

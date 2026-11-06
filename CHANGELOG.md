@@ -7,6 +7,10 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.1.2 — 2026-11-06
+
+- no sobre, o link para as notas voltou a ficar na mesma altura do número da versão
+
 ## 1.1.1 — 2026-11-05
 
 - a próxima faixa continua sendo guardada no aparelho mesmo quando o celular jura que está sem rede — é o que faz a música não parar na troca, com a tela desligada
