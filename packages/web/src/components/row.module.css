@@ -35,6 +35,13 @@
   opacity: 0.4;
 }
 
+/* Faixa do histórico que saiu do catálogo: a linha é só um retrato. Mais leve
+   que a de fora de alcance porque esta ainda responde ao toque — ela abre o
+   endereço da faixa. */
+.rowFora {
+  opacity: 0.65;
+}
+
 .main {
   flex: 1;
   min-width: 0;

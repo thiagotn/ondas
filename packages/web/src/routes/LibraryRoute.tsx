@@ -10,8 +10,10 @@ import {
   visibleTracks,
   whoAmI,
 } from '@ondas/core';
-import { useMemo } from 'react';
+import { t } from '@ondas/core';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import * as controller from '../app/controller';
 import { useLibrary, useSession } from '../app/stores';
 import { PlaylistIndex } from '../components/PlaylistIndex';
 import { SelectionBar } from '../components/SelectionBar';
@@ -20,11 +22,13 @@ import { UploadPanel } from '../components/UploadPanel';
 import { TrackList } from '../components/TrackList';
 import { useTrackRows } from '../hooks/useTrackRows';
 import { useCatalog } from '../query/catalog';
+import { useHistorico } from '../query/historico';
+import p from '../components/playlist.module.css';
 import s from '../components/shell.module.css';
 import { librarySegPath } from './paths';
 
 /**
- * `~/biblioteca`: envio para o acervo, os cinco segmentos e a lista.
+ * `~/biblioteca`: envio para o acervo, os seis segmentos e a lista.
  *
  * O segmento é o path (`/library/offline`), e não estado de tela: assim cada
  * recorte é linkável, sobrevive a um reload e o voltar anda entre eles.
@@ -51,7 +55,11 @@ export function LibraryRoute() {
   const cached = useLibrary((st) => st.cached);
   const playlists = useLibrary((st) => st.playlists);
 
-  const aberta = seg === 'playlists' && id ? playlists.find((p) => p.id === id) : undefined;
+  // A consulta roda em qualquer recorte (com conta): é o que faz `--historico`
+  // abrir já desenhado, do cache, em vez de piscar "carregando" a cada visita.
+  const historico = useHistorico();
+
+  const aberta = seg === 'playlists' && id ? playlists.find((pl) => pl.id === id) : undefined;
   const tracks = data?.tracks ?? [];
   const visible = useMemo(
     () =>
@@ -64,8 +72,9 @@ export function LibraryRoute() {
         liked,
         cached,
         ...(aberta ? { playlist: aberta.itens } : {}),
+        ...(historico.data ? { historico: historico.data } : {}),
       }),
-    [tracks, seg, liked, cached, aberta],
+    [tracks, seg, liked, cached, aberta, historico.data],
   );
   const rows = useTrackRows(visible, tracks);
 
@@ -114,7 +123,9 @@ export function LibraryRoute() {
       {/* Enviar arquivo só faz sentido com conta: o acervo é por usuário. E
           dentro de uma playlist ele não é o assunto — ali o que se faz é
           organizar o que já existe. */}
-      {user && seg !== 'playlists' && <UploadPanel />}
+      {/* Nem no histórico, pela mesma razão: ele é registro do que se ouviu, e
+          o painel de envio empurraria a primeira linha para baixo à toa. */}
+      {user && seg !== 'playlists' && seg !== 'history' && <UploadPanel />}
       {/* `--acervo`, `--compartilhadas` e `--playlists` só com conta, pela mesma
           razão do painel de envio: sem sessão o catálogo não traz faixa do
           acervo nenhuma e playlist é da conta, então os chips seriam listas
@@ -122,7 +133,8 @@ export function LibraryRoute() {
           vazio que explica o login (ver `emptyText`). */}
       <div className={s.segments}>
         {LIBRARY_SEGMENTS.filter(
-          (it) => (it !== 'acervo' && it !== 'shared' && it !== 'playlists') || user,
+          (it) =>
+            (it !== 'acervo' && it !== 'shared' && it !== 'playlists' && it !== 'history') || user,
         ).map((it) => (
           <button
             key={it}
@@ -151,22 +163,65 @@ export function LibraryRoute() {
           )}
         </>
       ) : (
-        <TrackList
-          rows={rows}
-          loading={isLoading}
-          {...(aberta ? { playlistID: aberta.id } : {})}
-          emptyText={emptyText({
-            tab: 'library',
-            seg,
-            q: '',
-            loading: isLoading,
-            user,
-            publicOff,
-            hidden,
-            ...(aberta ? { playlistAberta: true } : {}),
-          })}
-        />
+        <>
+          {seg === 'history' && user && visible.length > 0 && <LimparHistorico />}
+          <TrackList
+            rows={rows}
+            // O histórico não depende do catálogo para desenhar: as linhas saem
+            // do retrato. O que ele espera é a própria consulta.
+            loading={seg === 'history' && user ? historico.isLoading : isLoading}
+            {...(aberta ? { playlistID: aberta.id } : {})}
+            emptyText={emptyText({
+              tab: 'library',
+              seg,
+              q: '',
+              loading: isLoading,
+              user,
+              publicOff,
+              hidden,
+              ...(aberta ? { playlistAberta: true } : {}),
+            })}
+          />
+        </>
       )}
     </TabScaffold>
+  );
+}
+
+/**
+ * `[limpar histórico]`, com dois toques — como o `[apagar]` de uma playlist e
+ * o `[limpar downloads]` da conta: não dá para desfazer, e a caixa nativa do
+ * navegador destoaria.
+ *
+ * Só aparece com o que limpar. O marcador (onde a conta parou) NÃO é apagado
+ * por aqui: "esquecer o que ouvi" não é "perder onde parei".
+ */
+function LimparHistorico() {
+  const [confirmando, setConfirmando] = useState(false);
+  return (
+    <div className={p.item}>
+      {confirmando ? (
+        <>
+          <span className={p.contador}>{t('historico.limparPergunta')}</span>
+          <button
+            type="button"
+            className={`${p.acao} ${p.acaoRisco}`}
+            onClick={() => {
+              setConfirmando(false);
+              void controller.limparHistorico();
+            }}
+          >
+            {t('ui.sim')}
+          </button>
+          <button type="button" className={p.acao} onClick={() => setConfirmando(false)}>
+            {t('ui.nao')}
+          </button>
+        </>
+      ) : (
+        <button type="button" className={p.acao} onClick={() => setConfirmando(true)}>
+          {t('historico.limpar')}
+        </button>
+      )}
+    </div>
   );
 }

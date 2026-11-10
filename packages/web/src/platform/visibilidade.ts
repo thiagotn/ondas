@@ -20,3 +20,25 @@ export function aoVoltarParaATela(cb: () => void): () => void {
     window.removeEventListener('pageshow', voltou);
   };
 }
+
+/**
+ * Quando a página sai da frente da pessoa — a aba foi para trás, o app foi
+ * minimizado, a página está sendo descarregada.
+ *
+ * É a última chance de gravar o que só existe na memória. `visibilitychange`
+ * para oculto é o evento que os navegadores garantem (inclusive no celular,
+ * onde `beforeunload` e `unload` não são confiáveis); `pagehide` cobre a
+ * navegação para fora e a entrada no bfcache. Disparo duplo não incomoda: quem
+ * escuta só grava o que ainda estiver por gravar.
+ */
+export function aoSairDaTela(cb: () => void): () => void {
+  const saiu = () => {
+    if (document.visibilityState === 'hidden') cb();
+  };
+  document.addEventListener('visibilitychange', saiu);
+  window.addEventListener('pagehide', cb);
+  return () => {
+    document.removeEventListener('visibilitychange', saiu);
+    window.removeEventListener('pagehide', cb);
+  };
+}

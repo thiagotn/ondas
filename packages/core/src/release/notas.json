@@ -1,5 +1,21 @@
 [
   {
+    "versao": "1.2.0",
+    "data": "2026-11-10",
+    "itens": [
+      {
+        "pt-BR": "o app lembra onde você parou: abrindo com a mesma conta em qualquer aparelho, o player já vem com a última faixa, pausada no segundo certo — um toque e ela continua dali",
+        "en": "the app remembers where you stopped: open it with the same account on any device and the player already holds your last track, paused at the right second — one tap and it carries on from there",
+        "es": "la app recuerda dónde te quedaste: al abrirla con la misma cuenta en cualquier aparato, el player ya trae la última pista, en pausa en el segundo correcto — un toque y sigue desde ahí"
+      },
+      {
+        "pt-BR": "a biblioteca ganhou o recorte `--historico`, com o que você já ouviu — inclusive as faixas que saíram do em-alta desde então — e um botão para limpar",
+        "en": "the library has a new `--history` view with what you have listened to — including tracks that have left trending since — and a button to clear it",
+        "es": "la biblioteca tiene el nuevo recorte `--historial`, con lo que ya escuchaste — incluso las pistas que salieron de tendencias desde entonces — y un botón para limpiarlo"
+      }
+    ]
+  },
+  {
     "versao": "1.1.2",
     "data": "2026-11-06",
     "itens": [

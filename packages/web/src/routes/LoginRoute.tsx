@@ -12,6 +12,7 @@ import { Palette } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGuestMode } from '../app/guest';
+import * as historico from '../app/historico';
 import { CassetteLogo } from '../components/CassetteLogo';
 import { sincronizar } from '../app/likes';
 import { carregarPlaylists } from '../app/playlists';
@@ -46,6 +47,8 @@ export function LoginRoute() {
       // E as playlists, pela mesma razão: elas são da conta, e o espelho deste
       // navegador acabou de ficar velho.
       void carregarPlaylists();
+      // E o ponto onde a conta parou, que vira a faixa pausada no player.
+      void historico.iniciar({ novaSessao: true });
       setPassword('');
       uiStore.getState().closeGate();
       uiStore.getState().flash(t('login.autenticado', { nome: user.name }));

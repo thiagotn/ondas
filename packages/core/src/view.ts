@@ -1,9 +1,11 @@
 import { fmtBytes, fmtTime } from './format.js';
+import { faixasDoHistorico } from './historico/fila.js';
 import { t as traduzir } from './i18n/index.js';
+import type { ItemDoHistorico } from './ports/historico.js';
 import type { Catalog, CatalogSource, LibrarySegment, Session, TabId, Track } from './types.js';
 
 /**
- * Os cinco recortes da biblioteca, na ordem em que a tela os mostra.
+ * Os seis recortes da biblioteca, na ordem em que a tela os mostra.
  *
  * `acervo` fica no MEIO e não no fim: ele é o padrão de quem tem conta
  * (`defaultLibrarySegment`), e o padrão no canto direito faz a tela abrir com o
@@ -13,6 +15,11 @@ import type { Catalog, CatalogSource, LibrarySegment, Session, TabId, Track } fr
  * outros três não são — `acervo` e `shared` são procedência da faixa, `offline`
  * é o que está neste aparelho. `shared` encosta em `acervo` porque é a mesma
  * origem vista do outro lado, e `offline` continua por último.
+ *
+ * `history` fecha o grupo da esquerda pelo mesmo critério: curtidas, playlists
+ * e histórico são os três recortes sobre O QUE A PESSOA FEZ com a música, e os
+ * três moram na conta. Ele vem depois dos outros dois porque não é escolha — é
+ * registro.
  *
  * `playlists` é o único que NÃO lista faixas: `/library/playlists` é o índice
  * das playlists, e `/library/playlists/<id>` são as faixas de uma delas. Ele
@@ -27,6 +34,7 @@ import type { Catalog, CatalogSource, LibrarySegment, Session, TabId, Track } fr
 export const LIBRARY_SEGMENTS: readonly LibrarySegment[] = [
   'liked',
   'playlists',
+  'history',
   'acervo',
   'shared',
   'offline',
@@ -44,6 +52,7 @@ export const LIBRARY_SEGMENTS: readonly LibrarySegment[] = [
 const SEGMENT_SLUGS: Record<LibrarySegment, string> = {
   liked: 'liked',
   playlists: 'playlists',
+  history: 'history',
   offline: 'offline',
   acervo: 'archive',
   shared: 'shared',
@@ -125,7 +134,11 @@ export function hiddenInSegment(
 ): number {
   // `acervo` e `shared` não guardam marca no aparelho: os dois são filtros pela
   // procedência da faixa, e o que não está na lista não está em lugar nenhum.
-  if (seg === 'acervo' || seg === 'shared') return 0;
+  //
+  // `history` também devolve zero, e por outro motivo: ele é o único recorte
+  // que MOSTRA o que não está no catálogo (ver `faixasDoHistorico`), então não
+  // há nada escondido para confessar.
+  if (seg === 'acervo' || seg === 'shared' || seg === 'history') return 0;
   const naLista = new Set(tracks.map((t) => t.id));
   // A playlist é o terceiro caso, e o único cuja ausência NÃO depende do
   // catálogo público estar desligado: id guardado no servidor aponta para faixa
@@ -139,7 +152,7 @@ export function hiddenInSegment(
 }
 
 /**
- * Palavra da URL → recorte da biblioteca; o que não é uma das quatro vale
+ * Palavra da URL → recorte da biblioteca; o que não é uma das conhecidas vale
  * `padrao` — na tela, o de `defaultLibrarySegment`.
  *
  * Normaliza em silêncio em vez de dar tela de erro: `/library/lixo` é um
@@ -190,6 +203,8 @@ export interface ListQuery {
    * informação, e `liked`/`cached` só respondem "está?".
    */
   playlist?: readonly string[];
+  /** O histórico da conta, do mais recente para trás. Só importa em `history`. */
+  historico?: readonly ItemDoHistorico[];
 }
 
 /** A lista visível na aba atual. Busca casa título + artista + gênero, ignorando `#` inicial. */
@@ -222,6 +237,10 @@ export function visibleTracks(v: ListQuery): Track[] {
     const porID = new Map(v.tracks.map((t) => [t.id, t]));
     return (v.playlist ?? []).map((id) => porID.get(id)).filter((t): t is Track => t !== undefined);
   }
+  // O histórico é o segundo recorte que percorre os próprios itens, e o ÚNICO
+  // que não descarta o que falta: faixa fora do catálogo sai como retrato. Um
+  // histórico que encolhe quando o trending gira não é um histórico.
+  if (v.seg === 'history') return faixasDoHistorico(v.historico ?? [], v.tracks);
   return v.tracks.filter((t) => (v.seg === 'liked' ? v.liked[t.id] : v.cached[t.id]));
 }
 
@@ -418,6 +437,10 @@ export function emptyText(args: {
       return playlistAberta
         ? traduzir('vazio.playlistAberta', { botaoPlaylist: BOTAO_PLAYLIST })
         : traduzir('vazio.nenhumaPlaylist');
+    }
+    // Sem ensinar gesto nenhum: histórico não se monta, acontece.
+    if (seg === 'history') {
+      return traduzir(user ? 'vazio.historico' : 'vazio.historicoSemConta');
     }
     // A quarta porta fechada, na forma das outras três. Com conta a frase não
     // manda fazer nada: compartilhar não é ato de quem recebe.

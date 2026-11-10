@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import * as controller from '../app/controller';
 import { useGuestMode } from '../app/guest';
+import * as historico from '../app/historico';
 import { useSession, useUi } from '../app/stores';
 import { AboutOverlay } from '../components/AboutOverlay';
 import { AccountOverlay } from '../components/AccountOverlay';
@@ -27,7 +28,7 @@ import { PATHS } from './paths';
  * Também é quem entrega as faixas ao controller.
  */
 export function AppLayout() {
-  const { data } = useCatalog();
+  const { data, isFetching } = useCatalog();
   const user = useSession((st) => st.user);
   const restored = useSession((st) => st.restored);
   const guest = useGuestMode((st) => st.guest);
@@ -55,9 +56,17 @@ export function AppLayout() {
   useShortcuts(searchInputRef);
 
   const tracks = data?.tracks;
+  const temFaixaNaRota = !!faixaDaRota;
   useEffect(() => {
     controller.setTracks(tracks ?? []);
-  }, [tracks]);
+    // Depois do `setTracks`, e no mesmo efeito: a restauração do marcador arma
+    // a faixa PELA lista do controller, e as duas têm de ser a mesma.
+    //
+    // `isFetching` entra nas dependências porque a lista pode não mudar quando
+    // o refetch termina (o react-query preserva a referência de dado igual), e
+    // é o fim dele que libera a decisão sobre uma faixa que o cache não tem.
+    historico.aoMudarFaixas(tracks ?? [], { deeplink: temFaixaNaRota, atualizando: isFetching });
+  }, [tracks, temFaixaNaRota, isFetching]);
 
   const current = useCurrentTrack();
 

@@ -31,6 +31,8 @@ export interface TrackRowProps {
    */
   selecionando: boolean;
   onPlay(index: number): void;
+  /** O toque numa linha `fora` do catálogo: não há índice para tocar. */
+  onOpen(row: RowModel): void;
   /** O Tab chegou nesta linha: o cursor da lista vem junto. */
   onCursor(id: string): void;
   onLike(id: string): void;
@@ -47,6 +49,7 @@ export function TrackRow({
   compact,
   selecionando,
   onPlay,
+  onOpen,
   onCursor,
   onLike,
   onDownload,
@@ -59,6 +62,7 @@ export function TrackRow({
     row.isCurrent ? s.rowCurrent : '',
     row.isCursor ? s.rowCursor : '',
     row.unavailable ? s.rowUnavailable : '',
+    row.fora ? s.rowFora : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -106,6 +110,7 @@ export function TrackRow({
           // segurar marcaria a faixa E a tocaria.
           if (longo.consumiuClique()) return;
           if (selecionando) onMark(track.id);
+          else if (row.fora) onOpen(row);
           else onPlay(row.index);
         }}
         onFocus={(e) => {
@@ -137,7 +142,8 @@ export function TrackRow({
             {/* Faixa do acervo tem gênero `acervo` sempre (o worker o fixa), e
                 na tela estreita `#acervo` é ruído que empurra a duração. Vale
                 para a minha e para a compartilhada — as duas vêm do acervo. */}
-            {!(compact && (row.minha || row.owner)) && (
+            {/* E o retrato do histórico não guarda gênero: `#` sozinho seria lixo. */}
+            {!!track.genre && !(compact && (row.minha || row.owner)) && (
               <>
                 <span style={{ color: row.genreColor }}>#{track.genre}</span>{' '}
               </>
@@ -183,22 +189,27 @@ export function TrackRow({
         <Heart size={17} weight={row.liked ? 'fill' : 'regular'} />
       </button>
 
-      <button
-        type="button"
-        aria-label={t(row.cached ? 'acao.removerDoAparelho' : 'acao.baixar')}
-        className={[
-          s.action,
-          row.cached ? s.actionCached : '',
-          row.dlLabel ? s.actionDownloading : '',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-        onClick={() => onDownload(row)}
-      >
-        {row.cached ? <CheckCircle size={17} weight="fill" /> : <DownloadSimple size={17} />}
-      </button>
+      {/* Linha de fora não baixa nem compartilha daqui: o retrato não tem
+          `stream`, e baixar "nada" marcaria um arquivo vazio como guardado no
+          aparelho. Quem quer isso abre a faixa — lá ela é resolvida inteira. */}
+      {!row.fora && (
+        <button
+          type="button"
+          aria-label={t(row.cached ? 'acao.removerDoAparelho' : 'acao.baixar')}
+          className={[
+            s.action,
+            row.cached ? s.actionCached : '',
+            row.dlLabel ? s.actionDownloading : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          onClick={() => onDownload(row)}
+        >
+          {row.cached ? <CheckCircle size={17} weight="fill" /> : <DownloadSimple size={17} />}
+        </button>
+      )}
 
-      {showShare && (
+      {showShare && !row.fora && (
         <button
           type="button"
           aria-label={t('player.compartilhar')}

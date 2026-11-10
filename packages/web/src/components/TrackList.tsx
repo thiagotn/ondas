@@ -1,9 +1,12 @@
+import { trackPath } from '@ondas/core';
 import { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import * as controller from '../app/controller';
 import { compartilhar } from '../platform/share';
 import type { RowModel } from '../hooks/useTrackRows';
 import { useWide } from '../hooks/useWide';
 import { useUi } from '../app/stores';
+import { semOverlays } from '../routes/paths';
 import s from './shell.module.css';
 import { SelectionBar } from './SelectionBar';
 import { TrackRow } from './TrackRow';
@@ -20,6 +23,8 @@ export interface TrackListProps {
 export function TrackList({ rows, emptyText, loading, playlistID }: TrackListProps) {
   const wide = useWide();
   const selecionando = useUi((st) => st.selecionando);
+  const navigate = useNavigate();
+  const { pathname, search } = useLocation();
 
   // `j`/`k` andam pelo que está na tela, e isto é o único lugar que sabe o que
   // está na tela: `controller.tracks` é a lista completa, e em `--curtidas` ou
@@ -59,6 +64,14 @@ export function TrackList({ rows, emptyText, loading, playlistID }: TrackListPro
             compact={!wide}
             selecionando={selecionando}
             onPlay={(index) => void controller.play(index)}
+            // A linha de fora do catálogo abre o ENDEREÇO da faixa em vez de
+            // tocar no lugar. É o caminho que já existe para "uma faixa que não
+            // está na lista": o `TrackRoute` a busca por id, a põe na fila como
+            // avulsa e toca — e já sabe dizer que ela não existe mais. O `from`
+            // é o do `usePlayerOverlay`, para o fechar do player voltar para cá.
+            onOpen={(r) =>
+              navigate(trackPath(r.track), { state: { from: semOverlays(pathname + search) } })
+            }
             onCursor={controller.marcarCursor}
             onLike={controller.toggleLike}
             onDownload={(r) => void controller.download(r.track)}

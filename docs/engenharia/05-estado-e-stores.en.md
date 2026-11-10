@@ -255,6 +255,52 @@ five places at once. The optimism is cheap because the correction is free — **
 the API is the whole collection, so a failure restores the real state with no undo code at all. And a
 pending order goes up **before** `auth.logout()`, for the same reason as the likes queue.
 
+### The bookmark copies the like, with a queue of size one
+
+Since migration `0009` the account remembers **where it stopped**: the last track and its second
+(`packages/web/src/app/historico.ts`). It is the third piece of account data the screen writes, and
+the design is the like's — the server owns it, IndexedDB mirrors it (key `marcador`), 401 is the only
+invalidator, `esquecer()` runs on logout. The "queue" here has size one: only the latest bookmark
+matters, so instead of a queue the mirror carries a `pendente` flag.
+
+Three things about it have no counterpart in the like, and all three come from the player sitting in
+the middle.
+
+**`playerStore` is still not persisted.** What persists is a *derivative* of it, and the decision of
+when to write belongs to a pure core function, `observar`
+(`packages/core/src/historico/marcador.ts`), which takes player samples and returns effects: mirror
+every 5 s of music, upload every 15 s, upload immediately on pause, on a jump and on a track's first
+sound. The web module only subscribes to the store and runs the effects. The alternative — `persist`
+on the store — would write `t` four times a second and drag `playing` along, which restored as `true`
+is a lie.
+
+**Restoring means ARMING, not loading.** At boot the bookmarked track enters the store through
+`loadPaused` (paused, at the position) and the audio engine **is not told**. `engine.load` only
+happens on the first play, already carrying the starting point. Loading at boot would hand
+`engine.on('error')` — which skips to the next track and plays it — a chance to make sound on its own
+because of a stream that died since yesterday. The "store the id" rule holds in full: the bookmark
+stores `trackId`, and the index comes from `indexOfTrack` at arming time, against that device's list.
+
+**The cross-device conflict has two halves, one on each side of the wire.** The server ignores a
+write older than the current one, by the listener's clock (covered in
+[document 08](08-auth.en.md)). And the client writes nothing until sound comes out: `observar` only
+emits effects for a track that has `tocou`. Without the second half the first is useless — a phone
+left open, with yesterday's track armed, would stamp "now" on every return to the screen and always
+win.
+
+The **history** is the bookmark's sibling and the first account data to live in TanStack Query
+besides the catalogue (`packages/web/src/query/historico.ts`): it is a list that comes from outside
+and can go stale, which is the definition of the left column in the table above. Because the whole
+cache goes to IndexedDB, the query is removed on logout and on 401, for the same reason as
+`CATALOG_LOGADO_KEY`. The write — a track that passed thirty seconds of listening — is optimistic
+with a queue (`historico-fila`), like the like.
+
+And it is the only view that stores a **portrait** of the track (title, artist, duration) and not
+just the id. Likes and playlists are filters over the loaded catalogue and accept "decaying" when
+trending rotates; a history that shrinks by itself is not a history. A track that left the catalogue
+shows up as a portrait row, with no artwork and no download button, and tapping it opens its address
+— the path that already existed for "a track that is not in the list" (`TrackRoute`).
+
 ### The playback queue stopped being the catalogue
 
 `j`/`k` already walked what is on screen; `n` did not. It walked the whole catalogue, which in

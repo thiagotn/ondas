@@ -244,6 +244,36 @@ importa: curtir e clicar em `[sair]` é um gesto só, e depois que o cookie morr
 401. Sair apaga as curtidas deste navegador de propósito: elas estão no servidor e voltam no
 próximo login, e deixá-las aqui faria a próxima conta a entrar adotar o gosto da anterior.
 
+### A conta lembra onde você parou
+
+Até a migração `0009` nada do player era guardado em lugar nenhum: um reload recomeçava do `0:00`, e
+abrir o app no celular não sabia o que tinha tocado no desktop. Hoje a conta guarda o **marcador** —
+a última faixa e o segundo dela — e o **histórico** do que foi ouvido.
+
+**A retomada nunca toca sozinha.** Abrir o app com a conta traz a faixa já no player, **pausada** no
+segundo onde parou; um toque em play continua dali. O áudio só é pedido nesse toque. O link de uma
+faixa (`/t/...`) vence o marcador: quem abriu o link pediu aquela música.
+
+**A fila não é guardada.** `n`/`p` depois da retomada seguem a lista que estiver na tela daquele
+aparelho, como em qualquer outro play.
+
+**Entre dois aparelhos, vale quem ouviu por último** — pelo relógio de quem ouviu, não pela ordem em
+que os pedidos chegaram, para a posição gravada sem rede não passar por cima de uma mais nova. E o
+aparelho que só foi aberto não escreve nada: é preciso sair som para o marcador mudar.
+
+**A PWA instalada pergunta na volta para a tela**, no máximo uma vez por minuto e só com o player
+parado. É a única chamada à API que o app faz por foco — sem ela, o celular que fica com o app vivo
+por dias nunca veria o que foi ouvido em outro lugar. Com o player cheio aberto ela só atualiza a
+posição da mesma faixa, porque ali o endereço é a faixa.
+
+**`--historico`** é um recorte da biblioteca, só com conta. Uma faixa entra depois de trinta
+segundos de escuta (ou metade dela, se for mais curta) — arrastar a barra não conta. É uma linha por
+faixa, da mais recente para trás, com teto de 200. Ao contrário das curtidas, a linha guarda título e
+artista: a faixa que saiu do em-alta continua lá, esmaecida, e tocá-la abre o endereço dela. `[limpar
+histórico]` pede dois toques e não apaga o marcador.
+
+Sair da conta apaga do aparelho o espelho dos dois, pelo mesmo motivo das curtidas.
+
 ### A faixa pode ser de duas pessoas
 
 Até a migração `0007` o acervo tinha um dono e uma pergunta: *é seu?* Compartilhar partiu isso em

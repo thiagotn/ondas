@@ -280,6 +280,12 @@ func (s *Server) removerFaixa(w http.ResponseWriter, r *http.Request) {
 	if err := s.playlists.RemoverFaixa(r.Context(), prefixoID+id); err != nil {
 		slog.Error("item de playlist órfão", "faixa", id, "erro", err)
 	}
+	// E do histórico e do marcador de quem a ouviu — de TODAS as contas, porque
+	// faixa compartilhada entra no histórico de quem recebeu. No histórico a
+	// linha órfã ainda mostraria título e artista de algo que o dono apagou.
+	if err := s.history.RemoverFaixa(r.Context(), prefixoID+id); err != nil {
+		slog.Error("histórico órfão", "faixa", id, "erro", err)
+	}
 	// A linha já foi apagada; se a limpeza do R2 falhar, o objeto fica órfão
 	// mas o acervo do usuário já está correto. Erro vai para o log, não para a
 	// resposta.

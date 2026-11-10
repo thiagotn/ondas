@@ -28,6 +28,22 @@ describe('session store', () => {
 });
 
 describe('player store', () => {
+  it('armar uma faixa não liga o som nem a espera', () => {
+    // O `load` da restauração do marcador: a faixa aparece no player, parada no
+    // segundo onde a conta parou. Se isto ligasse `playing`, a tela diria PLAY
+    // (ou BUF) para um áudio que ninguém pediu.
+    const p = createPlayerStore();
+    p.getState().loadPaused(3, 'demo3', 214, 0, 42);
+    expect(p.getState()).toMatchObject({
+      cur: 3,
+      curId: 'demo3',
+      dur: 214,
+      t: 42,
+      playing: false,
+      waiting: false,
+    });
+  });
+
   it('carregar uma faixa zera o tempo e entra em espera', () => {
     const p = createPlayerStore();
     p.getState().load(3, 'demo3', 214, 0);

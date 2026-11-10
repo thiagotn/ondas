@@ -95,7 +95,7 @@ export interface ThemeDef {
 }
 
 export type TabId = 'home' | 'search' | 'library';
-export type LibrarySegment = 'liked' | 'playlists' | 'offline' | 'acervo' | 'shared';
+export type LibrarySegment = 'liked' | 'playlists' | 'history' | 'offline' | 'acervo' | 'shared';
 
 /**
  * Uma playlist da conta: um nome e uma ORDEM de ids.

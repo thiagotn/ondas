@@ -11,5 +11,7 @@ export type { AuthService, Credentials } from './auth.js';
 export { AuthError } from './auth.js';
 export type { LikesService } from './likes.js';
 export { LikesError } from './likes.js';
+export type { HistoricoService, ItemDoHistorico, Marcador } from './historico.js';
+export { HistoricoError } from './historico.js';
 export type { PlaylistsService } from './playlists.js';
 export { PlaylistsError } from './playlists.js';

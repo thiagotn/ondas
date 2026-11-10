@@ -16,13 +16,25 @@ export interface PlayerState {
   shuffle: boolean;
   repeat: boolean;
   load(index: number, trackId: string, dur: number, buf: number): void;
+  /**
+   * Põe uma faixa no player SEM tocar: parada, na posição dada.
+   *
+   * É o `load` da restauração do marcador (ver `historico/marcador.ts`). Existe
+   * à parte porque `load` promete que o som está a caminho — `playing` e
+   * `waiting` ligados, a tela em `BUF` — e aqui a promessa é a contrária: nada
+   * toca até a pessoa pedir.
+   */
+  loadPaused(index: number, trackId: string, dur: number, buf: number, t: number): void;
   patch(partial: Partial<Omit<PlayerState, keyof PlayerActions>>): void;
   toggleShuffle(): void;
   toggleRepeat(): void;
   reset(): void;
 }
 
-type PlayerActions = Pick<PlayerState, 'load' | 'patch' | 'toggleShuffle' | 'toggleRepeat' | 'reset'>;
+type PlayerActions = Pick<
+  PlayerState,
+  'load' | 'loadPaused' | 'patch' | 'toggleShuffle' | 'toggleRepeat' | 'reset'
+>;
 
 export type PlayerStore = ReturnType<typeof createPlayerStore>;
 
@@ -42,6 +54,8 @@ export function createPlayerStore() {
     shuffle: false,
     repeat: false,
     load: (cur, curId, dur, buf) => set({ cur, curId, dur, buf, t: 0, playing: true, waiting: true }),
+    loadPaused: (cur, curId, dur, buf, t) =>
+      set({ cur, curId, dur, buf, t, playing: false, waiting: false }),
     patch: (partial) => set(partial),
     toggleShuffle: () => set((s) => ({ shuffle: !s.shuffle })),
     toggleRepeat: () => set((s) => ({ repeat: !s.repeat })),

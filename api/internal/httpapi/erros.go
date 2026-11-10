@@ -40,12 +40,16 @@ const (
 	CodFalhaEnfileirar       = "falha_enfileirar"
 	CodFalhaLerAcervo        = "falha_ler_acervo"
 	CodFalhaLerCurtidas      = "falha_ler_curtidas"
+	CodFalhaLerHistorico     = "falha_ler_historico"
+	CodFalhaLerMarcador      = "falha_ler_marcador"
 	CodFalhaLerPlaylists     = "falha_ler_playlists"
 	CodFalhaLiberarArquivo   = "falha_liberar_arquivo"
 	CodFalhaPrepararEnvio    = "falha_preparar_envio"
 	CodFalhaRemover          = "falha_remover"
 	CodFalhaResolverDestino  = "falha_resolver_destino"
 	CodFalhaSalvarCurtidas   = "falha_salvar_curtidas"
+	CodFalhaSalvarHistorico  = "falha_salvar_historico"
+	CodFalhaSalvarMarcador   = "falha_salvar_marcador"
 	CodFalhaSalvarPlaylist   = "falha_salvar_playlist"
 	CodFalhaSalvarPreferenc  = "falha_salvar_preferencia"
 	CodIDRepetido            = "id_repetido"
@@ -108,12 +112,16 @@ var codigoPorMensagem = map[string]string{
 	"não foi possível ler as curtidas":                CodFalhaLerCurtidas,
 	"não foi possível ler as playlists":               CodFalhaLerPlaylists,
 	"não foi possível ler o acervo":                   CodFalhaLerAcervo,
+	"não foi possível ler o histórico":                CodFalhaLerHistorico,
+	"não foi possível ler o marcador":                 CodFalhaLerMarcador,
 	"não foi possível preparar o envio":               CodFalhaPrepararEnvio,
 	"não foi possível remover":                        CodFalhaRemover,
 	"não foi possível resolver o destino":             CodFalhaResolverDestino,
 	"não foi possível salvar a playlist":              CodFalhaSalvarPlaylist,
 	"não foi possível salvar a preferência":           CodFalhaSalvarPreferenc,
 	"não foi possível salvar as curtidas":             CodFalhaSalvarCurtidas,
+	"não foi possível salvar o histórico":             CodFalhaSalvarHistorico,
+	"não foi possível salvar o marcador":              CodFalhaSalvarMarcador,
 	"nome inválido":                                   CodNomeInvalido,
 	"o arquivo chegou vazio":                          CodArquivoVazio,
 	"o arquivo não chegou ao bucket — refaça o envio": CodArquivoAusenteBucket,

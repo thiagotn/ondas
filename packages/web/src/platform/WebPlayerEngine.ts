@@ -29,12 +29,31 @@ export class WebPlayerEngine implements PlayerEngine {
   private simDur = 0;
   private simBuf = 0;
   private simulated = false;
+  /**
+   * Para onde ir assim que o áudio souber a própria duração.
+   *
+   * Existe por causa da retomada do marcador: ela carrega a faixa e pede o
+   * segundo 42 no mesmo instante, e antes do `loadedmetadata` o elemento não
+   * tem duração — o `seek` saía calado e a música começava do `0:00`.
+   */
+  private seekPendente: number | null = null;
 
   constructor() {
     const a = (this.audio = new Audio());
     a.preload = 'auto';
     a.crossOrigin = 'anonymous';
-    a.addEventListener('timeupdate', () => this.emit('time', a.currentTime));
+    a.addEventListener('timeupdate', () => {
+      // Com um seek à espera, o `currentTime` ainda é o zero de antes dele.
+      // Emitir faria a barra voltar a `0:00` por um instante e depois pular.
+      if (this.seekPendente !== null) return;
+      this.emit('time', a.currentTime);
+    });
+    a.addEventListener('loadedmetadata', () => {
+      const alvo = this.seekPendente;
+      if (alvo === null) return;
+      this.seekPendente = null;
+      this.seek(alvo);
+    });
     a.addEventListener('durationchange', () => {
       if (Number.isFinite(a.duration)) this.emit('duration', a.duration);
     });
@@ -65,6 +84,8 @@ export class WebPlayerEngine implements PlayerEngine {
   load(track: Track, src: string): void {
     this.stopSim();
     this.audio.pause();
+    // O seek à espera era da faixa anterior.
+    this.seekPendente = null;
     this.simulated = !src;
     if (!src) {
       this.audio.removeAttribute('src');
@@ -118,7 +139,11 @@ export class WebPlayerEngine implements PlayerEngine {
       return;
     }
     if (Number.isFinite(this.audio.duration)) {
+      this.seekPendente = null;
       this.audio.currentTime = Math.min(this.audio.duration, Math.max(0, seconds));
+    } else if (this.audio.getAttribute('src')) {
+      // Faixa carregando: guarda, e o `loadedmetadata` aplica.
+      this.seekPendente = Math.max(0, seconds);
     }
   }
 

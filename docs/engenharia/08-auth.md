@@ -261,6 +261,7 @@ A resposta está na forma do roteador, e não num campo de permissão.
 | Só sessão | mexer na própria conta | `GET /auth/me`, `PATCH /auth/prefs` |
 | Só sessão | mexer no próprio gosto | `GET /likes`, `PATCH /likes` |
 | Só sessão | organizar a própria biblioteca | `GET /playlists`, `POST /playlists`, `PATCH /playlists/{id}`, `DELETE /playlists/{id}`, `PATCH /playlists/{id}/itens` |
+| Só sessão | o que a própria conta ouviu | `GET /playback`, `PUT /playback`, `GET /history`, `POST /history`, `DELETE /history` |
 
 A última linha é a mesma régua aplicada a um caso novo. `PATCH /auth/prefs` liga e desliga o
 catálogo público da conta (`users.publico`), e o token de máquina **não** a alcança: ele existe para
@@ -297,6 +298,26 @@ Toda resposta é a **coleção inteira** de playlists com os itens — mesmo con
 e `Likes.Aplicar`. Aqui ele compra uma coisa a mais: não existe rota de detalhe, logo não existe
 índice e detalhe para divergirem. Isso só é honesto com teto, e são três: 50 playlists por conta, 500
 itens por playlist, 60 caracteres de nome.
+
+`/playback` e `/history` (migração `0009`) são a mesma régua pela quarta vez — **fora** de `/acervo`,
+**sessão, nunca token** —, e `TestMarcadorEHistoricoExigemSessaoENaoAceitamToken` trava as cinco
+rotas. São dois endereços porque são duas tabelas com vidas diferentes: o marcador (onde a conta
+parou) é uma linha por conta reescrita a cada quinze segundos de música; o histórico cresce uma linha
+por faixa ouvida, tem teto de 200 e pode ser limpo sem levar o marcador junto.
+
+O que `/playback` tem de próprio é **confiar num relógio que não é nosso**. O corpo do `PUT` traz
+`em`, o `Date.now()` de quem ouviu, e é por ele que duas escritas se ordenam — não pela chegada. Tem
+de ser assim: a posição gravada sem rede há duas horas sobe quando a rede volta, e não pode vencer a
+que o outro aparelho gravou há dez minutos. As duas travas moram no SQL do upsert, e cada uma tem um
+teste que cai sem ela:
+
+- `WHERE playback.em <= EXCLUDED.em` — a escrita mais velha é ignorada, e a resposta é `200` com o
+  marcador que **ficou**; é por ela que o cliente descobre que perdeu;
+- `LEAST(em, now())` — relógio adiantado é o lado que machuca: sem o teto, um aparelho com a data
+  errada gravaria um marcador que nenhuma escrita honesta superaria, para sempre.
+
+`GET /playback` de quem nunca ouviu nada responde `200` com `{"marcador": null}`, e não `404`: `404`
+é o que a PWA nova recebe de uma API que ainda não subiu, e os dois não podem ser a mesma resposta.
 
 `PATCH /{id}/itens` cobre os três gestos da tela com um handler — `{add, remove, ordem}`, aplicados
 nessa ordem. `add` serve o modo de seleção, que **não conhece** o conteúdo da playlist de destino;

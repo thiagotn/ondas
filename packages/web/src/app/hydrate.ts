@@ -1,4 +1,5 @@
 import type { BackgroundSettings, LibrarySnapshot } from '@ondas/core';
+import * as historico from './historico';
 import { sincronizar } from './likes';
 import { carregarPlaylists } from './playlists';
 import { auth, kv, offlineStore } from './services';
@@ -30,4 +31,7 @@ export async function hydrate(): Promise<void> {
   // Mesma regra, mesma razão: o espelho já desenhou a fileira de playlists, e o
   // boot não pode ficar preso na rede esperando a versão autoritativa.
   void carregarPlaylists();
+  // E o marcador — onde a conta parou. O espelho arma o player sem rede; o
+  // servidor corrige depois se outro aparelho ouviu mais recentemente.
+  void historico.iniciar();
 }

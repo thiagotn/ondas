@@ -27,12 +27,13 @@ import {
   setMediaPosition,
 } from '../platform/mediaSession';
 import { compartilhar } from '../platform/share';
-import { aoVoltarParaATela } from '../platform/visibilidade';
+import { aoSairDaTela, aoVoltarParaATela } from '../platform/visibilidade';
 import { applyTheme, storeTheme } from '../theme/applyTheme';
 import { queryClient } from '../query/client';
 import { CATALOG_LOGADO_KEY, catalogKey } from '../query/catalog';
 import { ehCotaExcedida } from '../platform/CacheOfflineStore';
 import { useAvulsas } from './extras';
+import * as historico from './historico';
 import { esquecerCurtidas, registrar, sincronizar } from './likes';
 import * as listas from './playlists';
 import { auth, connectivity, engine, offlineStore } from './services';
@@ -119,6 +120,70 @@ function pararNaTela(): void {
 function gestoDaPessoa(): void {
   falhasSeguidas = 0;
   pendencia = null;
+}
+
+/**
+ * A faixa que a restauração do marcador pôs no player, e que ainda não tocou.
+ *
+ * ARMADA quer dizer: está na store e na tela — título, capa, a barra parada no
+ * segundo onde a conta parou — e o motor de áudio não sabe dela. Nenhum
+ * `engine.load` foi feito, de propósito: carregar no boot é pedir bytes que
+ * talvez ninguém ouça e, pior, é dar ao `engine.on('error')` a chance de pular
+ * para a faixa seguinte e TOCÁ-LA, sem gesto nenhum, por causa de um stream
+ * que morreu desde ontem.
+ *
+ * O áudio só é pedido no primeiro play (`togglePlay`), que carrega a faixa já
+ * na posição guardada aqui. Qualquer outro caminho que toque alguma coisa
+ * passa por `tocarFaixa`, que desarma.
+ */
+let armado: { id: string; pos: number } | null = null;
+
+/**
+ * Põe a faixa do marcador no player, pausada na posição. Devolve `false` se
+ * ela não coube: não está na lista, não é tocável, ou há som saindo.
+ *
+ * Quem decide SE restaurar é `app/historico.ts`; aqui só se recusa o que seria
+ * errado em qualquer circunstância.
+ */
+export function armar(id: string, pos: number): boolean {
+  const index = indexOfTrack(tracks, id);
+  const track = tracks[index];
+  if (!track) return false;
+  const player = playerStore.getState();
+  // Nunca por cima de música: nem da que está saindo, nem da que foi pedida e
+  // ainda carrega.
+  if (player.playing || player.waiting) return false;
+  // Sem abrir gate: a pessoa não pediu nada, e um bloqueio aqui é só motivo
+  // para não restaurar.
+  if (!playability(track, index, { session: sessionStore.getState().user }).ok) return false;
+  // Se havia uma faixa carregada e pausada no motor, ela fica lá, muda: o play
+  // seguinte carrega a armada por cima.
+  engine.pause();
+  armado = { id, pos };
+  playerStore
+    .getState()
+    .loadPaused(index, id, track.dur, libraryStore.getState().cached[id] ? 1 : 0, pos);
+  setMediaMetadata(track);
+  setMediaPlaybackState(false);
+  return true;
+}
+
+/** O id da faixa armada e intocada, ou `null`. */
+export function armadoEm(): string | null {
+  return armado && armado.id === playerStore.getState().curId ? armado.id : null;
+}
+
+/**
+ * Vai para um ponto da faixa. Com o player armado não há áudio para
+ * posicionar: muda só o ponto de onde o play vai partir.
+ */
+function irPara(seconds: number): void {
+  if (armado && armado.id === playerStore.getState().curId) {
+    armado.pos = seconds;
+    playerStore.getState().patch({ t: seconds });
+    return;
+  }
+  engine.seek(seconds);
 }
 
 /**
@@ -245,9 +310,12 @@ async function comecar(track: Track): Promise<Comeco> {
  * avanço por erro. Gesto da pessoa entra por `play`, que limpa o que o
  * automático armou antes de chegar aqui.
  */
-async function tocarFaixa(index: number): Promise<void> {
+async function tocarFaixa(index: number, inicio = 0): Promise<void> {
   const track = tracks[index];
   if (!track) return;
+  // Tudo o que toca passa por aqui, e tocar qualquer coisa desarma: a faixa do
+  // marcador deixa de ser "a que está esperando o play".
+  armado = null;
   const lib = libraryStore.getState();
   const ui = uiStore.getState();
   const verdict = playability(track, index, { session: sessionStore.getState().user });
@@ -278,6 +346,14 @@ async function tocarFaixa(index: number): Promise<void> {
 
   engine.load(track, src);
   setMediaMetadata(track);
+  // A retomada do marcador: a faixa começa de onde a conta parou. O `patch` é
+  // para a tela — `load` acabou de zerar o tempo, e a barra piscaria `0:00`
+  // até o áudio carregar. O `seek` o motor guarda e aplica quando souber a
+  // duração (ver `seekPendente` no `WebPlayerEngine`).
+  if (inicio > 0) {
+    playerStore.getState().patch({ t: inicio });
+    engine.seek(inicio);
+  }
 
   // `WebPlayerEngine.play()` engole a recusa do navegador (autoplay barrado é
   // uma promise rejeitada, não um evento de erro), e a tela só voltava para
@@ -308,6 +384,13 @@ export function togglePlay(): void {
   if (player.cur < 0) {
     const first = firstPlayable(queueContext());
     if (first >= 0) void tocarFaixa(first);
+    return;
+  }
+  // O primeiro play depois da restauração: é AQUI que o áudio é pedido, já na
+  // posição do marcador. Vale para a barra, o espaço e a tela de bloqueio —
+  // os três chegam por esta função.
+  if (armado && armado.id === player.curId) {
+    void tocarFaixa(player.cur, armado.pos);
     return;
   }
   // `engine.play()`, e não `tocarFaixa(cur)`: um pause/play no meio da faixa
@@ -399,13 +482,13 @@ export function tocarCursor(): void {
 export function seekFraction(fraction: number): void {
   const { dur } = playerStore.getState();
   if (!dur) return;
-  engine.seek(Math.min(1, Math.max(0, fraction)) * dur);
+  irPara(Math.min(1, Math.max(0, fraction)) * dur);
 }
 
 export function seekBy(seconds: number): void {
   const { t, dur } = playerStore.getState();
   if (!dur) return;
-  engine.seek(Math.min(dur, Math.max(0, t + seconds)));
+  irPara(Math.min(dur, Math.max(0, t + seconds)));
 }
 
 /**
@@ -662,6 +745,10 @@ export async function logout(): Promise<void> {
   await sincronizar();
   // Pelo mesmo motivo, para a ordem que o `J`/`K` deixou pendente.
   await listas.subirPendente();
+  // E para a posição dos últimos segundos, e a faixa que acabou de contar como
+  // ouvida: o marcador sobe a cada quinze segundos de música, e sair no meio
+  // do intervalo deixaria a conta um trecho atrás.
+  await historico.subirPendente();
   await auth.logout();
   sessionStore.getState().setUser(null);
   // O catálogo do logado tem as faixas do acervo, e ele fica persistido em
@@ -677,6 +764,16 @@ export async function logout(): Promise<void> {
   // E as playlists, pelo mesmo risco: espelho que fica aparece para a próxima
   // conta que entrar neste navegador.
   listas.esquecerPlaylists();
+  // E o marcador e o histórico, pelo mesmo risco e com um a mais: o espelho
+  // `pendente` de quem saiu seria GRAVADO na conta de quem entrasse.
+  await historico.esquecer();
+  // A faixa armada é a última coisa que a conta ouviu, parada na barra de
+  // baixo à vista de quem pegar o aparelho. Música que está tocando fica —
+  // sair da conta nunca parou o som —, mas esta ninguém pediu para ouvir.
+  if (armadoEm()) {
+    armado = null;
+    playerStore.getState().reset();
+  }
   // Marca de seleção é da tela, e a tela é de quem entrou agora.
   uiStore.getState().sairDaSelecao();
 }
@@ -766,6 +863,22 @@ export async function clearDownloads(): Promise<void> {
   uiStore.getState().flash(t('toast.downloadsApagados', { tamanho: fmtMB(antes) }));
 }
 
+/**
+ * Apaga o histórico da conta. Primeiro o servidor, como `togglePublico`: um
+ * pedido que falha não muda nada na tela.
+ */
+export async function limparHistorico(): Promise<void> {
+  const ui = uiStore.getState();
+  try {
+    await historico.limpar();
+  } catch (err) {
+    console.warn('[ondas] não foi possível limpar o histórico:', err);
+    ui.flash(t('semRede.historicoNaoLimpo'));
+    return;
+  }
+  ui.flash(t('toast.historicoLimpo'));
+}
+
 export function toggleSimulatedOffline(): void {
   const ui = uiStore.getState();
   const next = !ui.simulatedOffline;
@@ -835,7 +948,7 @@ export function bootstrap(): () => void {
       pause: () => engine.pause(),
       next: () => step(1),
       prev: () => step(-1),
-      seekTo: (seconds) => engine.seek(seconds),
+      seekTo: (seconds) => irPara(seconds),
       seekBy: (offset) => seekBy(offset),
     }),
     connectivity.subscribe((value) => {
@@ -843,6 +956,8 @@ export function bootstrap(): () => void {
       ui.flash(t(value ? 'toast.redeConectada' : 'toast.redeDesconectada'));
       // A rede voltou: é a hora de subir o que foi curtido sem ela.
       if (value) void sincronizar();
+      // E a posição e as faixas ouvidas sem ela.
+      if (value) void historico.subirPendente();
       // E de retomar a música, se ela parou justamente por falta de rede.
       if (value && pendencia) void retomar('toast.retomando');
       // As playlists não têm fila para subir (ver `app/playlists.ts`), mas o
@@ -859,7 +974,16 @@ export function bootstrap(): () => void {
     // cada foco de aba viraria dois pedidos à API.
     aoVoltarParaATela(() => {
       if (pendencia) void retomar('toast.continuando');
+      // A exceção consciente à regra acima, e a única: o marcador. A PWA
+      // instalada não "abre" — ela fica viva por dias —, e sem isto quem ouviu
+      // no desktop pegaria o celular e veria a faixa de ontem. Os freios (só
+      // parado, uma vez por minuto) estão em `historico.aoVoltar`.
+      else void historico.aoVoltar();
     }),
+    // A gravação do marcador e do histórico: observa a store do player.
+    historico.ligar({ faixaAtual: currentTrack, armar, armadoEm }),
+    // E o resto que só existe na memória, quando a página sai de cena.
+    aoSairDaTela(() => historico.despejar()),
   ];
   setOnline(connectivity.isOnline());
   player.reset();

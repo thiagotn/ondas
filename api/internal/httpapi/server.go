@@ -15,6 +15,7 @@ import (
 	"github.com/thiagotn/ondas/api/internal/audius"
 	"github.com/thiagotn/ondas/api/internal/auth"
 	"github.com/thiagotn/ondas/api/internal/config"
+	"github.com/thiagotn/ondas/api/internal/history"
 	"github.com/thiagotn/ondas/api/internal/likes"
 	"github.com/thiagotn/ondas/api/internal/playlists"
 	"github.com/thiagotn/ondas/api/internal/storage"
@@ -31,6 +32,8 @@ type Server struct {
 	likes    *likes.Likes
 	// As playlists da conta. Como as curtidas, não dependem de R2 nenhum.
 	playlists *playlists.Playlists
+	// O marcador (onde a conta parou) e o histórico do que ela ouviu.
+	history *history.History
 	// Prévia de link: cliente do Audius com cache, e um freio próprio — é a
 	// única rota pública que faz chamada para fora.
 	audius    *audius.Client
@@ -51,6 +54,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool) *Server {
 		jobs:      acervo.NewJobs(pool),
 		likes:     likes.NewLikes(pool),
 		playlists: playlists.NewPlaylists(pool),
+		history:   history.NewHistory(pool),
 		audius:    audius.New(audius.Opcoes{}),
 		ogLimiter: auth.NewLimiter(60, time.Minute),
 	}
@@ -130,6 +134,27 @@ func (s *Server) Router() http.Handler {
 			r.Patch("/{id}", s.renomearPlaylist)
 			r.Delete("/{id}", s.apagarPlaylist)
 			r.Patch("/{id}/itens", s.aplicarItensDaPlaylist)
+		})
+
+		// O marcador e o histórico: a mesma régua das curtidas e das playlists,
+		// e pelos mesmos dois motivos — sessão e NUNCA token (o que alguém
+		// ouviu não é assunto do bot que traz faixa nova), e fora do grupo
+		// /acervo (a maioria do que se ouve é do Audius, e o 503 de
+		// `exigirAcervo` seria uma mentira).
+		//
+		// São dois endereços porque são duas coisas com vidas diferentes (ver
+		// a migração 0009): `/playback` é reescrito a cada quinze segundos de
+		// música, `/history` cresce uma linha por faixa ouvida.
+		r.Route("/playback", func(r chi.Router) {
+			r.Use(s.exigirSessao)
+			r.Get("/", s.lerMarcador)
+			r.Put("/", s.gravarMarcador)
+		})
+		r.Route("/history", func(r chi.Router) {
+			r.Use(s.exigirSessao)
+			r.Get("/", s.listarHistorico)
+			r.Post("/", s.registrarHistorico)
+			r.Delete("/", s.limparHistorico)
 		})
 
 		// Nada aqui é público: o acervo é privado por definição.

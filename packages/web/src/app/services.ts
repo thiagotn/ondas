@@ -3,6 +3,7 @@ import {
   AcervoUploader,
   AudiusCatalogClient,
   HttpAuthService,
+  HttpHistoricoService,
   HttpLikesService,
   HttpPlaylistsService,
 } from '@ondas/core';
@@ -31,6 +32,11 @@ export const likesClient = new HttpLikesService();
  * `libraryStore` (ver `app/playlists.ts`).
  */
 export const playlistsClient = new HttpPlaylistsService();
+/**
+ * O marcador (onde a conta parou) e o histórico. Como os dois acima, não
+ * guarda espelho: quem guarda é `app/historico.ts`.
+ */
+export const historicoClient = new HttpHistoricoService();
 export const offlineStore = new CacheOfflineStore();
 export const connectivity = new BrowserConnectivity();
 export const catalogClient = new AudiusCatalogClient();

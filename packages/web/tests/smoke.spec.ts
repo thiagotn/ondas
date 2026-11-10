@@ -162,6 +162,49 @@ function semearCompartilhada(page: Page) {
   acervoSemeado.get(page)?.push({ ...COMPARTILHADA });
 }
 
+interface MarcadorFalso {
+  trackId: string;
+  pos: number;
+  dur: number;
+  em: number;
+}
+
+interface ItemFalso {
+  trackId: string;
+  titulo: string;
+  artista: string;
+  dur: number;
+  em: number;
+}
+
+/**
+ * O que a conta ouviu, no servidor de mentira — por página.
+ *
+ * `puts` guarda toda escrita do marcador que CHEGOU, aceita ou não: é o que
+ * deixa um teste afirmar "este aparelho não escreveu nada", que é metade da
+ * regra de conflito entre aparelhos.
+ */
+const ouvidoSemeado = new WeakMap<
+  Page,
+  { marcador: MarcadorFalso | null; puts: MarcadorFalso[]; historico: ItemFalso[] }
+>();
+
+/**
+ * Põe um marcador na conta ANTES do login, como se outro aparelho tivesse
+ * ouvido. Não há jeito de ele estar no IndexedDB desta página, então um player
+ * que aparece armado só pode ter vindo do `/api/playback`.
+ */
+function semearMarcador(page: Page, trackId: string, pos: number, dur: number) {
+  // Um minuto atrás: mais velho que qualquer coisa que o teste ouça depois.
+  ouvidoSemeado.get(page)!.marcador = { trackId, pos, dur, em: Date.now() - 60_000 };
+}
+
+function semearHistorico(page: Page, ...itens: Omit<ItemFalso, 'em'>[]) {
+  const agora = Date.now();
+  // Na ordem dada, do mais recente para trás.
+  ouvidoSemeado.get(page)!.historico.push(...itens.map((it, i) => ({ ...it, em: agora - i * 60_000 })));
+}
+
 async function stubApi(page: Page) {
   let logado = false;
   // `true` de propósito, e não "realista".
@@ -310,6 +353,47 @@ async function stubApi(page: Page) {
       return responder();
     }
     return route.fulfill({ status: 405, json: { error: 'método não suportado' } });
+  });
+
+  // O marcador e o histórico da conta.
+  //
+  // As rotas são OBRIGATÓRIAS pelo mesmo motivo das de cima, e aqui com mais
+  // peso: a PWA escreve o marcador sozinha, a cada faixa que toca. Sem elas
+  // TODO teste logado que toca música mandaria um PUT ao `vite preview` e
+  // levaria 405.
+  //
+  // O PUT copia a regra do servidor que a tela depende: escrita mais velha que
+  // a vigente é ignorada, e a resposta é o marcador que FICOU.
+  const ouvido: { marcador: MarcadorFalso | null; puts: MarcadorFalso[]; historico: ItemFalso[] } = {
+    marcador: null,
+    puts: [],
+    historico: [],
+  };
+  ouvidoSemeado.set(page, ouvido);
+
+  await page.route('**/api/playback', async (route) => {
+    if (!logado) return route.fulfill({ status: 401, json: { error: 'sessão expirada' } });
+    if (route.request().method() === 'PUT') {
+      const corpo = JSON.parse(route.request().postData() ?? '{}') as MarcadorFalso;
+      ouvido.puts.push(corpo);
+      if (!ouvido.marcador || ouvido.marcador.em <= corpo.em) ouvido.marcador = corpo;
+    }
+    return route.fulfill({ status: 200, json: { marcador: ouvido.marcador } });
+  });
+
+  await page.route('**/api/history', async (route) => {
+    if (!logado) return route.fulfill({ status: 401, json: { error: 'sessão expirada' } });
+    const metodo = route.request().method();
+    if (metodo === 'DELETE') ouvido.historico = [];
+    if (metodo === 'POST') {
+      const { itens } = JSON.parse(route.request().postData() ?? '{}') as { itens: ItemFalso[] };
+      for (const it of itens ?? []) {
+        ouvido.historico = ouvido.historico.filter((x) => x.trackId !== it.trackId);
+        ouvido.historico.push(it);
+      }
+    }
+    ouvido.historico.sort((a, b) => b.em - a.em);
+    return route.fulfill({ status: 200, json: { itens: ouvido.historico } });
   });
 
   await page.route('**/api/acervo', async (route) =>
@@ -916,14 +1000,32 @@ test('toque longo: casca não seleciona, o que se copia continua copiável', asy
   expect(await capa.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none');
 });
 
-/** Entra com a conta de teste e deixa a primeira faixa do acervo tocando. */
-async function logar(page: Page) {
+/**
+ * Entra com a conta de teste e espera a lista do logado chegar.
+ *
+ * `linha` é a faixa do acervo como a lista a desenha — `01` na calha. Quem
+ * semeia um marcador NESSA faixa passa a marca de pausa no lugar do número,
+ * porque a retomada a deixa como a faixa corrente.
+ */
+async function logar(page: Page, linha = /^01 Fita Caseira/) {
   await page.goto('/login');
   await skipSplash(page);
+  await preencherLogin(page, linha);
+}
+
+/**
+ * O formulário de login, SEM navegar até ele.
+ *
+ * Separado de `logar` por causa de quem testa o que sobra de uma conta para a
+ * outra: `page.goto` recarrega a página, e um boot novo já limpa por conta
+ * própria o que era da sessão que caiu. Sair e entrar de novo na MESMA página
+ * é o caminho em que só a limpeza do `logout()` protege.
+ */
+async function preencherLogin(page: Page, linha = /^01 Fita Caseira/) {
   await page.getByPlaceholder('voce@email.com').fill('thiago@ondas.app');
   await page.getByPlaceholder('••••').fill('senha-forte');
   await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
-  await expect(page.getByRole('button', { name: /^01 Fita Caseira/ })).toBeVisible({
+  await expect(page.getByRole('button', { name: linha })).toBeVisible({
     timeout: 30000,
   });
 }
@@ -1797,6 +1899,10 @@ test('recarregar o player volta na mesma faixa', async ({ page }) => {
   // O que `?player=1` não conseguia: a identidade da faixa está no path, e o
   // `playerStore` não é persistido — então o reload reconstrói a música em vez
   // de abrir um overlay sobre nada.
+  //
+  // É visitante de propósito: com conta existe o marcador, que traz de volta
+  // também o SEGUNDO onde a faixa parou (ver "O marcador é da conta", abaixo).
+  // Aqui o que se prova é a parte que não depende de conta nenhuma.
   await page.reload();
   await skipSplash(page);
   await expect(page).toHaveURL(LINK_DEMO);
@@ -1978,7 +2084,7 @@ test('curtida feita sem rede fica na fila e sobe quando a rede volta', async ({ 
   await expect(coracao(page, /Maré Baixa/)).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('os recortes aparecem na ordem curtidas, playlists, acervo, compartilhadas, offline', async ({
+test('os recortes aparecem na ordem curtidas, playlists, historico, acervo, compartilhadas, offline', async ({
   page,
 }) => {
   await blockAudius(page);
@@ -1992,6 +2098,7 @@ test('os recortes aparecem na ordem curtidas, playlists, acervo, compartilhadas,
   await expect(chips).toHaveText([
     '--curtidas',
     '--playlists',
+    '--historico',
     '--acervo',
     '--compartilhadas',
     '--offline',
@@ -2009,6 +2116,9 @@ test('sem conta, nem --acervo nem --compartilhadas são desenhados', async ({ pa
   await expect(page.getByRole('button', { name: '--offline' })).toBeVisible();
   await expect(page.getByRole('button', { name: '--acervo' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '--compartilhadas' })).toHaveCount(0);
+  // E o histórico, que é da conta como as curtidas — mas ao contrário delas
+  // nem o chip aparece: não há gesto que um visitante pudesse fazer ali.
+  await expect(page.getByRole('button', { name: '--historico' })).toHaveCount(0);
 });
 
 test('a faixa de outra conta fica em --compartilhadas, e a minha em --acervo', async ({ page }) => {
@@ -2784,4 +2894,341 @@ test('voltar para a tela retoma o que a rede não retomou', async ({ page }) => 
 
   await expect(page.getByText('PLAY', { exact: true })).toBeVisible({ timeout: 10000 });
   expect(await toastsVistos(page)).toMatch(/continuando de onde parou/);
+});
+
+/* ── O marcador é da conta ────────────────────────────────────────────────── */
+
+/**
+ * Onde a conta parou — a última faixa e o segundo dela — mora no servidor e
+ * segue a pessoa para qualquer aparelho. O que estes testes travam:
+ *
+ * - a retomada ARMA o player (faixa na tela, pausada no segundo certo) e nunca
+ *   faz som sozinha;
+ * - o aparelho que só foi aberto não escreve nada, para não passar por cima do
+ *   que outro aparelho está ouvindo;
+ * - sair da conta não deixa o ponto de parada para a próxima.
+ */
+
+/** O tempo corrente na linha do player: o texto logo depois do título. */
+const tempoDoPlayer = (page: Page) =>
+  page.getByRole('button', { name: 'Abrir player' }).locator('xpath=following-sibling::span[1]');
+
+/** As escritas do marcador que chegaram ao servidor de mentira. */
+const puts = (page: Page) => ouvidoSemeado.get(page)!.puts;
+
+const verPagina = (page: Page, estado: 'hidden' | 'visible') =>
+  page.evaluate((v) => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, estado);
+
+test('abrir com a conta traz o player pausado onde ela parou', async ({ page }) => {
+  await blockAudius(page);
+  // Semeado ANTES do login: é o "outro aparelho". Nada disto está no disco
+  // desta página.
+  semearMarcador(page, 'demo0', 42, 214);
+  await logar(page);
+
+  // A faixa está no player, parada no segundo do marcador.
+  await expect(page.getByText('Maré Baixa — Lia Sombra')).toBeVisible();
+  await expect(tempoDoPlayer(page)).toHaveText(/^0:42/);
+  await expect(page.getByText('PAUSE', { exact: true })).toBeVisible();
+  // E a linha dela na lista é a corrente, com a marca de pausa.
+  await expect(page.getByRole('button', { name: /^‖ Maré Baixa/ })).toBeVisible();
+
+  // Nunca toca sozinho: o tempo não anda, e o modo não sai de PAUSE.
+  await page.waitForTimeout(1500);
+  await expect(tempoDoPlayer(page)).toHaveText(/^0:42/);
+  await expect(page.getByText('PAUSE', { exact: true })).toBeVisible();
+
+  // Um toque e continua DALI — não do começo.
+  await page.getByRole('button', { name: 'Tocar', exact: true }).click();
+  await expect(page.getByText('PLAY', { exact: true })).toBeVisible();
+  await expect(tempoDoPlayer(page)).toHaveText(/^0:4[4-9]/, { timeout: 10000 });
+});
+
+test('a retomada vale para áudio de verdade, e não só para o tempo na tela', async ({ page }) => {
+  await blockAudius(page);
+  // Meio minuto de WAV: o fixture padrão tem 4s, e ali qualquer posição cai
+  // nas pontas que a retomada devolve ao começo de propósito.
+  //
+  // E servido com `Range`, como o R2 e o Audius servem. Sem `206` o Chrome
+  // trata o recurso como não posicionável e devolve o `currentTime` a zero —
+  // o teste falharia por causa do stub, e não do que ele quer provar.
+  const wav = wavDeSilencio(30);
+  await page.unroute('**/api/acervo/*/audio');
+  await page.route('**/api/acervo/*/audio', async (route) => {
+    const pedido = /bytes=(\d+)-(\d*)/.exec(route.request().headers()['range'] ?? '');
+    const ini = pedido ? Number(pedido[1]) : 0;
+    const fim = pedido?.[2] ? Number(pedido[2]) : wav.length - 1;
+    return route.fulfill({
+      status: pedido ? 206 : 200,
+      contentType: 'audio/wav',
+      headers: {
+        'accept-ranges': 'bytes',
+        ...(pedido ? { 'content-range': `bytes ${ini}-${fim}/${wav.length}` } : {}),
+      },
+      body: wav.subarray(ini, fim + 1),
+    });
+  });
+  semearMarcador(page, ACERVO[0]!.id, 12, 30);
+  await logar(page, /^‖ Fita Caseira/);
+
+  await expect(page.getByText('Fita Caseira — Eu Mesmo')).toBeVisible();
+  await expect(tempoDoPlayer(page)).toHaveText(/^0:12/);
+  await page.getByRole('button', { name: 'Tocar', exact: true }).click();
+  await expect(page.getByText('PLAY', { exact: true })).toBeVisible({ timeout: 10000 });
+
+  // `0:13` ou mais só aparece se o ELEMENTO de áudio foi posicionado: o `0:12`
+  // inicial é pintado pela store, mas daí em diante quem manda no relógio é o
+  // `timeupdate`. Sem o seek guardado até o áudio carregar (o `seekPendente`
+  // do motor), o próximo valor seria `0:00`.
+  await expect(tempoDoPlayer(page)).toHaveText(/^0:1[3-9]/, { timeout: 10000 });
+});
+
+test('o link de uma faixa vence o marcador', async ({ page }) => {
+  await blockAudius(page);
+  semearMarcador(page, 'demo0', 42, 214);
+  await logar(page);
+  await expect(page.getByText('Maré Baixa — Lia Sombra')).toBeVisible();
+
+  // Um boot novo, já com a sessão, direto no endereço de OUTRA faixa: quem
+  // abriu o link pediu aquela música, e o marcador não disputa com isso.
+  await page.goto(LINK_LOFI);
+  await skipSplash(page);
+  await expect(page.getByRole('heading', { name: 'Fio de Cobre' })).toBeVisible();
+  await expect(page.getByText('Maré Baixa — Lia Sombra')).toHaveCount(0);
+
+  // E vence mesmo quando o link não leva a lugar nenhum. É o caso em que só a
+  // regra segura: com a faixa do link tocando, o player já está ocupado e o
+  // marcador não teria onde entrar; aqui o player está VAZIO, e sem a regra a
+  // faixa de ontem apareceria armada por baixo de um endereço que fala de outra.
+  await page.goto('/t/faixa-que-nao-existe-zzz999');
+  await skipSplash(page);
+  await expect(page.getByText(/faixa não encontrada/)).toBeVisible({ timeout: 15000 });
+  await page.waitForTimeout(1000);
+  await expect(page.getByText('Maré Baixa — Lia Sombra')).toHaveCount(0);
+});
+
+test('ouvir grava o marcador na conta, e pausar grava onde parou', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+  expect(puts(page)).toHaveLength(0);
+
+  await page.getByRole('button', { name: /Maré Baixa/ }).click();
+  await expect(page.getByText('PLAY', { exact: true })).toBeVisible();
+  // O primeiro som já sobe: é quando "estou ouvindo isto" vira verdade para o
+  // outro aparelho.
+  await expect.poll(() => puts(page).length).toBeGreaterThan(0);
+  expect(puts(page)[0]).toMatchObject({ trackId: 'demo0' });
+
+  await expect(tempoDoPlayer(page)).toHaveText(/^0:0[2-9]/, { timeout: 10000 });
+  const antes = puts(page).length;
+  await page.getByRole('button', { name: 'Pausar', exact: true }).click();
+  await expect(page.getByText('PAUSE', { exact: true })).toBeVisible();
+
+  // E a pausa sobe sem esperar o intervalo de quinze segundos.
+  await expect.poll(() => puts(page).length).toBeGreaterThan(antes);
+  const ultimo = puts(page).at(-1)!;
+  expect(ultimo.trackId).toBe('demo0');
+  expect(ultimo.pos).toBeGreaterThanOrEqual(2);
+});
+
+test('o aparelho que só foi aberto não escreve por cima de ninguém', async ({ page }) => {
+  await blockAudius(page);
+  semearMarcador(page, 'demo0', 42, 214);
+  await logar(page);
+  await expect(tempoDoPlayer(page)).toHaveText(/^0:42/);
+
+  // Arrastar a barra com o player armado só muda de onde o play vai partir…
+  await page.keyboard.press('ArrowRight');
+  // …e a página saindo de cena é o momento em que a PWA grava o que tem na
+  // memória. Com o player armado ela não tem nada SEU para gravar: a posição
+  // na tela é a que veio do servidor.
+  await verPagina(page, 'hidden');
+  await page.waitForTimeout(800);
+  await verPagina(page, 'visible');
+  await page.waitForTimeout(400);
+
+  // É a outra metade da regra de conflito (a primeira é do servidor, que
+  // ignora escrita velha): um celular esquecido aberto não pode carimbar como
+  // "agora" a faixa que recebeu ontem.
+  expect(puts(page)).toHaveLength(0);
+});
+
+test('sair da conta não deixa o ponto de parada para a próxima', async ({ page }) => {
+  await blockAudius(page);
+  semearMarcador(page, 'demo0', 42, 214);
+  await logar(page);
+  await expect(page.getByText('Maré Baixa — Lia Sombra')).toBeVisible();
+
+  // Sair leva a faixa armada: ela é a última coisa que a conta ouviu, parada
+  // na barra de baixo à vista de quem pegar o aparelho.
+  await page.keyboard.press('5');
+  await page.getByRole('button', { name: /sair/ }).click();
+  await expect(page).toHaveURL(/login/);
+
+  // A conta que entra agora nunca ouviu nada. Se o espelho do IndexedDB
+  // tivesse ficado, o player apareceria armado com a faixa de quem saiu.
+  //
+  // Sem recarregar a página (`preencherLogin`, e não `logar`): um boot novo
+  // limparia o espelho sozinho, e o teste passaria sem provar o logout.
+  ouvidoSemeado.get(page)!.marcador = null;
+  await preencherLogin(page);
+  await page.waitForTimeout(1000);
+  await expect(page.getByText('Maré Baixa — Lia Sombra')).toHaveCount(0);
+  expect(puts(page)).toHaveLength(0);
+});
+
+/**
+ * A PWA instalada não "abre": ela fica viva por dias no celular. Sem perguntar
+ * ao servidor na volta para a tela, quem ouviu no desktop pegaria o telefone e
+ * veria a faixa de ontem — o recurso funcionaria só para quem fecha o app.
+ */
+test('voltar para a tela traz o que foi ouvido em outro aparelho', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+  await expect(page.getByText('Maré Baixa — Lia Sombra')).toHaveCount(0);
+
+  /** Adianta o relógio da página: a volta só pergunta uma vez por minuto. */
+  const passarDoisMinutos = () =>
+    page.evaluate(() => {
+      const agora = Date.now.bind(Date);
+      Date.now = () => agora() + 120_000;
+    });
+  const sairEVoltar = async () => {
+    await verPagina(page, 'hidden');
+    await verPagina(page, 'visible');
+  };
+
+  // Enquanto esta página estava em segundo plano, outro aparelho ouviu.
+  ouvidoSemeado.get(page)!.marcador = { trackId: 'demo0', pos: 42, dur: 214, em: Date.now() };
+  await passarDoisMinutos();
+  await sairEVoltar();
+
+  await expect(page.getByText('Maré Baixa — Lia Sombra')).toBeVisible();
+  await expect(tempoDoPlayer(page)).toHaveText(/^0:42/);
+  await expect(page.getByText('PAUSE', { exact: true })).toBeVisible();
+
+  // Mas nunca por cima de música: com som saindo, o que está tocando AQUI é o
+  // mais novo que existe, por mais que o servidor diga outra coisa.
+  await page.getByRole('button', { name: 'Tocar', exact: true }).click();
+  await expect(page.getByText('PLAY', { exact: true })).toBeVisible();
+  ouvidoSemeado.get(page)!.marcador = {
+    trackId: 'demo3',
+    pos: 90,
+    dur: 172,
+    em: Date.now() + 3_600_000,
+  };
+  await passarDoisMinutos();
+  await sairEVoltar();
+  await page.waitForTimeout(800);
+  await expect(page.getByText('Maré Baixa — Lia Sombra')).toBeVisible();
+  await expect(page.getByText('PLAY', { exact: true })).toBeVisible();
+});
+
+/* ── O histórico ──────────────────────────────────────────────────────────── */
+
+test('a faixa ouvida entra em --historico, e a que só foi iniciada não', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+
+  // Dois toques seguidos: a primeira faixa toca um instante e é trocada. Ela
+  // não foi ouvida, e histórico não é lista de cliques.
+  await page.getByRole('button', { name: /Último Trem/ }).click();
+  await expect(page.getByText('PLAY', { exact: true })).toBeVisible();
+  // O WAV do acervo tem 4s; faixa curta conta na metade.
+  await page.getByRole('button', { name: /^01 Fita Caseira/ }).click();
+  await expect
+    .poll(() => ouvidoSemeado.get(page)!.historico.map((it) => it.trackId), { timeout: 15000 })
+    .toEqual([ACERVO[0]!.id]);
+
+  await page.keyboard.press('3');
+  await page.getByRole('button', { name: '--historico' }).click();
+  await expect(page).toHaveURL(/\/library\/history$/);
+  await expect(page.getByText('ondas ls --historico')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Fita Caseira/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Último Trem/ })).toHaveCount(0);
+});
+
+test('o histórico mostra a faixa que saiu do catálogo, e limpar pede dois toques', async ({
+  page,
+}) => {
+  await blockAudius(page);
+  // A primeira não existe em catálogo nenhum desta página: é a faixa do
+  // trending de ontem. Só o retrato guardado no servidor a desenha.
+  semearHistorico(
+    page,
+    { trackId: 'saiu99', titulo: 'Faixa Que Saiu', artista: 'Alguém de Ontem', dur: 200 },
+    { trackId: 'demo0', titulo: 'Maré Baixa', artista: 'Lia Sombra', dur: 214 },
+  );
+  await logar(page);
+  await page.goto('/library/history');
+  await skipSplash(page);
+
+  // Na ordem do histórico, e não na do catálogo.
+  const linhas = page.getByRole('button', { name: /^(··|\d\d|‖|▶) / });
+  await expect(linhas.first()).toContainText('Faixa Que Saiu');
+  await expect(linhas.nth(1)).toContainText('Maré Baixa');
+
+  // A de fora não tem número na calha (ela não tem lugar no catálogo) nem
+  // botão de baixar — o retrato não tem áudio para guardar.
+  const deFora = page.getByRole('button', { name: /^·· Faixa Que Saiu/ });
+  await expect(deFora).toBeVisible();
+  await expect(deFora.locator('xpath=..').getByRole('button', { name: 'Baixar para offline' })).toHaveCount(0);
+  await expect(
+    page
+      .getByRole('button', { name: /Maré Baixa/ })
+      .locator('xpath=..')
+      .getByRole('button', { name: 'Baixar para offline' }),
+  ).toHaveCount(1);
+
+  // Tocá-la abre o endereço da faixa, que é quem sabe buscá-la por id.
+  await deFora.click();
+  await expect(page).toHaveURL(/\/t\/.*saiu99$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/library\/history$/);
+
+  // Limpar não se desfaz: dois toques, e o primeiro pode ser recusado.
+  await page.getByRole('button', { name: '[limpar histórico]' }).click();
+  await expect(page.getByText('limpar o histórico?')).toBeVisible();
+  await page.getByRole('button', { name: '[não]' }).click();
+  await expect(deFora).toBeVisible();
+
+  await page.getByRole('button', { name: '[limpar histórico]' }).click();
+  await page.getByRole('button', { name: '[sim]' }).click();
+  await expect(page.getByText('vazio — o que você ouvir aparece aqui.')).toBeVisible();
+  expect(ouvidoSemeado.get(page)!.historico).toHaveLength(0);
+  // Sem o que limpar, o botão sai.
+  await expect(page.getByRole('button', { name: '[limpar histórico]' })).toHaveCount(0);
+});
+
+test('limpar o histórico não apaga o ponto de onde continuar', async ({ page }) => {
+  await blockAudius(page);
+  semearMarcador(page, 'demo0', 42, 214);
+  semearHistorico(page, { trackId: 'demo0', titulo: 'Maré Baixa', artista: 'Lia Sombra', dur: 214 });
+  await logar(page);
+  await page.goto('/library/history');
+  await skipSplash(page);
+
+  await page.getByRole('button', { name: '[limpar histórico]' }).click();
+  await page.getByRole('button', { name: '[sim]' }).click();
+  await expect(page.getByText('vazio — o que você ouvir aparece aqui.')).toBeVisible();
+
+  // "Esquecer o que ouvi" e "perder onde parei" são dois pedidos.
+  await expect(page.getByText('Maré Baixa — Lia Sombra')).toBeVisible();
+  await expect(tempoDoPlayer(page)).toHaveText(/^0:42/);
+  expect(ouvidoSemeado.get(page)!.marcador).toMatchObject({ trackId: 'demo0', pos: 42 });
+});
+
+test('/en chama o recorte de --history', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+  await page.goto('/en/library/history');
+  await skipSplash(page);
+  await expect(page.getByRole('button', { name: '--history' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByText('empty — what you listen to shows up here.')).toBeVisible();
 });

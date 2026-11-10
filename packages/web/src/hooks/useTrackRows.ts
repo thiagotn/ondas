@@ -13,8 +13,17 @@ import { useNetwork } from './useNetwork';
 
 export interface RowModel {
   track: Track;
-  /** Índice na lista completa — as regras de acesso dependem dele. */
+  /** Índice na lista completa — as regras de acesso dependem dele. `-1` se `fora`. */
   index: number;
+  /**
+   * A faixa não está no catálogo carregado: a linha é só um RETRATO (título,
+   * artista, duração), sem capa nem stream. Só o histórico produz estas — é o
+   * único recorte que mostra o que saiu do catálogo (`faixasDoHistorico`).
+   *
+   * A linha não toca no lugar, porque não há índice para tocar; ela abre o
+   * endereço da faixa, que sabe buscá-la por id.
+   */
+  fora: boolean;
   /** `01`, `02`… ou `▶`/`‖` na faixa atual. */
   idx: string;
   isCurrent: boolean;
@@ -61,17 +70,25 @@ export function useTrackRows(visible: readonly Track[], all: readonly Track[]): 
     // mesmo CID.
     const hosts = artworkHosts(all);
     return visible.map((track) => {
-      const index = indexById.get(track.id) ?? 0;
-      const isCurrent = index === cur;
+      // `-1`, e não `0`: com zero, tocar uma linha fora do catálogo tocaria a
+      // primeira faixa da lista.
+      const index = indexById.get(track.id) ?? -1;
+      const fora = index < 0;
+      // `index >= 0` porque `cur` também é `-1` com o player vazio — sem isto
+      // toda linha de fora apareceria como "a que está tocando".
+      const isCurrent = index >= 0 && index === cur;
       const isCached = !!cached[track.id];
       const progress = dl[track.id];
       return {
         track,
         index,
-        idx: isCurrent ? (playing ? '▶' : '‖') : String(index + 1).padStart(2, '0'),
+        fora,
+        // Sem número na calha: `:08` salta para a faixa 8 do CATÁLOGO, e esta
+        // linha não tem lugar nele.
+        idx: isCurrent ? (playing ? '▶' : '‖') : fora ? '··' : String(index + 1).padStart(2, '0'),
         isCurrent,
         isCursor: track.id === cursorId,
-        locked: isLocked(track, index, session),
+        locked: !fora && isLocked(track, index, session),
         cached: isCached,
         liked: !!liked[track.id],
         canLike: !!session,

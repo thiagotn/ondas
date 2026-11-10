@@ -264,6 +264,7 @@ The answer is in the router's shape, not in a permission field.
 | Session only | touching one's own account | `GET /auth/me`, `PATCH /auth/prefs` |
 | Session only | touching one's own taste | `GET /likes`, `PATCH /likes` |
 | Session only | organising one's own library | `GET /playlists`, `POST /playlists`, `PATCH /playlists/{id}`, `DELETE /playlists/{id}`, `PATCH /playlists/{id}/itens` |
+| Session only | what one's own account listened to | `GET /playback`, `PUT /playback`, `GET /history`, `POST /history`, `DELETE /history` |
 
 The last two rows are the same ruler applied to new cases. `PATCH /auth/prefs` turns the account's public
 catalogue on and off (`users.publico`), and the machine token does **not** reach it: the token exists
@@ -302,6 +303,28 @@ Every response is the **whole collection** of playlists with their items — the
 `DefinirPublico` and `Likes.Aplicar`. Here it buys one thing more: there is no detail route, so there
 is no index and detail to drift apart. That is only honest with caps, and there are three: 50
 playlists per account, 500 items per playlist, 60 characters of name.
+
+`/playback` and `/history` (migration `0009`) are the same rule for the fourth time — **outside**
+`/acervo`, **session, never token** — and `TestMarcadorEHistoricoExigemSessaoENaoAceitamToken` pins
+all five routes. They are two addresses because they are two tables with different lives: the
+bookmark (where the account stopped) is one row per account rewritten every fifteen seconds of music;
+the history grows one row per track listened to, is capped at 200 and can be cleared without taking
+the bookmark with it.
+
+What `/playback` has of its own is **trusting a clock that is not ours**. The `PUT` body carries
+`em`, the listener's `Date.now()`, and that is what orders two writes — not arrival. It has to be:
+a position recorded offline two hours ago goes up when the network returns, and must not beat the one
+another device recorded ten minutes ago. Both guards live in the upsert's SQL, and each has a test
+that fails without it:
+
+- `WHERE playback.em <= EXCLUDED.em` — the older write is ignored, and the response is `200` with
+  the bookmark that **stayed**; that is how the client finds out it lost;
+- `LEAST(em, now())` — a clock running ahead is the side that hurts: without the cap, a device with
+  the wrong date would write a bookmark no honest write could ever beat.
+
+`GET /playback` for someone who never listened to anything answers `200` with `{"marcador": null}`,
+not `404`: `404` is what a new PWA gets from an API that has not been deployed yet, and the two must
+not be the same answer.
 
 `PATCH /{id}/itens` covers the screen's three gestures in one handler — `{add, remove, ordem}`,
 applied in that order. `add` serves selection mode, which **does not know** the destination

@@ -73,28 +73,34 @@ describe('hiddenInSegment', () => {
 });
 
 describe('LIBRARY_SEGMENTS', () => {
-  it('a ordem é a da tela: curtidas, playlists, acervo, compartilhadas, offline', () => {
+  it('a ordem é a da tela: curtidas, playlists, histórico, acervo, compartilhadas, offline', () => {
     // Esta lista É a ordem dos chips (`LibraryRoute` só a mapeia). O acervo no
     // meio e não no fim porque ele é o padrão de quem tem conta, e o padrão no
     // canto direito faria a tela abrir com o chip mais distante marcado.
     // `shared` encosta nele por ser a mesma origem vista do outro lado, e
-    // `playlists` encosta em `liked` porque os dois são escolha de quem ouve.
+    // `playlists` encosta em `liked` porque os dois são escolha de quem ouve, e
+    // `history` fecha esse grupo: é o terceiro recorte que mora na conta e fala
+    // do que a pessoa fez com a música.
     expect([...LIBRARY_SEGMENTS]).toEqual([
       'liked',
       'playlists',
+      'history',
       'acervo',
       'shared',
       'offline',
     ]);
   });
 
-  it('o chip é português e o slug é inglês, nos cinco', () => {
+  it('o chip é português e o slug é inglês, em todos', () => {
     // Os dois vocabulários existem de propósito: path em inglês, tela em
     // português. Três ids coincidem com o português por acaso, e é esse acaso
     // que já tinha escondido um `ondas ls --shared` no prompt.
     expect(LIBRARY_SEGMENTS.map(librarySegmentChip)).toEqual([
       'curtidas',
       'playlists',
+      // Sem acento de propósito: o chip é palavra de linha de comando, como
+      // `--acervo`, e os e2e casam os chips com `[a-zç]`.
+      'historico',
       'acervo',
       'compartilhadas',
       'offline',
@@ -102,6 +108,7 @@ describe('LIBRARY_SEGMENTS', () => {
     expect(LIBRARY_SEGMENTS.map(librarySegmentSlug)).toEqual([
       'liked',
       'playlists',
+      'history',
       'archive',
       'shared',
       'offline',
@@ -110,7 +117,7 @@ describe('LIBRARY_SEGMENTS', () => {
 });
 
 describe('parseLibrarySegment', () => {
-  it('ida e volta pelos quatro recortes', () => {
+  it('ida e volta por todos os recortes', () => {
     for (const seg of LIBRARY_SEGMENTS) {
       expect(parseLibrarySegment(librarySegmentSlug(seg), 'liked')).toBe(seg);
     }
@@ -339,8 +346,8 @@ describe('emptyText', () => {
     );
   });
 
-  it('os quatro recortes têm texto, e nenhum cai no genérico', () => {
-    // Guarda contra o recorte número cinco: sem isto, um `LibrarySegment` novo
+  it('todo recorte tem o seu texto, e nenhum cai no genérico', () => {
+    // Guarda contra o próximo recorte: sem isto, um `LibrarySegment` novo
     // cairia no `return` final — o texto de `--offline` — e a tela diria para
     // baixar faixas num recorte que não é de download.
     const vistos = new Set(
@@ -428,5 +435,72 @@ describe('storageLabel', () => {
 
   it('enquanto não mediu, diz que está medindo', () => {
     expect(storageLabel(null)).toBe('calculando…');
+  });
+});
+
+describe('o recorte do histórico', () => {
+  const item = (trackId: string, em: number) => ({
+    trackId,
+    titulo: 'Título guardado',
+    artista: 'Artista guardado',
+    dur: 123,
+    em,
+  });
+  const base = { tracks, tab: 'library' as const, q: '', genre: 'tudo', liked: {}, cached: {} };
+
+  it('sai na ordem do histórico, e não na do catálogo', () => {
+    const [a, b, c] = tracks;
+    const lista = visibleTracks({
+      ...base,
+      seg: 'history',
+      historico: [item(c!.id, 3), item(a!.id, 2), item(b!.id, 1)],
+    });
+    expect(lista.map((t) => t.id)).toEqual([c!.id, a!.id, b!.id]);
+  });
+
+  it('mostra a faixa que saiu do catálogo, com o retrato guardado', () => {
+    // É a diferença para a playlist, que descarta o que falta. Um histórico
+    // que encolhe quando o trending gira não é um histórico.
+    const lista = visibleTracks({
+      ...base,
+      seg: 'history',
+      historico: [item('saiu-do-trending', 2), item(tracks[0]!.id, 1)],
+    });
+    expect(lista).toHaveLength(2);
+    expect(lista[0]).toMatchObject({
+      id: 'saiu-do-trending',
+      title: 'Título guardado',
+      artist: 'Artista guardado',
+      dur: 123,
+      stream: '',
+    });
+    expect(lista[1]).toBe(tracks[0]);
+  });
+
+  it('sem histórico carregado é lista vazia, e nada fica "escondido"', () => {
+    expect(visibleTracks({ ...base, seg: 'history' })).toEqual([]);
+    expect(hiddenInSegment('history', { liked: { x: true }, cached: { y: true } }, tracks)).toBe(0);
+  });
+
+  it('o texto de vazio não ensina gesto, e sem conta pede login', () => {
+    expect(
+      emptyText({ tab: 'library', seg: 'history', q: '', loading: false, user: { name: 'a' } }),
+    ).toBe('vazio — o que você ouvir aparece aqui.');
+    expect(emptyText({ tab: 'library', seg: 'history', q: '', loading: false, user: null })).toBe(
+      'o histórico exige login.',
+    );
+  });
+
+  it('a linha do prompt usa a palavra do chip', () => {
+    const line = promptLine({
+      tab: 'library',
+      who: 'a',
+      genre: 'tudo',
+      q: '',
+      seg: 'history',
+      count: 2,
+      source: 'audius',
+    });
+    expect(line.cmd).toContain('--historico');
   });
 });

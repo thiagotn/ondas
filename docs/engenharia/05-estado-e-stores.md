@@ -247,6 +247,49 @@ vez. O otimismo sai barato porque a correção é de graça — **toda** respost
 inteira, então uma falha restaura o estado de verdade sem nenhum código de desfazer. E a ordem
 pendente sobe **antes** de `auth.logout()`, pelo mesmo motivo da fila de curtidas.
 
+### O marcador copia a curtida, com uma fila de tamanho um
+
+Desde a migração `0009` a conta lembra **onde parou**: a última faixa e o segundo dela
+(`packages/web/src/app/historico.ts`). É o terceiro dado da conta que a tela escreve, e o desenho é o
+da curtida — servidor como dono, espelho no IndexedDB (chave `marcador`), 401 como único invalidador,
+`esquecer()` no logout. A "fila" aqui tem tamanho um: só o marcador mais recente importa, então em
+vez de fila há um campo `pendente` no espelho.
+
+Três coisas nele não têm par na curtida, e as três vêm de o player estar no meio.
+
+**O `playerStore` continua não sendo persistido.** O que persiste é um *derivado* dele, e quem decide
+quando gravar é uma função pura do core, `observar` (`packages/core/src/historico/marcador.ts`), que
+recebe amostras do player e devolve efeitos: espelhar a cada 5 s de música, subir a cada 15 s, subir
+na hora em pausa, salto e primeiro som de uma faixa. O módulo da web só assina a store e executa os
+efeitos. A alternativa — `persist` no store — gravaria `t` quatro vezes por segundo e levaria junto
+`playing`, que restaurado como `true` é uma mentira.
+
+**Restaurar é ARMAR, e não carregar.** No boot a faixa do marcador entra na store por `loadPaused`
+(pausada, na posição) e o motor de áudio **não fica sabendo**. O `engine.load` só acontece no
+primeiro play, já com o ponto de partida. Carregar no boot daria ao `engine.on('error')` — que pula
+para a próxima faixa e a toca — a chance de fazer som sozinho por causa de um stream que morreu desde
+ontem. A regra "guarde o id" vale inteira aqui: o marcador guarda `trackId`, e o índice sai de
+`indexOfTrack` na hora de armar, contra a lista daquele aparelho.
+
+**O conflito entre aparelhos tem duas metades, uma em cada lado do fio.** O servidor ignora a escrita
+mais velha que a vigente, pelo relógio de quem ouviu (assunto do
+[documento 08](08-auth.md)). E o cliente não escreve nada enquanto não sai som: `observar` só emite
+efeito para faixa que já `tocou`. Sem a segunda metade a primeira não serve — um celular esquecido
+aberto, com a faixa de ontem armada, carimbaria "agora" a cada volta para a tela e venceria sempre.
+
+O **histórico** é irmão do marcador e é o primeiro dado de conta a morar no TanStack Query além do
+catálogo (`packages/web/src/query/historico.ts`): ele é lista que vem de fora e pode ficar velha, que
+é a definição da coluna da esquerda na tabela acima. Como o cache inteiro vai para o IndexedDB, a
+consulta é removida no logout e no 401, pelo mesmo motivo de `CATALOG_LOGADO_KEY`. A escrita — uma
+faixa que passou de trinta segundos de escuta — é otimista com fila (`historico-fila`), como a
+curtida.
+
+E ele é o único recorte que guarda um **retrato** da faixa (título, artista, duração), e não só o id.
+Curtida e playlist são filtros sobre o catálogo carregado e aceitam "decair" quando o trending gira;
+um histórico que encolhe sozinho não é um histórico. A faixa que saiu do catálogo aparece como linha
+de retrato, sem capa nem botão de baixar, e tocá-la abre o endereço dela — o caminho que já existia
+para "faixa que não está na lista" (`TrackRoute`).
+
 ### A fila de reprodução deixou de ser o catálogo
 
 `j`/`k` já andavam pelo que está na tela; `n` não. Ele andava pelo catálogo inteiro, o que em
