@@ -36,6 +36,53 @@ type User struct {
 	// espelho local gravado por uma versão antiga não significar "desligado"
 	// (ver `showsPublicCatalog` em core).
 	Publico bool `json:"publico"`
+	// A aparência que segue a conta (migração 0010).
+	//
+	// Valor e não ponteiro, para o JSON trazer `"prefs": {}` mesmo quando a
+	// conta nunca escolheu nada: é a PRESENÇA da chave que diz à PWA que este
+	// servidor sabe guardar preferências. Sem ela o cliente não manda nenhuma
+	// (um servidor antigo responderia 400 ao campo que não conhece).
+	Prefs Prefs `json:"prefs"`
+}
+
+// Prefs são as preferências de aparência da conta.
+//
+// Todo campo é ponteiro, e `nil` tem um sentido em cada direção: na resposta é
+// "a conta nunca escolheu" (a coluna é NULL, e o campo some do JSON); no pedido
+// é "não mexa neste". É o que deixa o PATCH ser parcial — trocar o tema num
+// aparelho não desfaz o idioma trocado em outro.
+type Prefs struct {
+	Tema    *string  `json:"tema,omitempty"`
+	Idioma  *string  `json:"idioma,omitempty"`
+	Opacity *float64 `json:"opacity,omitempty"`
+	Blur    *int16   `json:"blur,omitempty"`
+	Wall    *string  `json:"wall,omitempty"`
+}
+
+// Vazio diz se o pedido não traz preferência nenhuma.
+func (p Prefs) Vazio() bool {
+	return p.Tema == nil && p.Idioma == nil && p.Opacity == nil && p.Blur == nil && p.Wall == nil
+}
+
+// colunasUser é o que toda leitura de `users` traz, na ordem em que `lerUser`
+// lê. Eram cinco consultas repetindo a lista; com as preferências ela dobrou de
+// tamanho, e uma coluna esquecida em uma delas seria um `/login` que devolve
+// preferência vazia para uma conta que tem.
+const colunasUser = `id, email, name, publico,
+	pref_tema, pref_idioma, pref_opacity, pref_blur, pref_wall`
+
+// lerUser lê uma linha de `colunasUser`. `extras` são colunas a mais que a
+// consulta pediu DEPOIS delas — o `password_hash` de `Authenticate`.
+func lerUser(linha pgx.Row, extras ...any) (*User, error) {
+	var user User
+	destinos := append([]any{
+		&user.ID, &user.Email, &user.Name, &user.Publico,
+		&user.Prefs.Tema, &user.Prefs.Idioma, &user.Prefs.Opacity, &user.Prefs.Blur, &user.Prefs.Wall,
+	}, extras...)
+	if err := linha.Scan(destinos...); err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 type Users struct{ pool *pgxpool.Pool }
@@ -58,31 +105,29 @@ func (u *Users) Create(ctx context.Context, email, senha string) (*User, error) 
 	}
 	nome := strings.ToLower(email[:strings.Index(email, "@")])
 
-	var user User
-	err = u.pool.QueryRow(ctx,
+	user, err := lerUser(u.pool.QueryRow(ctx,
 		`INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3)
-		  RETURNING id, email, name, publico`,
+		  RETURNING `+colunasUser,
 		email, nome, hash,
-	).Scan(&user.ID, &user.Email, &user.Name, &user.Publico)
+	))
 	if err != nil {
 		if strings.Contains(err.Error(), "users_email_lower_idx") {
 			return nil, ErrEmailEmUso
 		}
 		return nil, fmt.Errorf("users: insert: %w", err)
 	}
-	return &user, nil
+	return user, nil
 }
 
 // Authenticate devolve `ErrSenhaInvalida` tanto para e-mail inexistente quanto
 // para senha errada — de propósito: a mensagem não pode servir de oráculo de
 // quem tem conta.
 func (u *Users) Authenticate(ctx context.Context, email, senha string) (*User, error) {
-	var user User
 	var hash string
-	err := u.pool.QueryRow(ctx,
-		`SELECT id, email, name, publico, password_hash FROM users WHERE lower(email) = lower($1)`,
+	user, err := lerUser(u.pool.QueryRow(ctx,
+		`SELECT `+colunasUser+`, password_hash FROM users WHERE lower(email) = lower($1)`,
 		strings.TrimSpace(email),
-	).Scan(&user.ID, &user.Email, &user.Name, &user.Publico, &hash)
+	), &hash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Gasta o mesmo tempo de um hash real, senão a diferença de latência
 		// entrega quais e-mails existem.
@@ -96,20 +141,18 @@ func (u *Users) Authenticate(ctx context.Context, email, senha string) (*User, e
 	if !VerifyPassword(hash, senha) {
 		return nil, ErrSenhaInvalida
 	}
-	return &user, nil
+	return user, nil
 }
 
 func (u *Users) ByID(ctx context.Context, id string) (*User, error) {
-	var user User
-	err := u.pool.QueryRow(ctx, `SELECT id, email, name, publico FROM users WHERE id = $1`, id).
-		Scan(&user.ID, &user.Email, &user.Name, &user.Publico)
+	user, err := lerUser(u.pool.QueryRow(ctx, `SELECT `+colunasUser+` FROM users WHERE id = $1`, id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNaoEncontrado
 	}
 	if err != nil {
 		return nil, fmt.Errorf("users: byID: %w", err)
 	}
-	return &user, nil
+	return user, nil
 }
 
 // NomesPorIDs devolve o nome de exibição de cada id, na ordem em que foram
@@ -152,35 +195,51 @@ func (u *Users) NomesPorIDs(ctx context.Context, ids []string) ([]string, error)
 // PorEmail resolve o dono configurado para a ingestão por token (o bot não tem
 // sessão, então é o e-mail do ConfigMap que diz de quem é a faixa).
 func (u *Users) PorEmail(ctx context.Context, email string) (*User, error) {
-	var user User
-	err := u.pool.QueryRow(ctx,
-		`SELECT id, email, name, publico FROM users WHERE lower(email) = lower($1)`, email).
-		Scan(&user.ID, &user.Email, &user.Name, &user.Publico)
+	user, err := lerUser(u.pool.QueryRow(ctx,
+		`SELECT `+colunasUser+` FROM users WHERE lower(email) = lower($1)`, email))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNaoEncontrado
 	}
 	if err != nil {
 		return nil, fmt.Errorf("users: porEmail: %w", err)
 	}
-	return &user, nil
+	return user, nil
 }
 
-// DefinirPublico liga ou desliga o catálogo público desta conta.
+// AtualizarPrefs muda as preferências da conta: `publico`, a aparência, ou as
+// duas coisas.
+//
+// PARCIAL por construção: `nil` é "não mexa", e o `COALESCE` deixa a coluna
+// como estava. É um UPDATE só, então não há janela em que metade do pedido
+// valeu — e dois aparelhos mudando campos diferentes ao mesmo tempo não se
+// atropelam, que é a única regra de conflito que as preferências têm.
+//
+// O que ele NÃO sabe fazer é voltar um campo para "nunca escolhi": `nil` já
+// tem outro sentido. Não faz falta — a tela só oferece trocar por outro valor.
 //
 // Devolve o usuário já atualizado em vez de só `error`: quem chama responde o
 // `User` novo, e assim não há uma segunda leitura que possa discordar da
 // escrita.
-func (u *Users) DefinirPublico(ctx context.Context, id string, on bool) (*User, error) {
-	var user User
-	err := u.pool.QueryRow(ctx,
-		`UPDATE users SET publico = $2 WHERE id = $1 RETURNING id, email, name, publico`,
-		id, on,
-	).Scan(&user.ID, &user.Email, &user.Name, &user.Publico)
+//
+// Não valida nada: a peneira é do handler (`validarPrefs`), e os CHECKs da
+// migração 0010 são a rede por baixo dele.
+func (u *Users) AtualizarPrefs(ctx context.Context, id string, publico *bool, p Prefs) (*User, error) {
+	user, err := lerUser(u.pool.QueryRow(ctx,
+		`UPDATE users SET
+		    publico      = COALESCE($2, publico),
+		    pref_tema    = COALESCE($3, pref_tema),
+		    pref_idioma  = COALESCE($4, pref_idioma),
+		    pref_opacity = COALESCE($5, pref_opacity),
+		    pref_blur    = COALESCE($6, pref_blur),
+		    pref_wall    = COALESCE($7, pref_wall)
+		  WHERE id = $1 RETURNING `+colunasUser,
+		id, publico, p.Tema, p.Idioma, p.Opacity, p.Blur, p.Wall,
+	))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNaoEncontrado
 	}
 	if err != nil {
-		return nil, fmt.Errorf("users: definirPublico: %w", err)
+		return nil, fmt.Errorf("users: atualizarPrefs: %w", err)
 	}
-	return &user, nil
+	return user, nil
 }

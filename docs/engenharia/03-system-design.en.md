@@ -153,7 +153,8 @@ that a given identifier exists.
 | Catalogue metadata | IndexedDB `ondas` | 24 h validity |
 | Query cache | IndexedDB `ondas-query` | a separate database, on purpose |
 | Downloaded tracks | Cache API `ondas-offline` | outside the Service Worker |
-| Theme | `localStorage` | must be synchronous, before first paint |
+| Account appearance (theme, language, background settings) | Postgres, `users.pref_*` | the device keeps a mirror; the background image is not uploaded |
+| Theme and language, on the device | `localStorage` | mirror of the account; must be synchronous, before first paint |
 
 The two separate IndexedDB databases have a concrete technical reason: `idb-keyval`'s `createStore`
 only creates the object store when the database is born, so splitting the `ondas` database for the

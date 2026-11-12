@@ -7,6 +7,14 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.4.0 — 2026-11-12
+
+- tema, idioma e os ajustes do fundo (transparência e desfoque) agora seguem a sua conta: escolha num aparelho e os outros abrem do mesmo jeito. A imagem de fundo que você enviou continua só no aparelho em que foi enviada — nos outros, o fundo usa a capa da faixa
+- na biblioteca, `]` e `[` passam para o recorte seguinte e o anterior, dando a volta no fim da fileira
+- a linha de comando aceita o nome de um recorte: `:historico` (ou só `:hist`) leva direto para ele, de qualquer tela
+- `enter` não toca mais uma faixa que não está na tela — acontecia na lista de `--playlists`, com a linha que tinha ficado marcada no recorte anterior
+- no painel de temas, as opções de wallpaper voltam a ter nome (`capa-atual`, `imagem`, `nenhum`) em vez de um código interno
+
 ## 1.3.0 — 2026-11-12
 
 - no computador, a tela de login fica no meio da janela em vez de encostada no canto

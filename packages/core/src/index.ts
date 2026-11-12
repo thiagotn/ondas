@@ -5,6 +5,7 @@ export * from './share.js';
 export * from './command.js';
 export * from './shortcuts.js';
 export * from './themes.js';
+export * from './prefs.js';
 export * from './access.js';
 export * from './queue.js';
 export * from './retomada.js';

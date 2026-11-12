@@ -1,4 +1,4 @@
-import { definirIdioma, LOCALES, type Locale } from '@ondas/core';
+import { definirIdioma, idioma, LOCALES, type Locale } from '@ondas/core';
 
 /**
  * Qual idioma o app fala, e como se troca de idioma.
@@ -10,6 +10,9 @@ import { definirIdioma, LOCALES, type Locale } from '@ondas/core';
  *
  * A ordem de decisão no boot: o endereço manda; sem prefixo, a preferência
  * salva; sem ela, o navegador; e pt-BR de reserva.
+ *
+ * Com conta, a "preferência salva" é espelho do idioma dela: quando a sessão
+ * chega dizendo outro, `adotarIdiomaDaConta` regrava e navega — uma vez.
  */
 
 const CHAVE = 'ondas:idioma';
@@ -26,6 +29,27 @@ export function prefixoDe(locale: Locale): string {
 export function idiomaDoCaminho(pathname: string): Locale | null {
   const seg = pathname.split('/')[1];
   return LOCALES.find((l) => l !== 'pt-BR' && PREFIXOS[l] === '/' + seg) ?? null;
+}
+
+/** O idioma que alguém ESCOLHEU neste aparelho — não o que a URL anuncia. */
+export function idiomaSalvo(): Locale | null {
+  return salvo();
+}
+
+/**
+ * Guarda a escolha, e diz se guardou DE VERDADE.
+ *
+ * Lê de volta em vez de confiar no `setItem` não ter lançado: é o retorno que
+ * `adotarIdiomaDaConta` usa para decidir se pode navegar, e navegar sem ter
+ * guardado é um laço.
+ */
+function guardar(locale: Locale): boolean {
+  try {
+    localStorage.setItem(CHAVE, locale);
+  } catch {
+    // Sem onde guardar, a escolha vale só para esta navegação.
+  }
+  return salvo() === locale;
 }
 
 function salvo(): Locale | null {
@@ -94,13 +118,49 @@ export function iniciarIdioma(): { locale: Locale; redirecionando: boolean } {
  * idioma é gesto deliberado e raro.
  */
 export function trocarIdioma(destino: Locale): void {
-  try {
-    localStorage.setItem(CHAVE, destino);
-  } catch {
-    // Sem onde guardar, a escolha vale só para esta navegação.
-  }
+  guardar(destino);
+  location.assign(caminhoNoIdioma(destino) + location.search + location.hash);
+}
+
+/** O endereço de agora, sob o prefixo de outro idioma. */
+function caminhoNoIdioma(destino: Locale): string {
   const atual = idiomaDoCaminho(location.pathname);
   const semPrefixo = atual ? location.pathname.slice(PREFIXOS[atual].length) : location.pathname;
-  const caminho = prefixoDe(destino) + (semPrefixo || '/');
-  location.assign(caminho + location.search + location.hash);
+  return prefixoDe(destino) + (semPrefixo || '/');
+}
+
+/**
+ * Faz este aparelho falar o idioma da CONTA. Devolve se vai navegar — e, como
+ * em `iniciarIdioma`, quem chama não pode seguir desenhando depois de um `true`.
+ *
+ * A regra inteira cabe em três recusas, e cada uma fecha um buraco:
+ *
+ *   1. O aparelho já tem esse idioma guardado: não faz nada, NEM QUE A TELA
+ *      ESTEJA EM OUTRO. Um link `/en/...` aberto por quem usa em português
+ *      abre em inglês e fica em inglês — o endereço manda, como sempre mandou,
+ *      e a conta não é consultada para desfazer um link.
+ *   2. Não deu para guardar (modo privado, cookies bloqueados): não navega.
+ *      Navegar sem guardar é um laço — a página nova decidiria o idioma pelo
+ *      navegador, a conta mandaria de volta, e assim para sempre.
+ *   3. A tela já está nesse idioma: guardou, e basta.
+ *
+ * O que sobra é o aparelho que APRENDEU um idioma novo da conta: ele navega
+ * uma vez, e no boot seguinte cai na recusa 1.
+ *
+ * `replace` e não `assign`, como no boot: é correção, não gesto, e o voltar
+ * não pode devolver a pessoa à tela no idioma errado.
+ *
+ * `destino` é para o login, que ia navegar para a home de todo jeito; sem ele,
+ * a página fica onde está, só que sob o outro prefixo.
+ */
+export function adotarIdiomaDaConta(daConta: Locale, destino?: string): boolean {
+  if (daConta === salvo()) return false;
+  if (!guardar(daConta)) return false;
+  if (daConta === idioma()) return false;
+  location.replace(
+    destino !== undefined
+      ? prefixoDe(daConta) + destino
+      : caminhoNoIdioma(daConta) + location.search + location.hash,
+  );
+  return true;
 }

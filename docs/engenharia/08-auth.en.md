@@ -273,10 +273,19 @@ like the others — `exigirSessao` never reads the token header — and
 `TestPrefsExigeSessaoENaoAceitaToken` pins it, for the same reason
 `TestEscopoDoTokenNoAcervo` exists.
 
-The body is `{"publico": bool}` read into a **pointer**: with a `bool`, a body missing the key would
-decode to `false` and turn off the catalogue of someone who merely sent bad JSON. Absent is a 400.
-And the field ships in **every** auth response — `signup`, `login` and `me` — because the PWA decides
-the catalogue's source at boot, before any other call.
+The body is `{"publico"?: bool, "prefs"?: {...}}`, and every field is read into a **pointer**: with
+a `bool`, a body missing the key would decode to `false` and turn off the catalogue of someone who
+merely sent bad JSON. Absent means "leave it" — the `UPDATE` uses `COALESCE` — and a request that
+changes nothing is a 400. And `publico` ships in **every** auth response — `signup`, `login` and
+`me` — because the PWA decides the catalogue's source at boot, before any other call.
+
+`prefs` is the appearance that follows the account (migration `0010`): `tema`, `idioma`, `opacity`,
+`blur` and `wall`. It ships in the same responses, **always** — `{}` for an account that never chose
+— because the key's presence is what tells the PWA this server stores it; without it the client
+sends none. Theme and language are validated by shape only: their catalogue belongs to the client,
+and a list here would require an API deploy before a new theme could be saved. `wall`, `opacity` and
+`blur` have closed ranges, and outside them is a 400 — no clamping, which would hide a client bug.
+The background image has no field. `TestPrefsExigeSessaoENaoAceitaToken` covers both bodies.
 
 `/likes` follows the same ruler and sits **outside** the `/acervo` group: a like depends on no R2
 credential, and `exigirAcervo`'s `503 acervo não configurado` would be a lie to someone who only

@@ -170,6 +170,98 @@ export function parseLibrarySegment(
 }
 
 /**
+ * Os recortes que esta sessão vê, na ordem da tela.
+ *
+ * `acervo`, `shared`, `playlists` e `history` só com conta: sem sessão o
+ * catálogo não traz faixa do acervo nenhuma e playlist e histórico são da
+ * conta, então os chips seriam listas sempre vazias.
+ *
+ * Aqui, e não na tela, porque são TRÊS os que perguntam: a fileira de chips, o
+ * `[`/`]` do teclado e o `:nome` da linha de comando. Com o filtro escrito na
+ * tela, o teclado andaria por chips que ninguém desenhou.
+ */
+export function visibleLibrarySegments(user: Session): readonly LibrarySegment[] {
+  if (user) return LIBRARY_SEGMENTS;
+  return LIBRARY_SEGMENTS.filter((seg) => !SO_COM_CONTA.has(seg));
+}
+
+const SO_COM_CONTA: ReadonlySet<LibrarySegment> = new Set(['acervo', 'shared', 'playlists', 'history']);
+
+/**
+ * O recorte vizinho na fileira, dando a volta nas pontas.
+ *
+ * `atual` pode não estar na fileira — quem saiu da conta em `/library/archive`
+ * continua nesse endereço, sem chip marcado. Aí a tecla entra pela ponta do
+ * lado para onde ela anda, em vez de fazer conta com um índice -1.
+ */
+export function adjacentLibrarySegment(
+  atual: LibrarySegment,
+  dir: 1 | -1,
+  user: Session,
+): LibrarySegment {
+  const fileira = visibleLibrarySegments(user);
+  const i = fileira.indexOf(atual);
+  if (i < 0) return fileira[dir === 1 ? 0 : fileira.length - 1]!;
+  return fileira[(i + dir + fileira.length) % fileira.length]!;
+}
+
+export type RecortePorNome =
+  | { ok: true; seg: LibrarySegment }
+  /** Nada casa, ou o prefixo casa mais de um (`opcoes`, na ordem da tela). */
+  | { ok: false; motivo: 'desconhecido' }
+  | { ok: false; motivo: 'ambiguo'; opcoes: readonly LibrarySegment[] }
+  /** O recorte existe, mas esta sessão não o vê. */
+  | { ok: false; motivo: 'conta'; seg: LibrarySegment };
+
+/**
+ * O recorte que alguém DIGITOU — `:historico`, `:hist`, `:--curtidas`.
+ *
+ * Casa primeiro a palavra da tela no idioma de agora, e só depois a da URL:
+ * quem digita lê o chip, e em espanhol `:l` tem de ser `--listas`, não o slug
+ * `liked`. O slug entra de todo jeito porque é o que aparece na barra de
+ * endereço, e recusar a palavra que a pessoa acabou de ler ali seria birra.
+ *
+ * Acento e caixa não contam: `--historico` já é escrito sem acento de
+ * propósito, e ninguém deveria precisar saber disso para chegar nele.
+ *
+ * Casa contra TODOS os recortes e só então confere a sessão, para o visitante
+ * que digita `:acervo` ouvir "é só com conta" e não "não existe".
+ */
+export function findLibrarySegment(nome: string, user: Session): RecortePorNome {
+  const alvo = normalizarNome(nome);
+  if (!alvo) return { ok: false, motivo: 'desconhecido' };
+
+  const daTela = (seg: LibrarySegment) => [normalizarNome(librarySegmentChip(seg))];
+  const daUrl = (seg: LibrarySegment) => [normalizarNome(SEGMENT_SLUGS[seg]), normalizarNome(seg)];
+
+  let achados: readonly LibrarySegment[] = [];
+  for (const [nomes, casa] of [
+    [daTela, (n: string) => n === alvo],
+    [daUrl, (n: string) => n === alvo],
+    [daTela, (n: string) => n.startsWith(alvo)],
+    [daUrl, (n: string) => n.startsWith(alvo)],
+  ] as const) {
+    achados = LIBRARY_SEGMENTS.filter((seg) => nomes(seg).some(casa));
+    if (achados.length) break;
+  }
+
+  if (!achados.length) return { ok: false, motivo: 'desconhecido' };
+  if (achados.length > 1) return { ok: false, motivo: 'ambiguo', opcoes: achados };
+  const seg = achados[0]!;
+  return visibleLibrarySegments(user).includes(seg)
+    ? { ok: true, seg }
+    : { ok: false, motivo: 'conta', seg };
+}
+
+function normalizarNome(texto: string): string {
+  return texto
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/**
  * O gênero como se LÊ, e não como se compara.
  *
  * `tudo` é sentinela: ele vale no `?genre=` da URL e na comparação de

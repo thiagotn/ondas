@@ -26,11 +26,26 @@ describe('parseComando', () => {
     expect(parseComando(':00')).toBeNull();
   });
 
-  it('devolve null para o que não é número', () => {
+  it('o que começa por letra é o nome de um recorte, e sai cru', () => {
+    // Cru de propósito: qual recorte é depende do idioma e da conta, e o
+    // parser não conhece nenhum dos dois (ver `findLibrarySegment`).
+    expect(parseComando(':historico')).toEqual({ kind: 'recorte', nome: 'historico' });
+    expect(parseComando('hist')).toEqual({ kind: 'recorte', nome: 'hist' });
+    expect(parseComando(':--curtidas')).toEqual({ kind: 'recorte', nome: '--curtidas' });
+    expect(parseComando(':Histórico')).toEqual({ kind: 'recorte', nome: 'Histórico' });
+    // `:ab` era lixo enquanto a linha só sabia número. Agora é um nome que
+    // não casa com nada, e quem diz isso é a tela, com um aviso.
+    expect(parseComando(':ab')).toEqual({ kind: 'recorte', nome: 'ab' });
+  });
+
+  it('devolve null para o que não é número nem nome', () => {
     expect(parseComando('')).toBeNull();
     expect(parseComando(':')).toBeNull();
-    expect(parseComando(':ab')).toBeNull();
     expect(parseComando(':8a')).toBeNull();
+    expect(parseComando(':a8')).toBeNull();
+    expect(parseComando(':--')).toBeNull();
+    expect(parseComando(':duas palavras')).toBeNull();
+    expect(parseComando(':' + 'a'.repeat(40))).toBeNull();
     expect(parseComando(':-3')).toBeNull();
     expect(parseComando(': 8')).toBeNull();
     expect(parseComando('::8')).toBeNull();

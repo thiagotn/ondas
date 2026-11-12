@@ -2,16 +2,16 @@ import {
   defaultLibrarySegment,
   emptyText,
   hiddenInSegment,
-  LIBRARY_SEGMENTS,
   librarySegmentChip,
   parseLibrarySegment,
   promptLine,
   showsPublicCatalog,
+  visibleLibrarySegments,
   visibleTracks,
   whoAmI,
 } from '@ondas/core';
 import { t } from '@ondas/core';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import * as controller from '../app/controller';
 import { useLibrary, useSession } from '../app/stores';
@@ -58,6 +58,15 @@ export function LibraryRoute() {
   // A consulta roda em qualquer recorte (com conta): é o que faz `--historico`
   // abrir já desenhado, do cache, em vez de piscar "carregando" a cada visita.
   const historico = useHistorico();
+
+  // O chip marcado entra na vista quando o recorte muda. No celular a fileira
+  // rola de lado em vez de quebrar, e `]` (ou um link direto para
+  // `/library/offline`) marcaria um chip que está fora da tela. `block:
+  // 'nearest'` para a página não pular na vertical por causa disso.
+  const chipAtivo = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    chipAtivo.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [seg]);
 
   const aberta = seg === 'playlists' && id ? playlists.find((pl) => pl.id === id) : undefined;
   const tracks = data?.tracks ?? [];
@@ -130,14 +139,13 @@ export function LibraryRoute() {
           razão do painel de envio: sem sessão o catálogo não traz faixa do
           acervo nenhuma e playlist é da conta, então os chips seriam listas
           sempre vazias. Quem sai da conta com um deles escolhido cai no texto de
-          vazio que explica o login (ver `emptyText`). */}
+          vazio que explica o login (ver `emptyText`). A lista sai do core
+          porque o teclado anda por ela também (`[`/`]`, `:nome`). */}
       <div className={s.segments}>
-        {LIBRARY_SEGMENTS.filter(
-          (it) =>
-            (it !== 'acervo' && it !== 'shared' && it !== 'playlists' && it !== 'history') || user,
-        ).map((it) => (
+        {visibleLibrarySegments(user).map((it) => (
           <button
             key={it}
+            ref={seg === it ? chipAtivo : undefined}
             type="button"
             aria-pressed={seg === it}
             className={seg === it ? `${s.segment} ${s.segmentActive}` : s.segment}

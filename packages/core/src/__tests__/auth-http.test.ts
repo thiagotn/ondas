@@ -124,6 +124,90 @@ describe('HttpAuthService.setPublico', () => {
   });
 });
 
+describe('HttpAuthService.setPrefs', () => {
+  it('manda só o que mudou, e regrava o espelho com o que a conta ficou', async () => {
+    const store = memoria({ user: { name: 'thiagotn', prefs: { idioma: 'en' } } });
+    const fetchImpl = vi.fn(async () =>
+      resposta(200, { name: 'thiagotn', publico: true, prefs: { idioma: 'en', tema: 'nord' } }),
+    );
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    const user = await auth.setPrefs({ tema: 'nord' });
+    expect(user.prefs).toEqual({ idioma: 'en', tema: 'nord' });
+
+    const [rota, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(rota).toBe('/api/auth/prefs');
+    expect(init.method).toBe('PATCH');
+    // Só o tema: mandar o resto junto desfaria o idioma trocado em outro
+    // aparelho desde o último boot deste.
+    expect(JSON.parse(String(init.body))).toEqual({ prefs: { tema: 'nord' } });
+    expect(init.keepalive).toBeUndefined();
+
+    // É o espelho que o próximo boot sem rede vai ler.
+    expect(store.dados.get('user')).toEqual({
+      name: 'thiagotn',
+      publico: true,
+      prefs: { idioma: 'en', tema: 'nord' },
+    });
+  });
+
+  it('repassa o keepalive — a troca de idioma recarrega a página em seguida', async () => {
+    const store = memoria({ user: { name: 'thiagotn', prefs: {} } });
+    const fetchImpl = vi.fn(async () => resposta(200, { name: 'thiagotn', prefs: { idioma: 'es' } }));
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    await auth.setPrefs({ idioma: 'es' }, { keepalive: true });
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.keepalive).toBe(true);
+  });
+
+  it('401 derruba a sessão, como no catálogo', async () => {
+    const store = memoria({ user: { name: 'thiagotn', prefs: {} } });
+    const fetchImpl = vi.fn(async () => resposta(401, { error: 'sessão expirada' }));
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    await expect(auth.setPrefs({ tema: 'nord' })).rejects.toThrow('sessão expirada');
+    expect(store.dados.has('user')).toBe(false);
+  });
+});
+
+describe('as preferências na resposta de auth', () => {
+  it('conta que nunca escolheu vem com o objeto vazio, e isso NÃO é ausência', async () => {
+    const fetchImpl = vi.fn(async () => resposta(200, { name: 'thiagotn', prefs: {} }));
+    const auth = new HttpAuthService(memoria({}), fetchImpl as unknown as typeof fetch);
+    expect(await auth.restore()).toEqual({ name: 'thiagotn', prefs: {} });
+  });
+
+  it('servidor de antes das preferências deixa o campo indefinido', async () => {
+    // É a diferença que impede o aparelho de mandar preferência para uma rota
+    // que a recusaria: `undefined` é "não há quem guarde", `{}` é "guardo, e
+    // está vazio".
+    const fetchImpl = vi.fn(async () => resposta(200, { name: 'thiagotn', publico: true }));
+    const auth = new HttpAuthService(memoria({}), fetchImpl as unknown as typeof fetch);
+    expect((await auth.restore())?.prefs).toBeUndefined();
+  });
+
+  it('o que este build não conhece é descartado, e não trocado por um padrão', async () => {
+    const fetchImpl = vi.fn(async () =>
+      resposta(200, {
+        name: 'thiagotn',
+        prefs: { tema: 'tema-do-futuro', idioma: 'fr', wall: 'video', opacity: 0.55, blur: 12 },
+      }),
+    );
+    const auth = new HttpAuthService(memoria({}), fetchImpl as unknown as typeof fetch);
+    expect((await auth.restore())?.prefs).toEqual({ opacity: 0.55, blur: 12 });
+  });
+
+  it('sem rede, o espelho devolve as preferências que a conta tinha', async () => {
+    const store = memoria({ user: { name: 'thiagotn', prefs: { tema: 'nord' } } });
+    const semRede = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    const auth = new HttpAuthService(store, semRede as unknown as typeof fetch);
+    expect((await auth.restore())?.prefs).toEqual({ tema: 'nord' });
+  });
+});
+
 describe('HttpAuthService.restore', () => {
   it('confirma a sessão pelo servidor', async () => {
     const store = memoria({ user: { name: 'antigo' } });

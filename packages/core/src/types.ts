@@ -1,5 +1,7 @@
 /** Tipos de domínio do Ondas. Puros: nada aqui depende de DOM ou de plataforma. */
 
+import type { PrefsDaConta } from './prefs.js';
+
 export interface Track {
   id: string;
   title: string;
@@ -66,6 +68,16 @@ export interface User {
    * `showsPublicCatalog` (`view.ts`), escrita como `!== false`.
    */
   publico?: boolean;
+  /**
+   * A aparência que segue a conta — tema, idioma e ajustes do fundo.
+   *
+   * OPCIONAL, e `undefined` NÃO é o mesmo que `{}`. `{}` é o servidor dizendo
+   * "esta conta nunca escolheu"; `undefined` é não haver servidor que saiba do
+   * assunto — uma API de antes das preferências, ou um espelho gravado por
+   * uma versão antiga. No segundo caso o aparelho segue só local e não manda
+   * nada (ver `decidirPrefs`).
+   */
+  prefs?: PrefsDaConta;
 }
 
 export type Session = User | null;

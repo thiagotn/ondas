@@ -57,6 +57,11 @@ const TABELA: readonly AtalhoBruto[] = [
   { tecla: 'j/k', acao: 'atalho.cursor', grupo: 'ir' },
   { tecla: 'enter', acao: 'atalho.tocarLinha', grupo: 'ir' },
   { tecla: ':', teclaChave: 'tecla.numero', acao: 'atalho.irPorNumero', grupo: 'ir' },
+  // A mesma linha de comando, com um nome no lugar do número. Entra como linha
+  // própria, e não como "nº ou recorte" na de cima, porque são dois destinos.
+  { tecla: ':', teclaChave: 'tecla.recorte', acao: 'atalho.irPorRecorte', grupo: 'ir' },
+  // Colchetes e não `h`/`l`: `l` já é curtir. E não as setas: elas são o seek.
+  { tecla: '[/]', acao: 'atalho.recorteVizinho', grupo: 'ir' },
   { tecla: '/', acao: 'atalho.buscar', grupo: 'ir' },
   { tecla: '1', acao: 'atalho.irHome', grupo: 'ir' },
   { tecla: '2', acao: 'atalho.irBuscar', grupo: 'ir' },

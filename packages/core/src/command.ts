@@ -1,5 +1,6 @@
 /**
- * A linha de comando do prompt — `:08` leva à faixa 08.
+ * A linha de comando do prompt — `:08` leva à faixa 08, `:historico` leva ao
+ * recorte da biblioteca.
  *
  * O número é a POSIÇÃO que a lista mostra na calha da esquerda: 1-based e
  * global, isto é, contada na lista completa do catálogo e não no recorte da
@@ -9,7 +10,7 @@
 
 import type { Track } from './types.js';
 
-export type Comando = { kind: 'faixa'; numero: number };
+export type Comando = { kind: 'faixa'; numero: number } | { kind: 'recorte'; nome: string };
 
 /**
  * Lê o que foi digitado no prompt.
@@ -19,12 +20,20 @@ export type Comando = { kind: 'faixa'; numero: number };
  * `width: 3ch`, então é o maior número que a lista consegue exibir.
  *
  * `0` não existe (a numeração começa em 1) e volta `null`, igual a lixo.
+ *
+ * O que começa por letra é o NOME de um recorte da biblioteca (`:historico`,
+ * `:--curtidas`). Aqui ele só é reconhecido pela forma e sai cru: qual recorte
+ * é, e se esta sessão o vê, depende do idioma e da conta, e quem sabe disso é
+ * `findLibrarySegment`. O parser continua sem conhecer nenhum dos dois.
  */
 export function parseComando(texto: string): Comando | null {
   const limpo = texto.trim().replace(/^:/, '');
-  if (!/^\d{1,3}$/.test(limpo)) return null;
-  const numero = Number(limpo);
-  return numero >= 1 ? { kind: 'faixa', numero } : null;
+  if (/^\d{1,3}$/.test(limpo)) {
+    const numero = Number(limpo);
+    return numero >= 1 ? { kind: 'faixa', numero } : null;
+  }
+  if (/^(--)?\p{L}[\p{L}-]{0,31}$/u.test(limpo)) return { kind: 'recorte', nome: limpo };
+  return null;
 }
 
 /**

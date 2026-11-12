@@ -141,6 +141,36 @@ E um detalhe que parece pequeno: o fundo personalizado é um dataURL de até ~1 
 cota de 5 MB do `localStorage` (`packages/web/src/app/stores.ts:22-26`). É o mesmo app usando os
 dois armazenamentos por razões opostas — um porque é síncrono, o outro porque é grande.
 
+## A aparência também é da conta — e copia o marcador sem o relógio
+
+Tema, idioma e os ajustes do fundo (transparência, desfoque, modo) seguem a conta desde a migração
+`0010`. O que este documento descreve acima continua de pé — o tema no `localStorage` porque é
+síncrono, o fundo no IndexedDB porque é grande —, só que os dois passaram a ser **espelho**: a dona é
+a conta, e `packages/web/src/app/prefs.ts` os regrava quando ela diz outra coisa.
+
+Três decisões separam isto do marcador e da curtida:
+
+- **Não há leitura própria.** As preferências chegam dentro do usuário que o `/me` do boot e o
+`/login` já devolvem. O custo, aceito: um aparelho aberto por dias só vê a mudança feita em outro no
+próximo boot.
+- **Não há relógio.** O `PATCH` é parcial e o conflito é por campo: trocar o tema num aparelho não
+desfaz o idioma trocado em outro. O único caso que um `em` resolveria — o mesmo campo mudado em dois
+aparelhos, um deles offline por dias — custa um gesto para desfazer, e não paga uma tabela. Quem
+decide, campo a campo, é `decidirPrefs` (`packages/core/src/prefs.ts`).
+- **A imagem de fundo não sobe.** Só `wall`, o modo. Num aparelho sem a imagem, `imagem` é exibido
+como capa (`wallEfetivo`) e a preferência fica como está — trocá-la ali desfaria a escolha no
+aparelho que tem a imagem.
+
+Duas chaves novas no `kv`, com papéis diferentes. `prefs-pendente` é a fila do que foi mudado aqui,
+com sessão, e ainda não subiu; sai no logout, **antes** de `setUser(null)`, porque é essa linha que
+leva a tela para o login. `prefs-adotadas` marca que este aparelho já entregou a uma conta o que
+tinha de antes, e **nunca** é apagada: o tema fica na tela depois de sair, e sem a marca ele seria
+gravado na próxima conta que entrasse.
+
+`User.prefs` indefinido não é o mesmo que `{}`. `{}` é o servidor dizendo "esta conta nunca
+escolheu"; indefinido é não haver servidor que saiba do assunto, e aí o aparelho segue só local e
+não manda nada.
+
 ## O terceiro dono: a URL
 
 O store de interface guardava mais do que devia. Aba, recorte da biblioteca, chip de gênero e termo

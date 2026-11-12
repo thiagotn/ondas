@@ -563,7 +563,8 @@ Decisões que valem registrar:
   `ondas whoami` mostra quanto ainda cabe (`storageLabel`), que é o número com que
   se decide se vale baixar o set de uma hora.
 - **Tema aplicado antes do primeiro paint** por um script inline no `index.html`
-  (daí ele morar no `localStorage`, que é síncrono). Os tokens completos saem de
+  (daí ele morar no `localStorage`, que é síncrono — com conta, como espelho do
+  tema dela; ver `app/prefs.ts`). Os tokens completos saem de
   `themeCssVars()`; `mixOklab()` resolve os mesmos valores em hex para o
   `theme-color` e para o theme provider nativo.
 - **O player cheio cabe na tela no celular**, sem rolagem — rolar para alcançar
@@ -601,6 +602,16 @@ Decisões que valem registrar:
   aquilo por um `<input>` de verdade. Input, e não teclas lidas do handler
   global, porque o guarda `typing` do `useShortcuts` já desliga todos os atalhos
   enquanto se digita — sem ele, `:12` trocaria de aba no `1`.
+- **A mesma linha aceita o nome de um recorte: `:historico` abre `--historico`.**
+  De qualquer tela, com ou sem o `--`, sem acento, e um prefixo que só case um
+  basta (`:hist`). Quem resolve o nome é `findLibrarySegment` (core), que casa
+  primeiro a palavra do chip no idioma de agora e só depois a da URL — e
+  distingue "não existe" de "é só com conta", para o aviso dizer qual dos dois.
+- **`]` e `[` andam pelos recortes da biblioteca, dando a volta.** Colchetes e
+  não setas (que são o seek) nem `h`/`l` (`l` é curtir). A fileira é a mesma que
+  a tela desenha (`visibleLibrarySegments`), então sem conta as teclas só
+  alternam entre os dois chips que existem. AltGr é aceito nos colchetes: em
+  teclado espanhol é só assim que eles saem.
 - **O número é o da calha, que é posição no catálogo INTEIRO** (`useTrackRows`
   numera pela lista completa, não pelo recorte da aba). Por isso `:08` significa
   a mesma faixa em qualquer tela — e por isso, quando ela não apareceria no

@@ -137,6 +137,8 @@ export const PT_BR = {
   'atalho.cursor': 'descer e subir na lista',
   'atalho.tocarLinha': 'tocar a linha marcada',
   'atalho.irPorNumero': 'ir para a faixa pelo número da calha',
+  'atalho.irPorRecorte': 'ir para um recorte da biblioteca pelo nome',
+  'atalho.recorteVizinho': 'recorte anterior e próximo, na biblioteca',
   'atalho.buscar': 'buscar',
   'atalho.irHome': '~/em-alta',
   'atalho.irBuscar': '~/buscar',
@@ -157,6 +159,7 @@ export const PT_BR = {
 
   'tecla.segurar': 'segurar',
   'tecla.numero': 'nº',
+  'tecla.recorte': 'recorte',
   'tecla.ou': 'ou',
   'legenda.play': 'play',
   'legenda.faixa': 'faixa',
@@ -203,7 +206,7 @@ export const PT_BR = {
   'barra.trocarTema': 'Trocar tema',
   'barra.sobre': 'ondas — sobre',
   'barra.irPorNumero': 'Ir para a faixa pelo número',
-  'barra.numeroPlaceholder': 'nº da faixa',
+  'barra.numeroPlaceholder': 'nº ou recorte',
 
   // ── player cheio ─────────────────────────────────────────────
   'acao.tocar': 'Tocar',
@@ -333,6 +336,9 @@ export const PT_BR = {
   'toast.naoComecou': 'o player não começou — toque em play',
   'toast.versaoNova': 'versão nova — recarregue quando quiser',
   'toast.faixaNaoExiste': 'faixa {numero} não existe',
+  'toast.recorteNaoExiste': 'recorte "{nome}" não existe',
+  'toast.recorteAmbiguo': '"{nome}" casa com {opcoes}',
+  'toast.recorteSoComConta': '--{recorte} é só com conta',
   'toast.curtirExigeConta': 'curtir exige entrar na conta',
   'toast.playlistsExigemConta': 'playlists exigem entrar na conta',
   'toast.faixasParaPlaylist': {

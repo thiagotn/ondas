@@ -153,7 +153,8 @@ identificador existe.
 | Metadados do catálogo | IndexedDB `ondas` | validade de 24 h |
 | Cache de consulta | IndexedDB `ondas-query` | banco separado, de propósito |
 | Faixas baixadas | Cache API `ondas-offline` | fora do Service Worker |
-| Tema | `localStorage` | tem de ser síncrono, antes do primeiro paint |
+| Aparência da conta (tema, idioma, ajustes do fundo) | Postgres, `users.pref_*` | o aparelho guarda espelho; a imagem de fundo não sobe |
+| Tema e idioma, no aparelho | `localStorage` | espelho da conta; tem de ser síncrono, antes do primeiro paint |
 
 Os dois bancos IndexedDB separados têm uma razão técnica concreta: `createStore` do `idb-keyval` só
 cria o *object store* quando o banco nasce, então dividir o banco `ondas` para o cache de consulta

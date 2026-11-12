@@ -14,6 +14,7 @@ import {
   t,
   valeRetomar,
   type Chave,
+  type Locale,
   type Pendencia,
   type QueueContext,
   type ThemeId,
@@ -35,7 +36,9 @@ import { ehCotaExcedida } from '../platform/CacheOfflineStore';
 import { useAvulsas } from './extras';
 import * as historico from './historico';
 import { esquecerCurtidas, registrar, sincronizar } from './likes';
+import { trocarIdioma } from './idioma';
 import * as listas from './playlists';
+import * as prefs from './prefs';
 import { auth, connectivity, engine, offlineStore } from './services';
 import { libraryStore, playerStore, sessionStore, uiStore } from './stores';
 
@@ -472,9 +475,19 @@ export function moverCursor(dir: 1 | -1): void {
   ui.setCursor(visiveis[Math.min(visiveis.length - 1, Math.max(0, atual + dir))] ?? null);
 }
 
-/** Toca a linha marcada. Resolve por id — índice guardado envelhece. */
+/**
+ * Toca a linha marcada. Resolve por id — índice guardado envelhece.
+ *
+ * Só se a linha estiver NA TELA. O cursor sobrevive à troca de recorte (é um
+ * id no store), e sem esta guarda o `enter` tocava a faixa marcada na lista
+ * anterior — no índice de `--playlists`, onde não há linha nenhuma, ou num
+ * recorte que não a contém. Tocar o que ninguém está vendo é pior que não
+ * fazer nada.
+ */
 export function tocarCursor(): void {
-  const index = indexOfTrack(tracks, uiStore.getState().cursorId);
+  const id = uiStore.getState().cursorId;
+  if (!id || !visiveis.includes(id)) return;
+  const index = indexOfTrack(tracks, id);
   if (index >= 0) void play(index);
 }
 
@@ -738,6 +751,21 @@ export function setTheme(id: ThemeId): void {
   uiStore.getState().flash(t('toast.tema', { tema: id }));
 }
 
+/**
+ * Troca o idioma — e, com conta, avisa a conta antes de sair da página.
+ *
+ * `trocarIdioma` navega, e a navegação mata o que estiver em voo. Por isso a
+ * ordem: a escolha vai para a fila NO DISCO (é o que `registrar` espera), o
+ * PATCH parte com `keepalive`, e só então a página sai. Se o pedido morrer no
+ * caminho, a fila o entrega no boot seguinte.
+ *
+ * Sem conta, `registrar` não faz nada e isto é o `trocarIdioma` de sempre.
+ */
+export async function escolherIdioma(destino: Locale): Promise<void> {
+  await prefs.registrar({ idioma: destino }, { agora: true });
+  trocarIdioma(destino);
+}
+
 export async function logout(): Promise<void> {
   // A fila sobe ANTES de o cookie morrer. Curtir e sair em seguida é um gesto
   // só, e o debounce de `registrar` pode nem ter disparado ainda: depois do
@@ -749,7 +777,18 @@ export async function logout(): Promise<void> {
   // ouvida: o marcador sobe a cada quinze segundos de música, e sair no meio
   // do intervalo deixaria a conta um trecho atrás.
   await historico.subirPendente();
+  // E para o tema ou o fundo mudado nos últimos instantes, que ainda está no
+  // debounce.
+  await prefs.subirPendente();
   await auth.logout();
+  // Da aparência só a FILA sai: o tema e o fundo ficam na tela (sair não muda
+  // a cara do app), mas o que ainda ia subir subiria para a próxima conta.
+  //
+  // ANTES de `setUser(null)`, e não junto das outras limpezas lá embaixo: é
+  // essa linha que leva a tela para o login, e quem entra em seguida encontra
+  // a fila que ainda estiver de pé. O e2e pegou exatamente isso, com a suíte
+  // sob carga — o tema de quem saiu gravado na conta de quem entrou.
+  await prefs.esquecer();
   sessionStore.getState().setUser(null);
   // O catálogo do logado tem as faixas do acervo, e ele fica persistido em
   // IndexedDB. Sair sem apagar deixaria os metadados das faixas próprias no
@@ -958,6 +997,8 @@ export function bootstrap(): () => void {
       if (value) void sincronizar();
       // E a posição e as faixas ouvidas sem ela.
       if (value) void historico.subirPendente();
+      // E o tema, o fundo ou o idioma trocado sem ela.
+      if (value) void prefs.subirPendente();
       // E de retomar a música, se ela parou justamente por falta de rede.
       if (value && pendencia) void retomar('toast.retomando');
       // As playlists não têm fila para subir (ver `app/playlists.ts`), mas o
@@ -982,6 +1023,8 @@ export function bootstrap(): () => void {
     }),
     // A gravação do marcador e do histórico: observa a store do player.
     historico.ligar({ faixaAtual: currentTrack, armar, armadoEm }),
+    // A aparência que a pessoa muda, a caminho da conta.
+    prefs.ligar(),
     // E o resto que só existe na memória, quando a página sai de cena.
     aoSairDaTela(() => historico.despejar()),
   ];

@@ -120,6 +120,8 @@ export const EN: Record<Chave, Frase> = {
   'atalho.cursor': 'move down and up the list',
   'atalho.tocarLinha': 'play the marked row',
   'atalho.irPorNumero': 'go to a track by its gutter number',
+  'atalho.irPorRecorte': 'go to a library view by name',
+  'atalho.recorteVizinho': 'previous and next view, in the library',
   'atalho.buscar': 'search',
   'atalho.irHome': '~/trending',
   'atalho.irBuscar': '~/search',
@@ -140,6 +142,7 @@ export const EN: Record<Chave, Frase> = {
 
   'tecla.segurar': 'hold',
   'tecla.numero': 'no.',
+  'tecla.recorte': 'view',
   'tecla.ou': 'or',
   'legenda.play': 'play',
   'legenda.faixa': 'track',
@@ -183,7 +186,7 @@ export const EN: Record<Chave, Frase> = {
   'barra.trocarTema': 'Change theme',
   'barra.sobre': 'ondas — about',
   'barra.irPorNumero': 'Go to a track by number',
-  'barra.numeroPlaceholder': 'track no.',
+  'barra.numeroPlaceholder': 'no. or view',
 
   'acao.tocar': 'Play',
   'acao.pausar': 'Pause',
@@ -296,6 +299,9 @@ export const EN: Record<Chave, Frase> = {
   'toast.naoComecou': 'the player did not start — press play',
   'toast.versaoNova': 'new version — reload whenever you like',
   'toast.faixaNaoExiste': 'track {numero} does not exist',
+  'toast.recorteNaoExiste': 'no view called "{nome}"',
+  'toast.recorteAmbiguo': '"{nome}" matches {opcoes}',
+  'toast.recorteSoComConta': '--{recorte} needs an account',
   'toast.curtirExigeConta': 'liking requires signing in',
   'toast.playlistsExigemConta': 'playlists require signing in',
   'toast.faixasParaPlaylist': {

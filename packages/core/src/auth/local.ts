@@ -1,6 +1,7 @@
 import { AuthError } from '../ports/auth.js';
 import type { AuthService, Credentials } from '../ports/auth.js';
 import type { KeyValueStore } from '../ports/key-value-store.js';
+import { lePrefs, type PrefsDaConta } from '../prefs.js';
 import type { Session, User } from '../types.js';
 
 export const SESSION_KEY = 'user';
@@ -46,6 +47,15 @@ export class LocalAuthService implements AuthService {
     const atual = await this.store.get<User>(SESSION_KEY);
     if (!atual) throw new AuthError('sem sessão');
     const user: User = { ...atual, publico: on };
+    await this.store.set(SESSION_KEY, user);
+    return user;
+  }
+
+  /** Sem servidor, a "conta" é o espelho: as preferências são mescladas nele. */
+  async setPrefs(parcial: PrefsDaConta): Promise<User> {
+    const atual = await this.store.get<User>(SESSION_KEY);
+    if (!atual) throw new AuthError('sem sessão');
+    const user: User = { ...atual, prefs: { ...atual.prefs, ...lePrefs(parcial) } };
     await this.store.set(SESSION_KEY, user);
     return user;
   }

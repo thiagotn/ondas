@@ -1,11 +1,19 @@
-import { idioma, LOCALES, t, THEMES, themeIndex } from '@ondas/core';
+import {
+  adjacentLibrarySegment,
+  defaultLibrarySegment,
+  idioma,
+  LOCALES,
+  parseLibrarySegment,
+  t,
+  THEMES,
+  themeIndex,
+} from '@ondas/core';
 import { useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, type NavigateFunction } from 'react-router-dom';
 import * as controller from '../app/controller';
-import { libraryStore, playerStore, uiStore } from '../app/stores';
-import { PATHS } from '../routes/paths';
+import { libraryStore, playerStore, sessionStore, uiStore } from '../app/stores';
+import { librarySegPath, PATHS, tabForPath } from '../routes/paths';
 import { applyTheme } from '../theme/applyTheme';
-import { trocarIdioma } from '../app/idioma';
 import { cmdInputRef } from './cmdInputRef';
 import { useAboutOverlay } from './useAboutOverlay';
 import { useAccountOverlay } from './useAccountOverlay';
@@ -75,7 +83,7 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
           ui.setPickIdx(idiomaCursor.current);
         } else if (k === 'Enter') {
           e.preventDefault();
-          trocarIdioma(LOCALES[idiomaCursor.current]!);
+          void controller.escolherIdioma(LOCALES[idiomaCursor.current]!);
         }
         return;
       }
@@ -117,7 +125,15 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
         else if (ui.selecionando) ui.sairDaSelecao();
         return;
       }
-      if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+      // Os colchetes são a exceção à guarda de modificador: em teclado espanhol
+      // e em vários ISO eles só saem com AltGr, que o Windows entrega como
+      // Ctrl+Alt (e o macOS, como Option). Barrar `altKey` ali deixaria a tecla
+      // muda justamente num dos três idiomas do app. Cmd+`[`/`]` continua do
+      // navegador (voltar e avançar), e Ctrl sozinho também não é nosso.
+      const colchete = k === '[' || k === ']';
+      const modificado =
+        e.metaKey || (colchete ? e.ctrlKey && !e.altKey : e.ctrlKey || e.altKey);
+      if (typing || modificado) return;
 
       // Com o gate aberto, Enter leva para o login.
       if (ui.gate && k === 'Enter') {
@@ -181,6 +197,10 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
         // com ordem própria para mexer.
         J: () => naLista && moverNaPlaylistDaRota(pathname, 1),
         K: () => naLista && moverNaPlaylistDaRota(pathname, -1),
+        // O recorte vizinho da biblioteca. Fora dela as duas teclas não fazem
+        // nada — quem decide é `recorteVizinho`, lendo a rota.
+        ']': () => naLista && recorteVizinho(pathname, 1, navigate),
+        '[': () => naLista && recorteVizinho(pathname, -1, navigate),
         // `0` é "a de agora", os outros dígitos são lugares. Faz o mesmo que o
         // `f` do handoff, que fica valendo sem ser anunciado.
         '0': () => (isPlayerOpen ? closePlayer() : openPlayer()),
@@ -260,6 +280,21 @@ export function useShortcuts(searchInput: React.RefObject<HTMLInputElement>): vo
  * aberta (`/library/playlists/<id>`), e um segundo dono divergiria dela — foi o
  * que já aconteceu entre a aba e o `playerOpen`.
  */
+/**
+ * `]` e `[`: o recorte seguinte e o anterior da biblioteca, dando a volta.
+ *
+ * O recorte de agora é lido do endereço, pela mesma peneira que a tela usa
+ * (`parseLibrarySegment`) — dentro de `/library/playlists/<id>` ele é
+ * `playlists`, então a tecla sai da playlist para o chip vizinho. E navega com
+ * push, como o clique no chip: o voltar anda entre recortes de um jeito só.
+ */
+function recorteVizinho(pathname: string, dir: 1 | -1, navigate: NavigateFunction): void {
+  if (tabForPath(pathname) !== 'library') return;
+  const user = sessionStore.getState().user;
+  const atual = parseLibrarySegment(pathname.split('/')[2], defaultLibrarySegment(user));
+  navigate(librarySegPath(adjacentLibrarySegment(atual, dir, user)));
+}
+
 function moverNaPlaylistDaRota(pathname: string, dir: 1 | -1): void {
   const partes = pathname.split('/').filter(Boolean);
   if (partes[0] !== 'library' || partes[1] !== 'playlists' || !partes[2]) return;

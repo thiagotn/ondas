@@ -64,7 +64,13 @@ function CommandLine() {
         value={texto}
         aria-label={t('barra.irPorNumero')}
         placeholder={t('barra.numeroPlaceholder')}
-        inputMode="numeric"
+        // Texto, e não numérico: a linha aceita `08` e aceita `historico`, e
+        // um teclado só de dígitos no celular esconderia metade dela. Sem
+        // maiúscula nem correção automática, que reescreveriam o nome.
+        inputMode="text"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
         autoComplete="off"
         onChange={(e) => setTexto(e.target.value)}
         onBlur={() => uiStore.getState().setCmdOpen(false)}

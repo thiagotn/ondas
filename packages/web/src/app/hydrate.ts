@@ -1,7 +1,9 @@
 import type { BackgroundSettings, LibrarySnapshot } from '@ondas/core';
 import * as historico from './historico';
 import { sincronizar } from './likes';
+import { adotarIdiomaDaConta } from './idioma';
 import { carregarPlaylists } from './playlists';
+import * as prefs from './prefs';
 import { auth, kv, offlineStore } from './services';
 import { BACKGROUND_KEY, libraryStore, LIBRARY_KEY, sessionStore, uiStore } from './stores';
 
@@ -17,9 +19,21 @@ export async function hydrate(): Promise<void> {
     auth.restore(),
     kv.get<BackgroundSettings>(BACKGROUND_KEY),
   ]);
-  if (background) uiStore.getState().hydrateBackground(background);
+  // Sem eco: isto é o disco voltando para a memória, e não alguém mexendo no
+  // slider — não pode entrar na fila do que sobe para a conta (`app/prefs.ts`).
+  if (background) prefs.aplicarSemEco(() => uiStore.getState().hydrateBackground(background));
   if (snapshot) libraryStore.getState().hydrate(snapshot);
   sessionStore.getState().markRestored(session);
+
+  // A aparência da conta. Vem DENTRO da sessão que acabou de chegar, então não
+  // custa pedido nenhum; e fica depois do fundo local, porque é sobre ele que
+  // ela decide. O idioma é o único que não se aplica no lugar: se a conta fala
+  // outro e este aparelho ainda não sabia, a página navega — uma vez.
+  if (session) {
+    void prefs.iniciar(session).then((daConta) => {
+      if (daConta) adotarIdiomaDaConta(daConta);
+    });
+  }
 
   const present = await offlineStore.keys();
   libraryStore.getState().reconcile(present);

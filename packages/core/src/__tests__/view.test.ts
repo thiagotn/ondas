@@ -1,12 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { demoTracks } from '../catalog/demo.js';
+import { definirIdioma } from '../i18n/index.js';
 import {
   bufferShortLabel,
+  adjacentLibrarySegment,
   bufferSourceLabel,
   defaultLibrarySegment,
   hiddenInSegment,
   showsPublicCatalog,
   emptyText,
+  findLibrarySegment,
   genreOptions,
   LIBRARY_SEGMENTS,
   librarySegmentChip,
@@ -14,6 +17,7 @@ import {
   parseLibrarySegment,
   promptLine,
   storageLabel,
+  visibleLibrarySegments,
   visibleTracks,
 } from '../view.js';
 
@@ -144,6 +148,99 @@ describe('parseLibrarySegment', () => {
     for (const lixo of ['lixo', 'LIKED', '../', 'liked ', 'archive/x', 'acervo']) {
       expect(parseLibrarySegment(lixo, 'liked')).toBe('liked');
     }
+  });
+});
+
+describe('visibleLibrarySegments', () => {
+  it('com conta é a fileira inteira, na ordem da tela', () => {
+    expect([...visibleLibrarySegments({ name: 'thiago' })]).toEqual([...LIBRARY_SEGMENTS]);
+  });
+
+  it('sem conta sobram os dois que não moram nela', () => {
+    expect([...visibleLibrarySegments(null)]).toEqual(['liked', 'offline']);
+  });
+});
+
+describe('adjacentLibrarySegment', () => {
+  const conta = { name: 'thiago' };
+
+  it('anda para os dois lados', () => {
+    expect(adjacentLibrarySegment('acervo', 1, conta)).toBe('shared');
+    expect(adjacentLibrarySegment('acervo', -1, conta)).toBe('history');
+  });
+
+  it('dá a volta nas duas pontas', () => {
+    expect(adjacentLibrarySegment('offline', 1, conta)).toBe('liked');
+    expect(adjacentLibrarySegment('liked', -1, conta)).toBe('offline');
+  });
+
+  it('sem conta só alterna entre os dois chips desenhados', () => {
+    expect(adjacentLibrarySegment('liked', 1, null)).toBe('offline');
+    expect(adjacentLibrarySegment('offline', 1, null)).toBe('liked');
+    expect(adjacentLibrarySegment('liked', -1, null)).toBe('offline');
+  });
+
+  it('de um recorte que a fileira não tem, entra pela ponta do lado da tecla', () => {
+    // Quem saiu da conta em `/library/archive` continua nesse endereço.
+    expect(adjacentLibrarySegment('acervo', 1, null)).toBe('liked');
+    expect(adjacentLibrarySegment('acervo', -1, null)).toBe('offline');
+  });
+});
+
+describe('findLibrarySegment', () => {
+  const conta = { name: 'thiago' };
+  afterEach(() => definirIdioma('pt-BR'));
+
+  it('casa a palavra do chip, com ou sem `--`, acento e caixa', () => {
+    for (const nome of ['historico', '--historico', 'Histórico', '  HISTORICO ']) {
+      expect(findLibrarySegment(nome, conta)).toEqual({ ok: true, seg: 'history' });
+    }
+  });
+
+  it('casa a palavra da URL mesmo com a tela em outro idioma', () => {
+    expect(findLibrarySegment('archive', conta)).toEqual({ ok: true, seg: 'acervo' });
+    expect(findLibrarySegment('history', conta)).toEqual({ ok: true, seg: 'history' });
+  });
+
+  it('um prefixo que só casa um recorte basta', () => {
+    expect(findLibrarySegment('hist', conta)).toEqual({ ok: true, seg: 'history' });
+    expect(findLibrarySegment('off', conta)).toEqual({ ok: true, seg: 'offline' });
+  });
+
+  it('o nome exato vence o prefixo de outro', () => {
+    // Em inglês `shared` é chip inteiro; não pode virar "ambíguo" só porque
+    // outra palavra começasse igual.
+    definirIdioma('en');
+    expect(findLibrarySegment('shared', conta)).toEqual({ ok: true, seg: 'shared' });
+  });
+
+  it('prefixo que casa mais de um é ambíguo, e diz quais', () => {
+    expect(findLibrarySegment('c', conta)).toEqual({
+      ok: false,
+      motivo: 'ambiguo',
+      opcoes: ['liked', 'shared'],
+    });
+  });
+
+  it('a palavra da tela vence a da URL', () => {
+    // Em espanhol `l` é o começo de `listas`. O slug `liked` também começa por
+    // `l`, mas quem digita está lendo o chip, não a barra de endereço.
+    definirIdioma('es');
+    expect(findLibrarySegment('l', conta)).toEqual({ ok: true, seg: 'playlists' });
+    expect(findLibrarySegment('megusta', conta)).toEqual({ ok: true, seg: 'liked' });
+  });
+
+  it('o que não casa com nada é desconhecido', () => {
+    for (const nome of ['xyz', '', '--', '123']) {
+      expect(findLibrarySegment(nome, conta)).toEqual({ ok: false, motivo: 'desconhecido' });
+    }
+  });
+
+  it('recorte que existe mas pede conta não é "desconhecido"', () => {
+    expect(findLibrarySegment('acervo', null)).toEqual({ ok: false, motivo: 'conta', seg: 'acervo' });
+    expect(findLibrarySegment('hist', null)).toEqual({ ok: false, motivo: 'conta', seg: 'history' });
+    // E os dois que o visitante vê continuam valendo para ele.
+    expect(findLibrarySegment('curtidas', null)).toEqual({ ok: true, seg: 'liked' });
   });
 });
 

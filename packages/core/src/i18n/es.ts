@@ -117,6 +117,8 @@ export const ES: Record<Chave, Frase> = {
   'atalho.cursor': 'bajar y subir en la lista',
   'atalho.tocarLinha': 'reproducir la fila marcada',
   'atalho.irPorNumero': 'ir a la pista por su número',
+  'atalho.irPorRecorte': 'ir a un recorte de la biblioteca por su nombre',
+  'atalho.recorteVizinho': 'recorte anterior y siguiente, en la biblioteca',
   'atalho.buscar': 'buscar',
   'atalho.irHome': '~/tendencias',
   'atalho.irBuscar': '~/buscar',
@@ -137,6 +139,7 @@ export const ES: Record<Chave, Frase> = {
 
   'tecla.segurar': 'mantener',
   'tecla.numero': 'nº',
+  'tecla.recorte': 'recorte',
   'tecla.ou': 'o',
   'legenda.play': 'play',
   'legenda.faixa': 'pista',
@@ -180,7 +183,7 @@ export const ES: Record<Chave, Frase> = {
   'barra.trocarTema': 'Cambiar tema',
   'barra.sobre': 'ondas — acerca de',
   'barra.irPorNumero': 'Ir a la pista por número',
-  'barra.numeroPlaceholder': 'nº de pista',
+  'barra.numeroPlaceholder': 'nº o recorte',
 
   'acao.tocar': 'Reproducir',
   'acao.pausar': 'Pausar',
@@ -294,6 +297,9 @@ export const ES: Record<Chave, Frase> = {
   'toast.naoComecou': 'el player no arrancó — toca play',
   'toast.versaoNova': 'versión nueva — recarga cuando quieras',
   'toast.faixaNaoExiste': 'la pista {numero} no existe',
+  'toast.recorteNaoExiste': 'el recorte "{nome}" no existe',
+  'toast.recorteAmbiguo': '"{nome}" coincide con {opcoes}',
+  'toast.recorteSoComConta': '--{recorte} es solo con cuenta',
   'toast.curtirExigeConta': 'dar me gusta exige iniciar sesión',
   'toast.playlistsExigemConta': 'las listas exigen iniciar sesión',
   'toast.faixasParaPlaylist': {

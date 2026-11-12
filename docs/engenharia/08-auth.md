@@ -269,10 +269,19 @@ entrar com faixa nova, e mudar o que alguém vê não é isso. A garantia é geo
 `exigirSessao` nem lê o header do token —, e `TestPrefsExigeSessaoENaoAceitaToken` a fixa, pelo
 mesmo motivo que `TestEscopoDoTokenNoAcervo` existe.
 
-O corpo é `{"publico": bool}` lido num **ponteiro**: com um `bool`, um corpo sem a chave
-decodificaria para `false` e desligaria o catálogo de quem só mandou um JSON errado. Ausente é 400.
-E o campo sai em **toda** resposta de auth — `signup`, `login` e `me` —, porque é no boot que a PWA
-decide a fonte do catálogo, antes de qualquer outra chamada.
+O corpo é `{"publico"?: bool, "prefs"?: {...}}`, e todo campo é lido num **ponteiro**: com um
+`bool`, um corpo sem a chave decodificaria para `false` e desligaria o catálogo de quem só mandou um
+JSON errado. Ausente é "não mexa" — o `UPDATE` usa `COALESCE` —, e um pedido que não mexe em nada é
+400. E `publico` sai em **toda** resposta de auth — `signup`, `login` e `me` —, porque é no boot que
+a PWA decide a fonte do catálogo, antes de qualquer outra chamada.
+
+`prefs` é a aparência que segue a conta (migração `0010`): `tema`, `idioma`, `opacity`, `blur` e
+`wall`. Sai nas mesmas respostas, **sempre** — `{}` para quem nunca escolheu —, porque é a presença
+da chave que diz à PWA que este servidor a guarda; sem ela o cliente não manda nenhuma. Tema e
+idioma são validados só pela forma: o catálogo dos dois é do cliente, e uma lista aqui exigiria
+deploy da API antes de um tema novo poder ser salvo. `wall`, `opacity` e `blur` têm faixa fechada, e
+fora dela é 400 — sem ajustar para a borda, que esconderia um bug do cliente. A imagem de fundo não
+tem campo. `TestPrefsExigeSessaoENaoAceitaToken` cobre os dois corpos.
 
 `/likes` segue a mesma régua e fica **fora** do grupo `/acervo`: curtida não depende de credencial
 de R2, e o `503 acervo não configurado` de `exigirAcervo` seria uma mentira para quem só quer

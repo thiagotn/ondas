@@ -105,6 +105,12 @@ IndexedDB is asynchronous. It is the same app using both stores for opposite rea
 because it is synchronous, the wallpaper's because a 1 MB data URL does not fit `localStorage`'s
 quota.
 
+With an account, that `localStorage` is a **mirror**: the account owns the theme, and `app/prefs.ts`
+rewrites it when the account says otherwise — which is what makes the *next* boot open right, with no
+flash of the old theme. A new device's first boot still opens on the default and switches when the
+session arrives; that is the price of the account not being readable before first paint. The
+mechanics are in [document 05](05-estado-e-stores.en.md).
+
 Duplicating the theme table in the HTML is an acknowledged cost. It covers three of the four fields,
 and drifting from it means a flash of the wrong colour at boot — visible, but not broken.
 

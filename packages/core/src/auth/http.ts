@@ -2,6 +2,7 @@ import type { ErroDaApi } from '../types.js';
 import { AuthError } from '../ports/auth.js';
 import type { AuthService, Credentials } from '../ports/auth.js';
 import type { KeyValueStore } from '../ports/key-value-store.js';
+import { lePrefs, type PrefsDaConta } from '../prefs.js';
 import type { Session, User } from '../types.js';
 
 /** Mesma chave do `LocalAuthService`: a sessão guardada localmente é só um espelho. */
@@ -18,6 +19,7 @@ interface RespostaUsuario {
   name?: unknown;
   email?: unknown;
   publico?: unknown;
+  prefs?: unknown;
 }
 
 interface RespostaErro {
@@ -118,10 +120,26 @@ export class HttpAuthService implements AuthService {
    * deixaria o botão parecendo instável em vez de mandá-la para o login.
    */
   async setPublico(on: boolean): Promise<User> {
+    return this.gravarPrefs({ publico: on });
+  }
+
+  /**
+   * Grava preferências de aparência na conta — parcial: o que não vem fica.
+   *
+   * A mesma rota, o mesmo 401 e o mesmo espelho de `setPublico`, e pela mesma
+   * razão: é o espelho que `restore()` devolve sem rede, então é ele que faz o
+   * próximo boot offline abrir com o que a conta tem.
+   */
+  async setPrefs(parcial: PrefsDaConta, opts?: { keepalive?: boolean }): Promise<User> {
+    return this.gravarPrefs({ prefs: parcial }, opts?.keepalive ? { keepalive: true } : {});
+  }
+
+  private async gravarPrefs(corpo: unknown, init: RequestInit = {}): Promise<User> {
     const res = await this.pedir(ROTAS.prefs, {
+      ...init,
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ publico: on }),
+      body: JSON.stringify(corpo),
     });
     if (res.status === 401) {
       await this.store.remove(SESSION_KEY);
@@ -160,7 +178,16 @@ function leUsuario(bruto: unknown): User | null {
   // preencher um padrão aqui mantém o padrão num lugar só
   // (`showsPublicCatalog`), e é o que deixa um servidor antigo — ou um corpo
   // estranho — significar o estado de hoje em vez de "desligado".
-  const pref = typeof u.publico === 'boolean' ? { publico: u.publico } : {};
+  //
+  // `prefs` segue a mesma regra, e a ausência aqui carrega ainda mais: sem a
+  // chave, o servidor é de antes das preferências, e quem lê `undefined` não
+  // manda nenhuma para ele (ver `decidirPrefs`). Preencher `{}` faria um
+  // servidor antigo parecer um que nunca recebeu escolha — e o aparelho tentaria
+  // subir as suas para uma rota que as recusa.
+  const pref = {
+    ...(typeof u.publico === 'boolean' ? { publico: u.publico } : {}),
+    ...(u.prefs && typeof u.prefs === 'object' ? { prefs: lePrefs(u.prefs) } : {}),
+  };
   if (typeof u.name === 'string' && u.name) return { name: u.name, ...pref };
   // Resposta sem `name` mas com e-mail ainda dá um nome exibível.
   if (typeof u.email === 'string' && u.email) {

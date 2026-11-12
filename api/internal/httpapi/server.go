@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -303,23 +304,30 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	escreverJSON(w, http.StatusOK, usuarioDe(r.Context()))
 }
 
-// prefs muda as preferências da conta. Hoje só `publico`.
+// prefs muda as preferências da conta: `publico` e a aparência (`prefs`: tema,
+// idioma e os ajustes do fundo).
 //
-// O campo é um PONTEIRO de propósito: com `bool`, um corpo sem a chave
+// Os campos são PONTEIROS de propósito: com `bool`, um corpo sem a chave
 // decodificaria para `false` e desligaria o catálogo de quem só queria mandar
-// um JSON errado. Ausente é pedido inválido, não "desliga".
+// um JSON errado. Ausente é "não mexa" — e um pedido que não mexe em nada é
+// inválido, não um 200 que finge ter feito algo.
 func (s *Server) prefs(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Publico *bool `json:"publico"`
+		Publico *bool       `json:"publico"`
+		Prefs   *auth.Prefs `json:"prefs"`
 	}
 	if !lerJSON(w, r, &req) {
 		return
 	}
-	if req.Publico == nil {
+	var aparencia auth.Prefs
+	if req.Prefs != nil {
+		aparencia = *req.Prefs
+	}
+	if (req.Publico == nil && aparencia.Vazio()) || !validarPrefs(aparencia) {
 		escreverErro(w, http.StatusBadRequest, "requisição inválida")
 		return
 	}
-	user, err := s.users.DefinirPublico(r.Context(), usuarioDe(r.Context()).ID, *req.Publico)
+	user, err := s.users.AtualizarPrefs(r.Context(), usuarioDe(r.Context()).ID, req.Publico, aparencia)
 	if err != nil {
 		// Conta apagada com cookie válido na mão: o mesmo tratamento do
 		// middleware, para o cliente cair no fluxo de sessão morta.
@@ -333,6 +341,43 @@ func (s *Server) prefs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	escreverJSON(w, http.StatusOK, user)
+}
+
+// A FORMA de um id de tema e de uma tag de idioma. Só a forma: quais existem é
+// assunto do cliente (`themes.ts` e `LOCALES`, no core), e uma lista aqui seria
+// a terceira cópia — tema novo passaria a exigir deploy da API antes de poder
+// ser salvo. O que esta peneira impede é texto arbitrário virar coluna.
+var (
+	reTema   = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
+	reIdioma = regexp.MustCompile(`^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$`)
+)
+
+// validarPrefs confere os campos que vieram; `nil` passa, porque é "não mexa".
+//
+// Fora da faixa é pedido inválido, e NÃO é ajustado para a borda: um cliente
+// que manda opacidade 5 tem um bug, e gravar 1 em silêncio o esconderia. As
+// faixas são as dos sliders (`OPACITY_MIN`/`OPACITY_MAX`/`BLUR_MAX` no core) e
+// as dos CHECKs da migração 0010 — que só pegariam o erro como um 500.
+//
+// `blur` fracionário nem chega aqui: o campo é inteiro, e `12.5` já falha no
+// `lerJSON`.
+func validarPrefs(p auth.Prefs) bool {
+	if p.Tema != nil && !reTema.MatchString(*p.Tema) {
+		return false
+	}
+	if p.Idioma != nil && !reIdioma.MatchString(*p.Idioma) {
+		return false
+	}
+	if p.Opacity != nil && !(*p.Opacity >= 0.3 && *p.Opacity <= 1) {
+		return false
+	}
+	if p.Blur != nil && (*p.Blur < 0 || *p.Blur > 40) {
+		return false
+	}
+	if p.Wall != nil && *p.Wall != "capa" && *p.Wall != "imagem" && *p.Wall != "nenhum" {
+		return false
+	}
+	return true
 }
 
 func (s *Server) gravarCookie(w http.ResponseWriter, userID string) {

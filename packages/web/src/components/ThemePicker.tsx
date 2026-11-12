@@ -1,4 +1,13 @@
-import { BLUR_MAX, OPACITY_MAX, OPACITY_MIN, t, THEMES, type WallMode } from '@ondas/core';
+import {
+  BLUR_MAX,
+  OPACITY_MAX,
+  OPACITY_MIN,
+  t,
+  THEMES,
+  wallEfetivo,
+  type Chave,
+  type WallMode,
+} from '@ondas/core';
 import type { ChangeEvent } from 'react';
 import * as controller from '../app/controller';
 import { uiStore, useUi } from '../app/stores';
@@ -66,7 +75,7 @@ export function ThemePicker() {
 }
 
 /** Rótulos das origens de wallpaper; `imagem` só aparece quando há uma salva. */
-const WALLS: [WallMode, string][] = [
+const WALLS: [WallMode, Chave][] = [
   ['capa', 'tema.wallCapa'],
   ['imagem', 'tema.wallImagem'],
   ['nenhum', 'tema.wallNenhum'],
@@ -78,6 +87,10 @@ function BackgroundControls() {
   const blur = useUi((st) => st.blur);
   const wall = useUi((st) => st.wall);
   const wallImg = useUi((st) => st.wallImg);
+  // A conta pode pedir `imagem` num aparelho que não tem imagem — ela não
+  // viaja. A tela mostra a capa (`Wallpaper`), e o chip marcado tem de dizer o
+  // mesmo: sem isto, nenhum dos chips desenhados ficaria aceso.
+  const mostrado = wallEfetivo(wall, wallImg);
 
   const upload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -124,15 +137,17 @@ function BackgroundControls() {
       <div className={s.setting}>
         <span className={s.settingLabel}>wallpaper</span>
         <span className={s.wallOptions}>
-          {WALLS.filter(([id]) => id !== 'imagem' || wallImg).map(([id, label]) => (
+          {/* `t(chave)`, e não a chave: a tabela guarda a CHAVE do catálogo, e
+              desenhá-la crua punha `tema.wallCapa` na tela. */}
+          {WALLS.filter(([id]) => id !== 'imagem' || wallImg).map(([id, chave]) => (
             <button
               key={id}
               type="button"
-              aria-pressed={wall === id}
-              className={wall === id ? `${s.wallOption} ${s.wallOptionOn}` : s.wallOption}
+              aria-pressed={mostrado === id}
+              className={mostrado === id ? `${s.wallOption} ${s.wallOptionOn}` : s.wallOption}
               onClick={() => uiStore.getState().setWall(id)}
             >
-              {wall === id ? `[${label}]` : label}
+              {mostrado === id ? `[${t(chave)}]` : t(chave)}
             </button>
           ))}
           <label className={s.upload}>

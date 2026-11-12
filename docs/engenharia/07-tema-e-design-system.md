@@ -104,6 +104,12 @@ Essa é a razão pela qual o tema mora no `localStorage` e não no IndexedDB
 IndexedDB é assíncrono. É o mesmo app usando os dois armazenamentos por razões opostas — este porque
 é síncrono, o do papel de parede porque um dataURL de 1 MB não cabe na cota do `localStorage`.
 
+Com conta, esse `localStorage` é **espelho**: a dona do tema é a conta, e `app/prefs.ts` o regrava
+quando ela diz outro — o que faz o boot *seguinte* já abrir certo, sem piscar no tema antigo. O
+primeiro boot de um aparelho novo ainda abre no padrão e troca quando a sessão chega; é o preço de a
+conta não poder ser lida antes do primeiro paint. A mecânica está no [documento
+05](05-estado-e-stores.md).
+
 A duplicação da tabela de temas no HTML é um custo reconhecido. Ela cobre três campos dos quatro, e
 divergir dela significaria um flash de cor errada no boot — visível, mas não quebrado.
 

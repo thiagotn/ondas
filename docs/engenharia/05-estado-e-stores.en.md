@@ -144,6 +144,36 @@ And a detail that looks small: the custom background is a data URL of up to ~1 M
 past `localStorage`'s 5 MB quota (`packages/web/src/app/stores.ts:22-26`). It is the same app using
 both stores for opposite reasons — one because it is synchronous, the other because it is large.
 
+## Appearance belongs to the account too — and copies the marker without the clock
+
+Theme, language and the background settings (opacity, blur, mode) follow the account since migration
+`0010`. What this document describes above still holds — the theme in `localStorage` because it is
+synchronous, the background in IndexedDB because it is large — except both are now a **mirror**: the
+account owns them, and `packages/web/src/app/prefs.ts` rewrites them when it says otherwise.
+
+Three decisions set this apart from the marker and the like:
+
+- **There is no read of its own.** Preferences arrive inside the user that boot's `/me` and `/login`
+already return. The accepted cost: a device left open for days only sees a change made elsewhere on
+its next boot.
+- **There is no clock.** The `PATCH` is partial and conflicts are per field: changing the theme on
+one device does not undo the language changed on another. The one case an `em` would solve — the same
+field changed on two devices, one of them offline for days — costs one gesture to undo, and does not
+pay for a table. The per-field decision is `decidirPrefs` (`packages/core/src/prefs.ts`).
+- **The background image is not uploaded.** Only `wall`, the mode. On a device without the image,
+`imagem` is shown as the cover (`wallEfetivo`) and the preference stays as it is — changing it there
+would undo the choice on the device that has the image.
+
+Two new `kv` keys, with different jobs. `prefs-pendente` is the queue of what was changed here, with
+a session, and not yet uploaded; it is dropped on logout, **before** `setUser(null)`, because that is
+the line that takes the screen to the login. `prefs-adotadas` marks that this device already handed
+an account what it had from before, and is **never** deleted: the theme stays on screen after signing
+out, and without the mark it would be written into the next account to sign in.
+
+An undefined `User.prefs` is not the same as `{}`. `{}` is the server saying "this account never
+chose"; undefined means no server knows about it, and then the device stays local-only and sends
+nothing.
+
 ## The third owner: the URL
 
 The interface store used to hold more than it should. The tab, the library segment, the genre chip

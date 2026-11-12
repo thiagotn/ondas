@@ -1,5 +1,36 @@
 [
   {
+    "versao": "1.4.0",
+    "data": "2026-11-12",
+    "itens": [
+      {
+        "pt-BR": "tema, idioma e os ajustes do fundo (transparência e desfoque) agora seguem a sua conta: escolha num aparelho e os outros abrem do mesmo jeito. A imagem de fundo que você enviou continua só no aparelho em que foi enviada — nos outros, o fundo usa a capa da faixa",
+        "en": "theme, language and the background settings (transparency and blur) now follow your account: pick them on one device and the others open the same way. A background image you uploaded stays on the device it was uploaded from — elsewhere the background uses the track cover",
+        "es": "el tema, el idioma y los ajustes del fondo (transparencia y desenfoque) ahora siguen a tu cuenta: elígelos en un aparato y los demás se abren igual. La imagen de fondo que subiste se queda en el aparato donde la subiste — en los demás, el fondo usa la carátula de la pista"
+      },
+      {
+        "pt-BR": "na biblioteca, `]` e `[` passam para o recorte seguinte e o anterior, dando a volta no fim da fileira",
+        "en": "in the library, `]` and `[` move to the next and previous view, wrapping around at the end of the row",
+        "es": "en la biblioteca, `]` y `[` pasan al recorte siguiente y al anterior, dando la vuelta al final de la fila"
+      },
+      {
+        "pt-BR": "a linha de comando aceita o nome de um recorte: `:historico` (ou só `:hist`) leva direto para ele, de qualquer tela",
+        "en": "the command line takes a view name: `:history` (or just `:hist`) jumps straight to it from any screen",
+        "es": "la línea de comandos acepta el nombre de un recorte: `:historial` (o solo `:hist`) lleva directo a él desde cualquier pantalla"
+      },
+      {
+        "pt-BR": "`enter` não toca mais uma faixa que não está na tela — acontecia na lista de `--playlists`, com a linha que tinha ficado marcada no recorte anterior",
+        "en": "`enter` no longer plays a track that is not on screen — it happened on the `--playlists` list, with the row left marked in the previous view",
+        "es": "`enter` ya no reproduce una pista que no está en pantalla — pasaba en la lista de `--listas`, con la fila que había quedado marcada en el recorte anterior"
+      },
+      {
+        "pt-BR": "no painel de temas, as opções de wallpaper voltam a ter nome (`capa-atual`, `imagem`, `nenhum`) em vez de um código interno",
+        "en": "in the theme panel, the wallpaper options have their names back (`current-cover`, `image`, `none`) instead of an internal code",
+        "es": "en el panel de temas, las opciones de wallpaper vuelven a tener nombre (`portada-actual`, `imagen`, `ninguno`) en lugar de un código interno"
+      }
+    ]
+  },
+  {
     "versao": "1.3.0",
     "data": "2026-11-12",
     "itens": [

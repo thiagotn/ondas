@@ -30,8 +30,14 @@ export function TrackList({ rows, emptyText, loading, playlistID }: TrackListPro
   // está na tela: `controller.tracks` é a lista completa, e em `--curtidas` ou
   // na busca o recorte é um filtro esparso dela. Mesmo padrão do `setTracks`
   // no `AppLayout`, um nível abaixo.
+  //
+  // A limpeza ao desmontar é o que cobre a tela SEM lista: o índice de
+  // `--playlists` não monta este componente, e sem ela `visiveis` continuava
+  // sendo o recorte de onde se veio — `j` andava por linhas que não estavam na
+  // tela.
   useEffect(() => {
     controller.setVisible(rows.map((r) => r.track.id));
+    return () => controller.setVisible([]);
   }, [rows]);
 
   if (loading) return <div className={s.loading}>⠋ carregando metadados…</div>;

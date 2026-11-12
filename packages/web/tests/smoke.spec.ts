@@ -205,8 +205,45 @@ function semearHistorico(page: Page, ...itens: Omit<ItemFalso, 'em'>[]) {
   ouvidoSemeado.get(page)!.historico.push(...itens.map((it, i) => ({ ...it, em: agora - i * 60_000 })));
 }
 
+/**
+ * A aparência da conta, no servidor de mentira — por página.
+ *
+ * `prefs` é o que a conta tem; `undefined` é uma API de ANTES das preferências,
+ * que nem manda a chave nem aceita o campo (ver `apiSemPrefs`).
+ *
+ * `patches` guarda toda escrita de aparência que CHEGOU. Como os `puts` do
+ * marcador, é o que deixa um teste afirmar "este aparelho não escreveu nada" —
+ * que aqui é a regra inteira: aplicar o que veio da conta não pode virar um
+ * PATCH de volta.
+ */
+const prefsSemeadas = new WeakMap<
+  Page,
+  { prefs: Record<string, unknown> | undefined; patches: Record<string, unknown>[]; recusados: number }
+>();
+
+/** Põe preferências na conta ANTES do login, como se outro aparelho as tivesse escolhido. */
+function semearPrefs(page: Page, prefs: Record<string, unknown>) {
+  Object.assign(prefsSemeadas.get(page)!.prefs!, prefs);
+}
+
+/** Faz a API se comportar como a de antes das preferências. */
+function apiSemPrefs(page: Page) {
+  prefsSemeadas.get(page)!.prefs = undefined;
+}
+
+const contaFalsa = (page: Page) => prefsSemeadas.get(page)!;
+
 async function stubApi(page: Page) {
   let logado = false;
+  const conta: {
+    prefs: Record<string, unknown> | undefined;
+    patches: Record<string, unknown>[];
+    recusados: number;
+  } = { prefs: {}, patches: [], recusados: 0 };
+  prefsSemeadas.set(page, conta);
+  // `prefs` sai em toda resposta de auth quando o servidor as guarda — é a
+  // presença da chave que a PWA lê como "pode mandar".
+  const aparencia = () => (conta.prefs ? { prefs: conta.prefs } : {});
   // `true` de propósito, e não "realista".
   //
   // O usuário de teste TEM faixa no acervo, então um servidor de verdade
@@ -235,7 +272,10 @@ async function stubApi(page: Page) {
       return route.fulfill({ status: 400, json: { error: 'senha precisa de 8+ caracteres' } });
     }
     logado = true;
-    return route.fulfill({ status: 200, json: { name: email.split('@')[0], email, publico } });
+    return route.fulfill({
+      status: 200,
+      json: { name: email.split('@')[0], email, publico, ...aparencia() },
+    });
   });
 
   await page.route('**/api/auth/logout', async (route) => {
@@ -247,7 +287,7 @@ async function stubApi(page: Page) {
     logado
       ? route.fulfill({
           status: 200,
-          json: { name: 'thiago', email: 'thiago@ondas.app', publico },
+          json: { name: 'thiago', email: 'thiago@ondas.app', publico, ...aparencia() },
         })
       : route.fulfill({ status: 401, json: { error: 'sessão expirada' } }),
   );
@@ -261,13 +301,29 @@ async function stubApi(page: Page) {
   await page.route('**/api/auth/prefs', async (route) => {
     if (!logado) return route.fulfill({ status: 401, json: { error: 'sessão expirada' } });
     const corpo = JSON.parse(route.request().postData() ?? '{}');
-    if (typeof corpo.publico !== 'boolean') {
-      return route.fulfill({ status: 400, json: { error: 'requisição inválida' } });
+    const invalido = () =>
+      route.fulfill({
+        status: 400,
+        json: { error: 'requisição inválida', code: 'requisicao_invalida' },
+      });
+    const temPublico = typeof corpo.publico === 'boolean';
+    const temPrefs = corpo.prefs && typeof corpo.prefs === 'object';
+    // A API de antes das preferências recusa o campo que não conhece
+    // (`DisallowUnknownFields` no `lerJSON`), e é isso que o stub imita.
+    if (temPrefs && !conta.prefs) {
+      conta.recusados += 1;
+      return invalido();
     }
-    publico = corpo.publico;
+    if (!temPublico && !(temPrefs && Object.keys(corpo.prefs).length)) return invalido();
+    if (temPublico) publico = corpo.publico;
+    if (temPrefs) {
+      conta.patches.push(corpo.prefs);
+      // Parcial, como o `COALESCE` do servidor: o que não vem fica.
+      Object.assign(conta.prefs!, corpo.prefs);
+    }
     return route.fulfill({
       status: 200,
-      json: { name: 'thiago', email: 'thiago@ondas.app', publico },
+      json: { name: 'thiago', email: 'thiago@ondas.app', publico, ...aparencia() },
     });
   });
 
@@ -3260,4 +3316,506 @@ test('/en chama o recorte de --history', async ({ page }) => {
     'true',
   );
   await expect(page.getByText('empty — what you listen to shows up here.')).toBeVisible();
+});
+
+/* ── Os recortes pelo teclado ─────────────────────────────────────────────── */
+
+/** O chip do recorte, pelo nome que a tela mostra. */
+const chip = (page: Page, nome: string) => page.getByRole('button', { name: nome, exact: true });
+
+/** Digita na linha de comando e confirma. */
+async function comando(page: Page, texto: string) {
+  await page.keyboard.press(':');
+  await page.getByLabel('Ir para a faixa pelo número').fill(texto);
+  await page.keyboard.press('Enter');
+}
+
+test('`]` e `[` andam pelos recortes e dão a volta nas pontas', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+  await page.keyboard.press('3');
+  await expect(page).toHaveURL('/library');
+  // Com conta `/library` é `--acervo`, o quarto dos seis.
+  await expect(chip(page, '--acervo')).toHaveAttribute('aria-pressed', 'true');
+
+  await page.keyboard.press(']');
+  await expect(page).toHaveURL('/library/shared');
+  await expect(chip(page, '--compartilhadas')).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press(']');
+  await expect(page).toHaveURL('/library/offline');
+  // A ponta direita: o próximo é o primeiro.
+  await page.keyboard.press(']');
+  await expect(page).toHaveURL('/library/liked');
+  await expect(chip(page, '--curtidas')).toHaveAttribute('aria-pressed', 'true');
+
+  // E a ponta esquerda, para o outro lado.
+  await page.keyboard.press('[');
+  await expect(page).toHaveURL('/library/offline');
+  await page.keyboard.press('[');
+  await expect(page).toHaveURL('/library/shared');
+
+  // Push, como o clique no chip: o voltar anda entre recortes.
+  await page.goBack();
+  await expect(page).toHaveURL('/library/offline');
+});
+
+test('sem conta, `]` só alterna entre os dois chips desenhados', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+  await page.keyboard.press('3');
+  await expect(chip(page, '--curtidas')).toHaveAttribute('aria-pressed', 'true');
+
+  // Se o teclado andasse pela fileira inteira, cairia em `--playlists`, que
+  // ninguém desenhou para o visitante.
+  await page.keyboard.press(']');
+  await expect(page).toHaveURL('/library/offline');
+  await page.keyboard.press(']');
+  await expect(page).toHaveURL('/library/liked');
+  await page.keyboard.press('[');
+  await expect(page).toHaveURL('/library/offline');
+});
+
+test('de dentro de uma playlist, `]` sai para o chip vizinho', async ({ page }) => {
+  await blockAudius(page);
+  semearPlaylist(page, 'noite', ['demo0']);
+  await logar(page);
+  await page.goto('/library/playlists');
+  await page.getByRole('button', { name: /noite/ }).click();
+  await expect(page).toHaveURL('/library/playlists/semeada-noite');
+
+  await page.keyboard.press(']');
+  await expect(page).toHaveURL('/library/history');
+});
+
+test('fora da biblioteca os colchetes não fazem nada', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+
+  await page.keyboard.press(']');
+  await page.keyboard.press('[');
+  await expect(page).toHaveURL('/');
+
+  // Nem com o player cheio por cima, que é outra rota.
+  await page.getByRole('button', { name: /Maré Baixa/ }).click();
+  await page.keyboard.press('0');
+  await expect(page).toHaveURL(LINK_DEMO);
+  await page.keyboard.press(']');
+  await expect(page).toHaveURL(LINK_DEMO);
+});
+
+test('o chip marcado pelo teclado entra na vista quando a fileira rola', async ({ page }) => {
+  await blockAudius(page);
+  // Estreito de propósito, nos dois projetos: é só onde a fileira transborda.
+  await page.setViewportSize({ width: 360, height: 740 });
+  await logar(page);
+  await page.goto('/library/liked');
+  const offline = chip(page, '--offline');
+  await expect(chip(page, '--curtidas')).toHaveAttribute('aria-pressed', 'true');
+
+  const dentroDaFileira = () =>
+    offline.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const f = el.parentElement!.getBoundingClientRect();
+      return r.left >= f.left - 1 && r.right <= f.right + 1;
+    });
+  // O estado inicial tem de tornar o teste relevante: com o chip já à vista,
+  // ele passaria sem rolagem nenhuma.
+  expect(await dentroDaFileira()).toBe(false);
+
+  await page.keyboard.press('[');
+  await expect(page).toHaveURL('/library/offline');
+  await expect.poll(dentroDaFileira).toBe(true);
+});
+
+test('os colchetes valem com AltGr, e continuam do navegador com Cmd', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+  await page.keyboard.press('3');
+  await expect(page).toHaveURL('/library');
+
+  // Tipo estreito de propósito: `KeyboardEventInit` carrega `view: Window`, que
+  // o Playwright não sabe serializar.
+  const tecla = (extra: { metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean }) =>
+    page.evaluate(
+      (init) => window.dispatchEvent(new KeyboardEvent('keydown', { key: ']', ...init })),
+      extra,
+    );
+
+  // Cmd+] é "avançar" do navegador: não é nosso.
+  await tecla({ metaKey: true });
+  // Ctrl sozinho também não.
+  await tecla({ ctrlKey: true });
+  await expect(page).toHaveURL('/library');
+
+  // AltGr no Windows chega como Ctrl+Alt — é como `]` sai num teclado espanhol.
+  await tecla({ ctrlKey: true, altKey: true });
+  await expect(page).toHaveURL('/library/offline');
+});
+
+test('`:nome` leva ao recorte, de qualquer tela', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+  await expect(page).toHaveURL('/');
+
+  await comando(page, 'historico');
+  await expect(page).toHaveURL('/library/history');
+  await expect(chip(page, '--historico')).toHaveAttribute('aria-pressed', 'true');
+
+  // Um prefixo que só casa um recorte basta, e o `--` do chip é aceito.
+  await comando(page, 'off');
+  await expect(page).toHaveURL('/library/offline');
+  await comando(page, '--acervo');
+  await expect(page).toHaveURL('/library/archive');
+
+  // O que não leva a lugar nenhum diz por quê, e a tela fica onde estava.
+  await comando(page, 'xyz');
+  await expect(page.getByText('recorte "xyz" não existe')).toBeVisible();
+  await expect(page).toHaveURL('/library/archive');
+  await comando(page, 'c');
+  await expect(page.getByText('"c" casa com --curtidas, --compartilhadas')).toBeVisible();
+  await expect(page).toHaveURL('/library/archive');
+});
+
+test('sem conta, `:acervo` avisa que é só com conta e não navega', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+
+  await comando(page, 'acervo');
+  await expect(page.getByText('--acervo é só com conta')).toBeVisible();
+  await expect(page).toHaveURL('/');
+
+  // Os dois que o visitante vê continuam valendo.
+  await comando(page, 'offline');
+  await expect(page).toHaveURL('/library/offline');
+});
+
+test('/en entende o nome do recorte em inglês', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+  await page.goto('/en/');
+  await skipSplash(page);
+
+  await page.keyboard.press(':');
+  await page.getByLabel('Go to a track by number').fill('history');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL('/en/library/history');
+  await expect(chip(page, '--history')).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('a janela de atalhos lista os dois caminhos até um recorte', async ({ page }) => {
+  await blockAudius(page);
+  await entrarVisitante(page);
+  await page.keyboard.press('?');
+  const ajuda = page.getByRole('dialog', { name: 'ondas --help' });
+  await expect(ajuda.getByText('[/]', { exact: true })).toBeVisible();
+  await expect(ajuda.getByText('recorte anterior e próximo, na biblioteca')).toBeVisible();
+  await expect(ajuda.getByText(':recorte', { exact: true })).toBeVisible();
+});
+
+test('enter não toca uma faixa que ficou no recorte anterior', async ({ page }) => {
+  await blockAudius(page);
+  semearPlaylist(page, 'noite', ['demo0']);
+  await logar(page);
+  await page.keyboard.press('3');
+  await expect(chip(page, '--acervo')).toHaveAttribute('aria-pressed', 'true');
+
+  // O cursor marca uma linha de `--acervo`…
+  await page.keyboard.press('j');
+  await expect(cursor(page)).toContainText('Fita Caseira');
+
+  // …e o teclado leva ao índice de `--playlists`, que não lista faixa nenhuma.
+  await page.keyboard.press('[');
+  await page.keyboard.press('[');
+  await expect(page).toHaveURL('/library/playlists');
+  await expect(page.getByRole('button', { name: /noite/ })).toBeVisible();
+
+  // Aqui não há linha marcada na tela: `enter` e `j` não têm sobre o que agir.
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('j');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Abrir player' })).toHaveCount(0);
+});
+
+/* ── A aparência é da conta ───────────────────────────────────────────────── */
+
+const tema = (page: Page) => page.locator('html');
+
+/** Escolhe um tema pelo seletor, como quem usa. */
+async function escolherTema(page: Page, nome: RegExp) {
+  await page.getByRole('button', { name: 'Trocar tema' }).click();
+  await page
+    .getByRole('dialog', { name: 'ondas +list-themes' })
+    .getByRole('button', { name: nome })
+    .click();
+}
+
+/**
+ * Espera passar o debounce da subida, e mais um pouco.
+ *
+ * Só para afirmar AUSÊNCIA — "nada subiu". Para presença usa-se `expect.poll`,
+ * que não precisa de relógio.
+ */
+const passarODebounce = (page: Page) => page.waitForTimeout(1500);
+
+/** "Outro aparelho": o mesmo navegador sem nada do que este guardou de aparência. */
+async function esquecerAparenciaLocal(page: Page) {
+  await page.evaluate(() => {
+    localStorage.removeItem('ondas-theme');
+    localStorage.removeItem('ondas:idioma');
+  });
+}
+
+test('o tema da conta chega no login, e este aparelho não escreve de volta', async ({ page }) => {
+  await blockAudius(page);
+  semearPrefs(page, { tema: 'nord' });
+  await logar(page);
+  await expect(tema(page)).toHaveAttribute('data-theme', 'nord');
+
+  // E o boot seguinte já abre nele, pelo espelho que o primeiro paint lê.
+  await page.reload();
+  await skipSplash(page);
+  await expect(tema(page)).toHaveAttribute('data-theme', 'nord');
+
+  // Aplicar o que veio da conta não é gesto: se virasse PATCH, cada boot de
+  // cada aparelho escreveria na conta, e o último a abrir venceria sempre.
+  await passarODebounce(page);
+  expect(contaFalsa(page).patches).toEqual([]);
+});
+
+test('conta que nunca escolheu adota o tema que o aparelho já tinha', async ({ page }) => {
+  await blockAudius(page);
+  await page.goto('/login');
+  await skipSplash(page);
+  await escolherTema(page, /Dracula/);
+  await expect(tema(page)).toHaveAttribute('data-theme', 'dracula');
+
+  // É o dia da atualização: sem isto, quem já usava um tema o perderia para o
+  // padrão no primeiro login depois dela.
+  await preencherLogin(page);
+  await expect.poll(() => contaFalsa(page).prefs).toMatchObject({ tema: 'dracula' });
+  await expect(tema(page)).toHaveAttribute('data-theme', 'dracula');
+});
+
+test('conta que já escolheu vence o tema do aparelho', async ({ page }) => {
+  await blockAudius(page);
+  semearPrefs(page, { tema: 'nord' });
+  await page.goto('/login');
+  await skipSplash(page);
+  await escolherTema(page, /Dracula/);
+  await expect(tema(page)).toHaveAttribute('data-theme', 'dracula');
+
+  await preencherLogin(page);
+  await expect(tema(page)).toHaveAttribute('data-theme', 'nord');
+  await passarODebounce(page);
+  expect(contaFalsa(page).prefs).toEqual({ tema: 'nord' });
+  expect(contaFalsa(page).patches).toEqual([]);
+});
+
+test('trocar de tema com conta sobe para ela, e outro aparelho abre igual', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+  await escolherTema(page, /Nord/);
+  await expect.poll(() => contaFalsa(page).patches).toEqual([{ tema: 'nord' }]);
+
+  // O reload sozinho não provaria nada: o `localStorage` desenharia o mesmo
+  // tema. Sem ele, o que sobra é o que a conta diz.
+  await esquecerAparenciaLocal(page);
+  await page.reload();
+  await skipSplash(page);
+  await expect(tema(page)).toHaveAttribute('data-theme', 'nord');
+});
+
+test('os ajustes do fundo seguem a conta, e a imagem que não veio vira capa', async ({ page }) => {
+  await blockAudius(page);
+  semearPrefs(page, { opacity: 0.5, blur: 10, wall: 'imagem' });
+  await logar(page);
+
+  // A transparência chegou: o wallpaper existe e o fundo deixou de ser opaco.
+  const wallpaper = page.locator('div[aria-hidden="true"][style*="blur("]');
+  await expect(wallpaper).toHaveCount(1);
+  await expect(wallpaper).toHaveAttribute('style', /blur\(10px\)/);
+  expect(
+    await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--color-bg-a').trim(),
+    ),
+  ).not.toContain('100%');
+
+  // A conta pede `imagem`, e este aparelho não tem imagem nenhuma — ela não
+  // viaja. A tela mostra a capa e o chip aceso diz o mesmo.
+  await page.getByRole('button', { name: 'Trocar tema' }).click();
+  await expect(page.getByRole('button', { name: '[capa-atual]' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByRole('button', { name: /^\[?imagem\]?$/ })).toHaveCount(0);
+
+  // E a preferência da conta continua `imagem`: mostrar a capa aqui não pode
+  // desfazer a escolha no aparelho que TEM a imagem.
+  await passarODebounce(page);
+  expect(contaFalsa(page).patches).toEqual([]);
+  expect(contaFalsa(page).prefs).toMatchObject({ wall: 'imagem' });
+});
+
+test('arrastar a transparência sobe o valor final, e não um pedido por passo', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+  await page.getByRole('button', { name: 'Trocar tema' }).click();
+  const slider = page.getByLabel('background-opacity');
+  const trilha = (await slider.boundingBox())!;
+  const meio = trilha.y + trilha.height / 2;
+
+  for (const fracao of [0.2, 0.35, 0.5, 0.65, 0.8]) {
+    await page.mouse.click(trilha.x + trilha.width * fracao, meio);
+  }
+  const final = Number(await slider.inputValue());
+
+  await expect
+    .poll(() => contaFalsa(page).prefs)
+    .toMatchObject({ opacity: Math.round(final * 100) / 100 });
+  // Cinco passos, e no máximo dois pedidos: sem o debounce seriam cinco.
+  expect(contaFalsa(page).patches.length).toBeLessThanOrEqual(2);
+});
+
+test('o idioma da conta leva o aparelho para ele, uma vez só', async ({ page }) => {
+  await blockAudius(page);
+  semearPrefs(page, { idioma: 'en' });
+  let boots = 0;
+  page.on('request', (req) => {
+    if (req.url().endsWith('/api/auth/me')) boots += 1;
+  });
+
+  // O login é em português (é o idioma do navegador do teste), e a conta fala
+  // inglês: a home já abre sob `/en`.
+  await logar(page);
+  await expect(page).toHaveURL('/en/');
+  await skipSplash(page);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+
+  // Sem laço: o aparelho guardou o idioma antes de navegar, então o boot
+  // seguinte não tem o que corrigir. Um `/me` por boot, e a URL parada.
+  await page.waitForTimeout(1000);
+  const antes = boots;
+  await page.reload();
+  await skipSplash(page);
+  await page.waitForTimeout(1500);
+  expect(boots).toBe(antes + 1);
+  await expect(page).toHaveURL('/en/');
+  expect(contaFalsa(page).patches).toEqual([]);
+});
+
+test('um link em outro idioma abre nele, e não muda o idioma da conta', async ({ page }) => {
+  await blockAudius(page);
+  semearPrefs(page, { idioma: 'pt-BR' });
+  await logar(page);
+
+  // O endereço manda, como sempre mandou: a conta não é consultada para
+  // desfazer um link que alguém mandou em inglês.
+  await page.goto('/en/');
+  await skipSplash(page);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await passarODebounce(page);
+  await expect(page).toHaveURL('/en/');
+  // E abrir o link não é escolher: nada sobe.
+  expect(contaFalsa(page).patches).toEqual([]);
+
+  await page.goto('/');
+  await skipSplash(page);
+  await expect(page).toHaveURL('/');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
+});
+
+test('trocar de idioma com conta sobe para ela, e outro aparelho abre nele', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+
+  await page.getByRole('button', { name: 'Trocar idioma' }).click();
+  await page
+    .getByRole('dialog', { name: 'ondas +list-langs' })
+    .getByRole('button', { name: /español/ })
+    .click();
+  await expect(page).toHaveURL('/es/');
+  await skipSplash(page);
+  // Pelo estado, e não pelo pedido: ele parte com `keepalive` de uma página que
+  // está saindo, e se morrer no caminho é a fila do boot seguinte que entrega.
+  await expect.poll(() => contaFalsa(page).prefs).toMatchObject({ idioma: 'es' });
+
+  // Outro aparelho: sem idioma guardado, navegador em português, na raiz.
+  await esquecerAparenciaLocal(page);
+  await page.goto('/');
+  await expect(page).toHaveURL('/es/');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+});
+
+test('tema trocado sem rede fica na fila e sobe quando ela volta', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+
+  // O handler numa variável, pelo mesmo motivo do teste da curtida: `unroute`
+  // sem ele levaria junto a rota do `stubApi`.
+  const semRede = (route: Route) => route.abort();
+  await page.route('**/api/auth/prefs', semRede);
+  await escolherTema(page, /Nord/);
+  await passarODebounce(page);
+  expect(contaFalsa(page).patches).toEqual([]);
+
+  // Fechar e reabrir ainda sem rede: a fila está no disco, e a conta — que
+  // ainda diz "nunca escolhi" — não desfaz o gesto.
+  await page.reload();
+  await skipSplash(page);
+  await expect(tema(page)).toHaveAttribute('data-theme', 'nord');
+  await passarODebounce(page);
+  expect(contaFalsa(page).patches).toEqual([]);
+
+  await page.unroute('**/api/auth/prefs', semRede);
+  await page.reload();
+  await skipSplash(page);
+  await expect.poll(() => contaFalsa(page).patches).toEqual([{ tema: 'nord' }]);
+});
+
+test('contra uma API de antes das preferências, o aparelho segue só local', async ({ page }) => {
+  await blockAudius(page);
+  apiSemPrefs(page);
+  await logar(page);
+
+  await escolherTema(page, /Nord/);
+  await expect(tema(page)).toHaveAttribute('data-theme', 'nord');
+  await passarODebounce(page);
+  // Nem tenta: a rota antiga responderia 400 ao campo que não conhece, e a
+  // fila cresceria para sempre.
+  expect(contaFalsa(page).recusados).toBe(0);
+
+  await page.reload();
+  await skipSplash(page);
+  await expect(tema(page)).toHaveAttribute('data-theme', 'nord');
+  await passarODebounce(page);
+  expect(contaFalsa(page).recusados).toBe(0);
+});
+
+test('sair não muda a cara do app, e a fila de quem saiu não sobe para a próxima conta', async ({
+  page,
+}) => {
+  await blockAudius(page);
+  await logar(page);
+
+  // Sem rede para a fila ficar presa: é o único jeito de ela ainda existir na
+  // hora do `[sair]`, que tenta subi-la antes.
+  const semRede = (route: Route) => route.abort();
+  await page.route('**/api/auth/prefs', semRede);
+  await escolherTema(page, /Nord/);
+  await page.keyboard.press('Escape');
+
+  await page.keyboard.press('5');
+  await page.getByRole('button', { name: /sair/ }).click();
+  await expect(page).toHaveURL(/login/);
+  // O tema fica: é aparência do aparelho, e apagar piscaria a tela no padrão.
+  await expect(tema(page)).toHaveAttribute('data-theme', 'nord');
+
+  // Outra pessoa entra NA MESMA PÁGINA (`preencherLogin`, e não `logar`): um
+  // boot novo esconderia a falta da limpeza do logout.
+  await page.unroute('**/api/auth/prefs', semRede);
+  await preencherLogin(page);
+  await passarODebounce(page);
+  // O tema de quem saiu continua na tela, mas não é gravado em quem entrou —
+  // nem pela fila, nem por uma segunda "primeira adoção".
+  expect(contaFalsa(page).patches).toEqual([]);
 });

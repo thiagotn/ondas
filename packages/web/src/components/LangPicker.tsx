@@ -1,5 +1,5 @@
 import { BANDEIRAS, idioma, LOCALES, NOMES_DE_IDIOMA, t } from '@ondas/core';
-import { trocarIdioma } from '../app/idioma';
+import * as controller from '../app/controller';
 import { uiStore, useUi } from '../app/stores';
 import o from './overlay.module.css';
 
@@ -11,7 +11,7 @@ import o from './overlay.module.css';
  * "inglês", encontra "english".
  *
  * Diferente do seletor de tema, aqui não há pré-visualização ao passar o
- * mouse: trocar de idioma navega (ver `trocarIdioma`), e não dá para desfazer
+ * mouse: trocar de idioma navega (ver `escolherIdioma`), e não dá para desfazer
  * com um `onMouseLeave`.
  */
 export function LangPicker() {
@@ -41,7 +41,7 @@ export function LangPicker() {
               className={i === cursor ? `${o.pickerRow} ${o.pickerRowFocused}` : o.pickerRow}
               aria-current={locale === atual ? 'true' : undefined}
               onMouseEnter={() => uiStore.getState().setPickIdx(i)}
-              onClick={() => trocarIdioma(locale)}
+              onClick={() => void controller.escolherIdioma(locale)}
             >
               <span className={o.pickerMark}>
                 {locale === atual ? '●' : i === cursor ? '❯' : ''}

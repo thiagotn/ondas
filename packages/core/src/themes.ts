@@ -31,6 +31,18 @@ export function findTheme(id: string | null | undefined): ThemeDef {
   return THEMES.find((t) => t.id === id) ?? THEMES.find((t) => t.id === DEFAULT_THEME_ID)!;
 }
 
+/**
+ * Se o id é de um tema que ESTE build tem.
+ *
+ * Existe ao lado de `findTheme` porque os dois respondem perguntas opostas:
+ * `findTheme` sempre devolve um tema (o padrão, na dúvida), e é o certo para
+ * desenhar. Para um id que veio da conta, "na dúvida, o padrão" trocaria o
+ * tema da pessoa por um que ela não escolheu.
+ */
+export function isThemeId(id: string | null | undefined): id is ThemeId {
+  return THEMES.some((t) => t.id === id);
+}
+
 export function themeIndex(id: string | null | undefined): number {
   return Math.max(0, THEMES.findIndex((t) => t.id === findTheme(id).id));
 }

@@ -27,6 +27,14 @@ describe('atalhos', () => {
     expect(teclas).toContain('esc');
   });
 
+  it('os dois caminhos de teclado até um recorte estão na janela', () => {
+    const teclas = atalhos(false).map((a) => a.tecla);
+    expect(teclas).toContain('[/]');
+    expect(teclas).toContain(':recorte');
+    // E não engoliram a linha do número, que divide o `:` com ela.
+    expect(teclas).toContain(':nº');
+  });
+
   it('a legenda do rodapé é mais curta que a referência', () => {
     expect(legenda().length).toBeLessThan(atalhos(false).length);
   });

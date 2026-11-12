@@ -1,4 +1,5 @@
 import type { ErroDaApi } from '../types.js';
+import type { PrefsDaConta } from '../prefs.js';
 import type { Session, User } from '../types.js';
 
 export interface Credentials {
@@ -39,4 +40,12 @@ export interface AuthService {
    * é ele que `restore()` devolve sem rede.
    */
   setPublico(on: boolean): Promise<User>;
+  /**
+   * Grava na conta as preferências de aparência dadas, e só elas — o que não
+   * vem no objeto fica como está. Devolve o usuário novo.
+   *
+   * `keepalive` é para a troca de idioma, que recarrega a página logo depois:
+   * sem ele o pedido morreria com a navegação.
+   */
+  setPrefs(parcial: PrefsDaConta, opts?: { keepalive?: boolean }): Promise<User>;
 }

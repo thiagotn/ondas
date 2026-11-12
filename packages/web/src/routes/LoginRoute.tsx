@@ -13,6 +13,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGuestMode } from '../app/guest';
 import * as historico from '../app/historico';
+import { adotarIdiomaDaConta } from '../app/idioma';
+import * as prefs from '../app/prefs';
 import { CassetteLogo } from '../components/CassetteLogo';
 import { sincronizar } from '../app/likes';
 import { carregarPlaylists } from '../app/playlists';
@@ -41,6 +43,10 @@ export function LoginRoute() {
     try {
       const user = await auth.login({ email, password });
       sessionStore.getState().setUser(user);
+      // A aparência da conta, antes de sair desta tela: tema e fundo já valem
+      // aqui, e o idioma decide PARA ONDE se sai. O `await` é só de disco — o
+      // que tiver de subir sobe por conta própria.
+      const idiomaDaConta = await prefs.iniciar(user);
       // Traz as curtidas da conta — e sobe as que este aparelho guardava de
       // antes de elas serem da conta (`app/likes.ts`).
       void sincronizar();
@@ -51,6 +57,10 @@ export function LoginRoute() {
       void historico.iniciar({ novaSessao: true });
       setPassword('');
       uiStore.getState().closeGate();
+      // A conta fala outro idioma, e este aparelho ainda não sabia: a home é
+      // aberta já sob o prefixo dele, com uma navegação de verdade. O aviso de
+      // boas-vindas não é mostrado nesse caso — ele morreria com a página.
+      if (idiomaDaConta && adotarIdiomaDaConta(idiomaDaConta, PATHS.home)) return;
       uiStore.getState().flash(t('login.autenticado', { nome: user.name }));
       navigate(PATHS.home);
     } catch (err) {
