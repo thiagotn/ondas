@@ -1,5 +1,16 @@
 [
   {
+    "versao": "1.3.0",
+    "data": "2026-11-12",
+    "itens": [
+      {
+        "pt-BR": "no computador, a tela de login fica no meio da janela em vez de encostada no canto",
+        "en": "on a computer, the login screen sits in the middle of the window instead of tucked into the corner",
+        "es": "en el ordenador, la pantalla de inicio de sesión queda en el centro de la ventana en lugar de pegada a la esquina"
+      }
+    ]
+  },
+  {
     "versao": "1.2.0",
     "data": "2026-11-10",
     "itens": [

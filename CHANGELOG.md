@@ -7,6 +7,10 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.3.0 — 2026-11-12
+
+- no computador, a tela de login fica no meio da janela em vez de encostada no canto
+
 ## 1.2.0 — 2026-11-10
 
 - o app lembra onde você parou: abrindo com a mesma conta em qualquer aparelho, o player já vem com a última faixa, pausada no segundo certo — um toque e ela continua dali

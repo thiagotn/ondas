@@ -303,7 +303,7 @@
 }
 
 /* ── o player cabe na tela ────────────────────────────────────────
-   Primeiro e único `@media` do projeto, no mesmo ponto de corte do
+   Primeiro `@media` de largura do projeto, no mesmo ponto de corte do
    `useWide` (`hooks/useWide.ts`). Acima dele nada muda.
 
    Abaixo, capa e dados empilham e a soma passava da altura do celular: era

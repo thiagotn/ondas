@@ -60,6 +60,22 @@
   max-width: 640px;
 }
 
+/* Na janela larga o bloco vai para o meio. Encostado no canto, ele deixava
+   dois terços da tela vazios à direita e parecia página que não terminou de
+   carregar. O corte é o mesmo do `useWide` (`hooks/useWide.ts`); abaixo dele
+   nada muda — no celular o formulário já ocupa a largura toda, e subir com o
+   teclado aberto é pior do que ficar no topo. */
+@media (min-width: 860px) {
+  .content {
+    align-self: center;
+    width: 100%;
+    justify-content: center;
+    /* A barra de cima tem 40px: devolvê-los embaixo põe o bloco no meio da
+       JANELA, e não no meio do que sobrou dela. */
+    padding-bottom: 68px;
+  }
+}
+
 .lockup {
   display: flex;
   align-items: center;

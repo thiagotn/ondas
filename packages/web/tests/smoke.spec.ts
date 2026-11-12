@@ -609,6 +609,35 @@ test('o player esconde os atalhos no estreito e mantém as ações numa linha', 
   for (const c of caixas) expect(c.direita).toBeLessThanOrEqual(limite);
 });
 
+test('o login fica no meio da janela larga e no topo da estreita', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+
+  const janela = page.viewportSize()!;
+  const caixa = (await page.getByRole('button', { name: /continuar como visitante/ }).boundingBox())!;
+  const esquerda = caixa.x;
+  const direita = janela.width - (caixa.x + caixa.width);
+
+  if (janela.width >= 860) {
+    // As duas sobras iguais, e não só "longe da borda": um `margin-left` fixo
+    // também afastaria o bloco e continuaria torto.
+    expect(Math.abs(esquerda - direita)).toBeLessThanOrEqual(1);
+    expect(esquerda).toBeGreaterThan(100);
+
+    // E na vertical: do lockup ao último botão, o bloco tem a mesma sobra em
+    // cima e embaixo.
+    const topo = (await page.getByText('ondas', { exact: true }).boundingBox())!.y;
+    const fim = caixa.y + caixa.height;
+    expect(Math.abs((topo + fim) / 2 - janela.height / 2)).toBeLessThan(40);
+  } else {
+    // No celular nada muda: largura toda, logo abaixo da barra.
+    expect(esquerda).toBeLessThanOrEqual(24);
+    expect(direita).toBeLessThanOrEqual(24);
+    const topo = (await page.getByText('ondas', { exact: true }).boundingBox())!.y;
+    expect(topo).toBeLessThan(140);
+  }
+});
+
 test('faixa [pro] abre o gate de permissão para visitante', async ({ page }) => {
   await page.goto('/login');
   await skipSplash(page);
