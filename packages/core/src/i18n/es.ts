@@ -319,8 +319,6 @@ export const ES: Record<Chave, Frase> = {
   'sobre.notas': '[notas de la versión]',
   'sobre.bugs': 'bugs',
   'sobre.reportar': '[reportar un bug]',
-  'sobre.bugsDica':
-    '¿encontraste un problema? abre una issue en github con: qué pasó, qué esperabas, los pasos para repetirlo, la versión de arriba y tu dispositivo y navegador.',
   'sobre.texto1':
     'ondas es un reproductor de música con estética de terminal — la ola rompe, la lista es la pantalla, y todo se hace con el teclado.',
   'sobre.texto2': 'uno de los side projects de {autor}, hechos para estudiar IA.',

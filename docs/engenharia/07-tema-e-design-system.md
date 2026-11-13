@@ -167,7 +167,7 @@ terceira é a única cor que um módulo declara: a espuma da onda do logo
 (`packages/web/src/components/wave.module.css`) é o destaque misturado com branco, porque espuma
 tem de ser clara nos nove temas e nenhum token é claro no escuro e no claro ao mesmo tempo.
 
-Há cinco `@keyframes` no projeto inteiro. O comentário em `packages/web/src/styles/global.css:116`
+Há quatro `@keyframes` no projeto inteiro. O comentário em `packages/web/src/styles/global.css:116`
 diz o que isso significa na prática: *"O cursor é o único movimento da interface."*
 
 ## O que foi descartado

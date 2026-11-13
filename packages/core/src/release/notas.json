@@ -1,5 +1,16 @@
 [
   {
+    "versao": "1.8.0",
+    "data": "2026-11-13",
+    "itens": [
+      {
+        "pt-BR": "`ondas --about` mostra a marca da onda no lugar do nome em blocos, e a linha de bugs ficou só com o link `[reportar um bug]` — o texto que explicava o que informar ocupava meia tela no celular",
+        "en": "`ondas --about` shows the wave mark instead of the block-letter name, and the bugs row is now just the `[report a bug]` link — the text explaining what to include took up half the screen on a phone",
+        "es": "`ondas --about` muestra la marca de la ola en lugar del nombre en bloques, y la fila de bugs quedó solo con el enlace `[reportar un bug]` — el texto que explicaba qué informar ocupaba media pantalla en el móvil"
+      }
+    ]
+  },
+  {
     "versao": "1.7.1",
     "data": "2026-11-13",
     "itens": [

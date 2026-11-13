@@ -4117,14 +4117,16 @@ test('apagar a conta pede a senha, e só o aceite do servidor tira a pessoa do a
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test('`ondas --about` diz como reportar um bug e leva às issues do projeto', async ({ page }) => {
+test('`ondas --about` leva às issues do projeto para reportar um bug', async ({ page }) => {
   await logar(page);
   await page.keyboard.press('7');
   const sobre = page.getByRole('dialog', { name: 'ondas --about' });
   await expect(sobre).toBeVisible();
 
-  // O mínimo que a issue precisa está escrito ali, antes do clique.
-  await expect(sobre.getByText(/os passos para repetir, a versão acima/)).toBeVisible();
+  // A linha é só o rótulo e o link: o que informar quem pede é o formulário da
+  // issue, e a frase que explicava isso aqui ocupava meia tela no celular.
+  await expect(sobre.getByText('bugs', { exact: true })).toBeVisible();
+  await expect(sobre.getByText(/abra uma issue/)).toHaveCount(0);
   const link = sobre.getByRole('link', { name: '[reportar um bug]' });
   await expect(link).toHaveAttribute('href', 'https://github.com/thiagotn/ondas/issues/new/choose');
   // Abre em outra aba: reportar não pode custar a música que está tocando.

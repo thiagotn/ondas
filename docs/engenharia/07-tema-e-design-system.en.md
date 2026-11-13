@@ -168,7 +168,7 @@ declares: the foam on the logo's wave (`packages/web/src/components/wave.module.
 mixed with white, because foam has to be light in all nine themes and no token is light in both
 dark and light at once.
 
-There are five `@keyframes` in the entire project. The comment at
+There are four `@keyframes` in the entire project. The comment at
 `packages/web/src/styles/global.css:116` says what that means in practice: *"O cursor é o único
 movimento da interface."* — the cursor is the interface's only motion.
 

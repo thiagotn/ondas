@@ -320,8 +320,6 @@ export const EN: Record<Chave, Frase> = {
   'sobre.notas': '[release notes]',
   'sobre.bugs': 'bugs',
   'sobre.reportar': '[report a bug]',
-  'sobre.bugsDica':
-    'found a problem? open an issue on github with: what happened, what you expected, the steps to reproduce, the version above and your device and browser.',
   'sobre.texto1':
     'ondas is a music player with a terminal aesthetic — the wave breaks, the list is the screen, and everything is done from the keyboard.',
   'sobre.texto2': 'one of {autor}\u2019s side projects, built to study AI.',

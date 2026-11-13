@@ -727,84 +727,22 @@
 
 /* ── sobre (`ondas --about`) ──────────────────────────────────── */
 
-/* Mais folga que nos atalhos: a arte precisa respirar longe do texto. */
+/* Mais folga que nos atalhos: a marca precisa respirar longe do texto. */
 .sobreCorpo {
   gap: 16px;
   align-items: center;
 }
 
-/* O logo em ASCII, no estilo do About do omarchy — a palavra passada pela
-   fonte FIGlet *Delta Corps Priest 1*:
-
-      ▄██████▄  ███▄▄▄▄   ████████▄     ▄████████    ▄████████
-     ███    ███ ███▀▀▀██▄ ███   ▀███   ███    ███   ███    ███
-     ███    ███ ███   ███ ███    ███   ███    ███   ███    █▀
-     ███    ███ ███   ███ ███    ███   ███    ███   ███
-     ███    ███ ███   ███ ███    ███ ▀███████████ ▀███████████
-     ███    ███ ███   ███ ███    ███   ███    ███          ███
-     ███    ███ ███   ███ ███   ▄███   ███    ███    ▄█    ███
-      ▀██████▀   ▀█   █▀  ████████▀    ███    █▀   ▄████████▀
-
-   Ela NÃO é desenhada como texto. JetBrains Mono não tem os blocos (U+2588 e
-   as metades), então cada um caía numa fonte de reserva cuja célula é mais
-   larga que a dela — 7,225px contra 7,0px a 12px — e as colunas desencontravam.
-   Pior: em posição fracionária os blocos vizinhos não encostam, e a arte
-   ganhava listras claras no meio das letras.
-
-   Então o mesmo desenho virou uma máscara vetorial: um retângulo por célula
-   (inteira, metade de cima ou metade de baixo), as vizinhas de mesma altura
-   fundidas numa barra só. Sem fonte, sem emenda, e nítido em qualquer tamanho
-   ou densidade de tela. O que pinta através dela é o `background` — é por isso
-   que o brilho abaixo é um gradiente de verdade, e não um recorte no texto.
-
-   Para refazer a arte: `figlet -f 'Delta Corps Priest 1' ondas`, um retângulo
-   por caractere, e o `scale(.6 1)` do SVG devolve a proporção da célula do
-   terminal (avanço de 0,6em por linha de 1em). */
-.sobreArte {
-  width: min(100%, 420px);
-  aspect-ratio: 34.2 / 8;
-  background-color: var(--color-accent);
-  -webkit-mask: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2034.2%208%22%3E%3Cg%20transform%3D%22scale(.6%201)%22%3E%3Cpath%20d%3D%22M1%200.5h1v0.5h-1zM2%200h6v1h-6zM8%200.5h1v0.5h-1zM11%200h3v1h-3zM14%200.5h4v0.5h-4zM21%200h8v1h-8zM29%200.5h1v0.5h-1zM35%200.5h1v0.5h-1zM36%200h8v1h-8zM48%200.5h1v0.5h-1zM49%200h8v1h-8zM0%201h3v1h-3zM7%201h3v1h-3zM11%201h3v1h-3zM14%201h3v0.5h-3zM17%201h2v1h-2zM19%201.5h1v0.5h-1zM21%201h3v1h-3zM27%201h1v0.5h-1zM28%201h3v1h-3zM34%201h3v1h-3zM41%201h3v1h-3zM47%201h3v1h-3zM54%201h3v1h-3zM0%202h3v1h-3zM7%202h3v1h-3zM11%202h3v1h-3zM17%202h3v1h-3zM21%202h3v1h-3zM28%202h3v1h-3zM34%202h3v1h-3zM41%202h3v1h-3zM47%202h3v1h-3zM54%202h1v1h-1zM55%202h1v0.5h-1zM0%203h3v1h-3zM7%203h3v1h-3zM11%203h3v1h-3zM17%203h3v1h-3zM21%203h3v1h-3zM28%203h3v1h-3zM34%203h3v1h-3zM41%203h3v1h-3zM47%203h3v1h-3zM0%204h3v1h-3zM7%204h3v1h-3zM11%204h3v1h-3zM17%204h3v1h-3zM21%204h3v1h-3zM28%204h3v1h-3zM32%204h1v0.5h-1zM33%204h11v1h-11zM45%204h1v0.5h-1zM46%204h11v1h-11zM0%205h3v1h-3zM7%205h3v1h-3zM11%205h3v1h-3zM17%205h3v1h-3zM21%205h3v1h-3zM28%205h3v1h-3zM34%205h3v1h-3zM41%205h3v1h-3zM54%205h3v1h-3zM0%206h3v1h-3zM7%206h3v1h-3zM11%206h3v1h-3zM17%206h3v1h-3zM21%206h3v1h-3zM27%206.5h1v0.5h-1zM28%206h3v1h-3zM34%206h3v1h-3zM41%206h3v1h-3zM48%206.5h1v0.5h-1zM49%206h1v1h-1zM54%206h3v1h-3zM1%207h1v0.5h-1zM2%207h6v1h-6zM8%207h1v0.5h-1zM12%207h1v0.5h-1zM13%207h1v1h-1zM17%207h1v1h-1zM18%207h1v0.5h-1zM21%207h8v1h-8zM29%207h1v0.5h-1zM34%207h3v1h-3zM41%207h1v1h-1zM42%207h1v0.5h-1zM46%207.5h1v0.5h-1zM47%207h8v1h-8zM55%207h1v0.5h-1z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E') no-repeat center / contain;
-  mask: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2034.2%208%22%3E%3Cg%20transform%3D%22scale(.6%201)%22%3E%3Cpath%20d%3D%22M1%200.5h1v0.5h-1zM2%200h6v1h-6zM8%200.5h1v0.5h-1zM11%200h3v1h-3zM14%200.5h4v0.5h-4zM21%200h8v1h-8zM29%200.5h1v0.5h-1zM35%200.5h1v0.5h-1zM36%200h8v1h-8zM48%200.5h1v0.5h-1zM49%200h8v1h-8zM0%201h3v1h-3zM7%201h3v1h-3zM11%201h3v1h-3zM14%201h3v0.5h-3zM17%201h2v1h-2zM19%201.5h1v0.5h-1zM21%201h3v1h-3zM27%201h1v0.5h-1zM28%201h3v1h-3zM34%201h3v1h-3zM41%201h3v1h-3zM47%201h3v1h-3zM54%201h3v1h-3zM0%202h3v1h-3zM7%202h3v1h-3zM11%202h3v1h-3zM17%202h3v1h-3zM21%202h3v1h-3zM28%202h3v1h-3zM34%202h3v1h-3zM41%202h3v1h-3zM47%202h3v1h-3zM54%202h1v1h-1zM55%202h1v0.5h-1zM0%203h3v1h-3zM7%203h3v1h-3zM11%203h3v1h-3zM17%203h3v1h-3zM21%203h3v1h-3zM28%203h3v1h-3zM34%203h3v1h-3zM41%203h3v1h-3zM47%203h3v1h-3zM0%204h3v1h-3zM7%204h3v1h-3zM11%204h3v1h-3zM17%204h3v1h-3zM21%204h3v1h-3zM28%204h3v1h-3zM32%204h1v0.5h-1zM33%204h11v1h-11zM45%204h1v0.5h-1zM46%204h11v1h-11zM0%205h3v1h-3zM7%205h3v1h-3zM11%205h3v1h-3zM17%205h3v1h-3zM21%205h3v1h-3zM28%205h3v1h-3zM34%205h3v1h-3zM41%205h3v1h-3zM54%205h3v1h-3zM0%206h3v1h-3zM7%206h3v1h-3zM11%206h3v1h-3zM17%206h3v1h-3zM21%206h3v1h-3zM27%206.5h1v0.5h-1zM28%206h3v1h-3zM34%206h3v1h-3zM41%206h3v1h-3zM48%206.5h1v0.5h-1zM49%206h1v1h-1zM54%206h3v1h-3zM1%207h1v0.5h-1zM2%207h6v1h-6zM8%207h1v0.5h-1zM12%207h1v0.5h-1zM13%207h1v1h-1zM17%207h1v1h-1zM18%207h1v0.5h-1zM21%207h8v1h-8zM29%207h1v0.5h-1zM34%207h3v1h-3zM41%207h1v1h-1zM42%207h1v0.5h-1zM46%207.5h1v0.5h-1zM47%207h8v1h-8zM55%207h1v0.5h-1z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E') no-repeat center / contain;
-}
-
-/* O brilho que atravessa a arte, como no About do omarchy. O acento 100 é o
-   mais misturado com o `fg` (ver o docblock de `tokens.ts`), então é a banda
-   que contrasta tanto no tema claro quanto no escuro. */
-.sobreGlint {
-  background-image: linear-gradient(
-    100deg,
-    var(--color-accent) 44%,
-    var(--color-accent-100) 50%,
-    var(--color-accent) 56%
-  );
-  background-size: 300% 100%;
-  animation: ondas-glint 6s linear infinite;
-}
-
-/* A varredura acontece só no fim do ciclo: a arte fica parada a maior parte do
-   tempo, e o brilho passa de vez em quando — não é um letreiro. */
-@keyframes ondas-glint {
-  0%,
-  72% {
-    background-position: 140% 0;
-  }
-  100% {
-    background-position: -40% 0;
-  }
-}
-
-/* Quem pediu menos movimento vê a arte parada. Sem o gradiente ela volta a ser
-   a cor de acento chapada do `.sobreArte`, que continua lá embaixo. */
-@media (prefers-reduced-motion: reduce) {
-  .sobreGlint {
-    animation: none;
-    background-image: none;
-  }
+/* A marca, no lugar onde ficava a palavra "ondas" em blocos de FIGlet. O
+   tamanho é o de um selo, e não o da abertura: aqui ela assina a janela, e o
+   que se lê é o texto logo abaixo. */
+.sobreLogo {
+  width: 104px;
+  flex-shrink: 0;
 }
 
 /* Centrado, e não à esquerda como o resto das janelas: estas duas frases são
-   legenda da arte acima delas, e lidas em bloco com ela. O painel abaixo
+   legenda da marca acima delas, e lidas em bloco com ela. O painel abaixo
    continua alinhado à esquerda — ele é tabela, não texto. */
 .sobreTexto {
   margin: 0;

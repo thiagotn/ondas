@@ -1,19 +1,21 @@
 import { t, tAoRedor } from '@ondas/core';
 import { Link } from 'react-router-dom';
+import { usePlayer } from '../app/stores';
 import { useAboutOverlay } from '../hooks/useAboutOverlay';
+import { useCurrentTrack } from '../hooks/useCurrentTrack';
 import { useWide } from '../hooks/useWide';
 import { PATHS } from '../routes/paths';
 import o from './overlay.module.css';
 import s from './shell.module.css';
+import { WaveLogo } from './WaveLogo';
 
 /** O perfil do autor, atrás do `@thiagotn` que a própria frase já dizia. */
 const GITHUB = 'https://github.com/thiagotn';
 
 /**
  * Onde se reporta um bug: o seletor de modelos de issue do repositório. O
- * `/choose` cai no formulário de `.github/ISSUE_TEMPLATE/bug.yml`, que pede o
- * mesmo que a frase daqui resume — a frase existe para a pessoa já chegar lá
- * com a versão e os passos na mão.
+ * `/choose` cai no formulário de `.github/ISSUE_TEMPLATE/bug.yml`, que é quem
+ * pede versão, passos e aparelho — esta janela só leva até lá.
  */
 const ISSUES = 'https://github.com/thiagotn/ondas/issues/new/choose';
 
@@ -35,6 +37,9 @@ const ISSUES = 'https://github.com/thiagotn/ondas/issues/new/choose';
 export function AboutOverlay() {
   const wide = useWide();
   const { closeAbout } = useAboutOverlay();
+  const { t: tempo, dur, playing } = usePlayer((st) => st);
+  const faixa = useCurrentTrack();
+  const duracao = dur || faixa?.dur || 0;
   // A frase chega partida em volta do `{autor}` do catálogo: o nome cai no meio
   // dela, e em espanhol não no mesmo lugar que em português.
   const [antesDoAutor, depoisDoAutor] = tAoRedor('sobre.texto2', 'autor');
@@ -54,10 +59,15 @@ export function AboutOverlay() {
         </button>
 
         <div className={o.sobreCorpo}>
-          {/* Decorativa, e por isso um span vazio: o desenho é uma máscara no
-              CSS (a explicação de por que não é texto está lá), e o nome do
-              produto já está no rótulo da janela e na frase abaixo. */}
-          <span className={`${o.sobreArte} ${o.sobreGlint}`} aria-hidden="true" />
+          {/* A marca, viva como a da barra de abas que abriu esta janela: mexe
+              com o áudio e o sol acompanha a faixa. Sem faixa nenhuma o sol
+              fica alto, e não no mar: aqui a marca é assinatura, e meio sol
+              afundado leria como desenho cortado. Decorativa (sem nome
+              acessível): o nome do produto já está no rótulo da janela e na
+              frase abaixo. */}
+          <div className={o.sobreLogo}>
+            <WaveLogo playing={playing} progress={duracao ? tempo / duracao : 1} />
+          </div>
 
           <p className={o.sobreTexto}>{t('sobre.texto1')}</p>
           <p className={o.sobreTexto}>
@@ -87,7 +97,11 @@ export function AboutOverlay() {
             </div>
             <div className={s.panelRow}>
               <span className={s.panelLabel}>{t('sobre.bugs')}</span>
-              <span className={`${s.panelValue} ${s.panelMuted}`}>{t('sobre.bugsDica')}</span>
+              {/* Só o link. O que informar não precisa estar escrito aqui: o
+                  formulário da issue já pede cada campo, e a frase que explicava
+                  isso ocupava meia tela no celular. O `panelValue` vazio é o
+                  que empurra o link para a direita, como na linha da versão. */}
+              <span className={s.panelValue} />
               <a className={s.link} href={ISSUES} target="_blank" rel="noreferrer">
                 {t('sobre.reportar')}
               </a>

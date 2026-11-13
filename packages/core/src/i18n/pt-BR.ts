@@ -351,8 +351,6 @@ export const PT_BR = {
   'sobre.notas': '[notas da versão]',
   'sobre.bugs': 'bugs',
   'sobre.reportar': '[reportar um bug]',
-  'sobre.bugsDica':
-    'achou um problema? abra uma issue no github com: o que aconteceu, o que você esperava, os passos para repetir, a versão acima e o aparelho e navegador.',
   'sobre.texto1':
     'ondas é um player de música com estética de terminal — a onda quebra, a lista é a tela, e tudo se faz pelo teclado.',
   // `{autor}` fica no catálogo, e não no componente, porque é no meio da frase

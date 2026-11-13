@@ -7,6 +7,10 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.8.0 — 2026-11-13
+
+- `ondas --about` mostra a marca da onda no lugar do nome em blocos, e a linha de bugs ficou só com o link `[reportar um bug]` — o texto que explicava o que informar ocupava meia tela no celular
+
 ## 1.7.1 — 2026-11-13
 
 - o favicon, o ícone do app e a tela de abertura do iOS agora trocam junto com a marca — na 1.7.0 eles continuavam mostrando a fita, porque o endereço dos arquivos não mudava e a cópia antiga ficava guardada por semanas
