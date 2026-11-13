@@ -24,6 +24,12 @@ const require = createRequire(import.meta.url);
 const SRC = join(here, '..', '..', '..', 'design_handoff_ondas_brand_onda', 'assets', 'splash.svg');
 const OUT = join(here, '..', 'public', 'splash');
 const BG = '#1e1e2e';
+/**
+ * A versão da marca, que vai na query dos links: os PNGs têm nome fixo e cache
+ * de 30 dias, então é o endereço que tem de mudar quando o desenho muda. O mesmo
+ * número mora no index.html e nos manifests.
+ */
+const VERSAO_DA_MARCA = 2;
 
 /**
  * Telas em retrato (o manifest fixa `orientation: portrait`). `w`/`h` são
@@ -93,6 +99,6 @@ for (const { w, h, dw, dh, dpr } of SIZES) {
   console.log(
     `<link rel="apple-touch-startup-image" media="screen and (device-width: ${dw}px) and ` +
       `(device-height: ${dh}px) and (-webkit-device-pixel-ratio: ${dpr}) and (orientation: portrait)" ` +
-      `href="/splash/splash-${w}x${h}.png" />`,
+      `href="/splash/splash-${w}x${h}.png?v=${VERSAO_DA_MARCA}" />`,
   );
 }

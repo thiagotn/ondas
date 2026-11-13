@@ -1,5 +1,16 @@
 [
   {
+    "versao": "1.7.1",
+    "data": "2026-11-13",
+    "itens": [
+      {
+        "pt-BR": "o favicon, o ícone do app e a tela de abertura do iOS agora trocam junto com a marca — na 1.7.0 eles continuavam mostrando a fita, porque o endereço dos arquivos não mudava e a cópia antiga ficava guardada por semanas",
+        "en": "the favicon, the app icon and the iOS launch screen now change along with the mark — in 1.7.0 they kept showing the cassette, because the files kept the same address and the old copy stayed cached for weeks",
+        "es": "el favicon, el icono de la app y la pantalla de inicio de iOS ahora cambian junto con la marca — en la 1.7.0 seguían mostrando la cinta, porque los archivos mantenían la misma dirección y la copia antigua quedaba guardada durante semanas"
+      }
+    ]
+  },
+  {
     "versao": "1.7.0",
     "data": "2026-11-13",
     "itens": [
