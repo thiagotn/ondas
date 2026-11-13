@@ -3801,8 +3801,16 @@ test('sair não muda a cara do app, e a fila de quem saiu não sobe para a próx
   await page.keyboard.press('Escape');
 
   await page.keyboard.press('5');
+  // O `[sair]` navega para o login NA HORA e deixa o `logout` correndo atrás
+  // (ele ainda sobe curtidas, ordem e histórico antes de matar o cookie). A
+  // URL não prova que ele acabou: é a resposta do `/logout` que prova. Sem
+  // esperar por ela, numa máquina lenta a rede abaixo voltava com o logout no
+  // meio, e a subida de despedida — que é de quem está saindo, e é certa —
+  // era contada como gravação na conta seguinte.
+  const saiu = page.waitForResponse('**/api/auth/logout');
   await page.getByRole('button', { name: /sair/ }).click();
   await expect(page).toHaveURL(/login/);
+  await saiu;
   // O tema fica: é aparência do aparelho, e apagar piscaria a tela no padrão.
   await expect(tema(page)).toHaveAttribute('data-theme', 'nord');
 
