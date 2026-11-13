@@ -683,7 +683,7 @@ test('visitante entra, troca de tema, toca e abre o full player', async ({ page 
   // Sem sessão, a rota raiz manda para o login.
   await expect(page.getByText('ondas — login')).toBeVisible();
   await expect(page.getByLabel('ondas', { exact: true })).toBeVisible();
-  await expect(page.getByText('lado A', { exact: true })).toBeVisible();
+  await expect(page.getByText('a grande onda', { exact: true })).toBeVisible();
 
   // Credenciais inválidas são recusadas sem sair da tela.
   await page.getByPlaceholder('voce@email.com').fill('thiago');
@@ -1331,7 +1331,7 @@ test('a abertura toca no boot, e um toque a pula', async ({ page }) => {
 
   const splash = page.getByRole('button', { name: 'pular abertura' });
   await expect(splash).toBeVisible();
-  await expect(page.getByText('lado A · streaming independente')).toBeVisible();
+  await expect(page.getByText('a grande onda · streaming independente')).toBeVisible();
 
   // Um toque pula — não é preciso esperar os 2,2s.
   await splash.click();

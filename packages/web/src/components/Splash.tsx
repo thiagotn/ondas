@@ -2,7 +2,7 @@ import { t } from '@ondas/core';
 import { useEffect, useState } from 'react';
 import { useSplash } from '../app/splash';
 import { useCatalog } from '../query/catalog';
-import { CassetteLogo } from './CassetteLogo';
+import { WaveLogo } from './WaveLogo';
 import s from './splash.module.css';
 
 /** Um quadro por tick, como no protótipo. */
@@ -15,7 +15,7 @@ const CAP_MS = 4500;
 const BAR = 20;
 
 /**
- * Abertura: a fita rebobinando enquanto o catálogo carrega.
+ * Abertura: o sol nascendo atrás da onda enquanto o catálogo carrega.
  *
  * Fecha quando já passou o mínimo **e** o catálogo chegou, ou no teto — o que
  * vier primeiro. Um toque pula.
@@ -52,7 +52,7 @@ export function Splash() {
       }}
     >
       <div className={s.logo}>
-        <CassetteLogo playing progress={progress} label speed={1.2} />
+        <WaveLogo playing progress={progress} speed={1.2} />
       </div>
 
       <div className={s.wordmark}>

@@ -1,0 +1,48 @@
+.logo {
+  display: block;
+  overflow: visible;
+}
+
+/* A espuma é a única cor do app que não sai de um token pronto, e é de
+   propósito. Espuma tem de ser CLARA em qualquer tema: `--color-text` serviria
+   nos oito escuros e a deixaria quase preta no claro, e `--color-bg` faria o
+   contrário. Derivar do destaque com branco dá uma espuma clara nos nove, com
+   o tom da própria onda. */
+.foam {
+  fill: color-mix(in oklab, var(--color-accent) 22%, white);
+}
+
+/* O movimento do logo. A velocidade vem de `--wave-speed` (prop `speed`). */
+.bob {
+  animation: ondas-bob var(--wave-speed, 1.8s) ease-in-out infinite alternate;
+}
+
+/* As gotas escorrem um pouco mais rápido que a onda, para não andarem juntas. */
+.drift {
+  animation: ondas-drift calc(var(--wave-speed, 1.8s) * 0.66) ease-in-out infinite alternate;
+}
+
+.paused {
+  animation-play-state: paused;
+}
+
+@keyframes ondas-bob {
+  to {
+    transform: translateY(-1.2px);
+  }
+}
+
+@keyframes ondas-drift {
+  to {
+    transform: translate(1.2px, 1.4px);
+  }
+}
+
+/* Quem pediu menos movimento vê a onda parada. O sol continua subindo com a
+   faixa: aquilo é estado, não animação. */
+@media (prefers-reduced-motion: reduce) {
+  .bob,
+  .drift {
+    animation: none;
+  }
+}

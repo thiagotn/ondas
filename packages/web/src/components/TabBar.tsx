@@ -5,7 +5,7 @@ import { useAboutOverlay } from '../hooks/useAboutOverlay';
 import { useCurrentTrack } from '../hooks/useCurrentTrack';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { useWide } from '../hooks/useWide';
-import { CassetteLogo } from './CassetteLogo';
+import { WaveLogo } from './WaveLogo';
 import s from './shell.module.css';
 
 // O rótulo é CHAVE, e não a palavra: ele é o mesmo caminho que o prompt
@@ -101,7 +101,7 @@ function TabLogo() {
       onClick={openAbout}
     >
       <span className={s.logoMark}>
-        <CassetteLogo playing={playing} progress={duration ? t / duration : 0} />
+        <WaveLogo playing={playing} progress={duration ? t / duration : 0} />
       </span>
     </button>
   );

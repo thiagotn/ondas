@@ -7,6 +7,11 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.7.0 — 2026-11-13
+
+- marca nova: a Grande Onda de Kanagawa, com o sol vermelho atrás, no lugar da fita cassete. A onda se mexe enquanto a música toca, e o sol nasce conforme a faixa avança
+- o ícone do app, o favicon e a tela de abertura do iOS acompanham a marca nova — em quem já instalou o app, o ícone pode demorar a trocar
+
 ## 1.6.0 — 2026-11-13
 
 - dá para pedir uma conta: a tela de login ganhou `[c] pedir uma conta`. O pedido passa por análise, e é a própria tela de login que diz se ele foi aprovado

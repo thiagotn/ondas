@@ -277,8 +277,8 @@ export const PT_BR = {
 
   // ── abertura ─────────────────────────────────────────────────
   'splash.pular': 'pular abertura',
-  'splash.tagline': 'lado A · streaming independente',
-  'splash.carregando': 'rebobinando · carregando metadados',
+  'splash.tagline': 'a grande onda · streaming independente',
+  'splash.carregando': 'subindo a maré · carregando metadados',
   'splash.pronto': 'pronto ▶',
 
   // ── seletor de tema ──────────────────────────────────────────
@@ -304,7 +304,7 @@ export const PT_BR = {
 
   // ── login ────────────────────────────────────────────────────
   'login.janela': 'ondas — login',
-  'login.ladoA': 'lado A',
+  'login.assinatura': 'a grande onda',
   'login.intro': 'ondas v{versao} — streaming de música independente',
   'login.introLinha2': 'digite suas credenciais ou continue como visitante.',
   'login.entrarCompleto': 'entrar — catálogo completo + offline',
@@ -354,7 +354,7 @@ export const PT_BR = {
   'sobre.bugsDica':
     'achou um problema? abra uma issue no github com: o que aconteceu, o que você esperava, os passos para repetir, a versão acima e o aparelho e navegador.',
   'sobre.texto1':
-    'ondas é um player de música com estética de terminal — a fita roda, a lista é a tela, e tudo se faz pelo teclado.',
+    'ondas é um player de música com estética de terminal — a onda quebra, a lista é a tela, e tudo se faz pelo teclado.',
   // `{autor}` fica no catálogo, e não no componente, porque é no meio da frase
   // que o nome cai — e a posição dele muda com o idioma. Quem o troca pelo link
   // do github é `tAoRedor` (ver `i18n/index.ts`).

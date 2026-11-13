@@ -2,7 +2,7 @@ import { BANDEIRAS, idioma, LOCALES, t, themeIndex } from '@ondas/core';
 import { Palette } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
 import { uiStore, useUi } from '../app/stores';
-import { CassetteLogo } from '../components/CassetteLogo';
+import { WaveLogo } from '../components/WaveLogo';
 import { TrafficLights } from '../components/TrafficLights';
 import s from './login.module.css';
 
@@ -78,11 +78,11 @@ export function AuthShell({
         <div className={s.lockup}>
           <div className={s.lockupMark}>
             {/* Gira sozinho na abertura da tela, devagar: é vitrine, não player. */}
-            <CassetteLogo playing progress={0.3} speed={3} ariaLabel="ondas" />
+            <WaveLogo playing progress={0.7} speed={3} ariaLabel="ondas" />
           </div>
           <div className={s.lockupText}>
             <span className={s.lockupName}>ondas</span>
-            <span className={s.lockupSide}>{t('login.ladoA')}</span>
+            <span className={s.lockupSide}>{t('login.assinatura')}</span>
           </div>
         </div>
         {children}

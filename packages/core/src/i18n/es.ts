@@ -249,8 +249,8 @@ export const ES: Record<Chave, Frase> = {
   'busca.aria': 'Buscar pista, artista o género',
 
   'splash.pular': 'saltar intro',
-  'splash.tagline': 'lado A · streaming independiente',
-  'splash.carregando': 'rebobinando · cargando metadatos',
+  'splash.tagline': 'la gran ola · streaming independiente',
+  'splash.carregando': 'sube la marea · cargando metadatos',
   'splash.pronto': 'listo ▶',
 
   'idioma.rodape': 'j/k navegar · enter cambiar · esc cerrar',
@@ -272,7 +272,7 @@ export const ES: Record<Chave, Frase> = {
   'upload.adicionarArquivo': '[+ archivo]',
 
   'login.janela': 'ondas — login',
-  'login.ladoA': 'lado A',
+  'login.assinatura': 'la gran ola',
   'login.intro': 'ondas v{versao} — streaming de música independiente',
   'login.introLinha2': 'escribe tus credenciales o continúa como visitante.',
   'login.entrarCompleto': 'entrar — catálogo completo + offline',
@@ -322,7 +322,7 @@ export const ES: Record<Chave, Frase> = {
   'sobre.bugsDica':
     '¿encontraste un problema? abre una issue en github con: qué pasó, qué esperabas, los pasos para repetirlo, la versión de arriba y tu dispositivo y navegador.',
   'sobre.texto1':
-    'ondas es un reproductor de música con estética de terminal — la cinta gira, la lista es la pantalla, y todo se hace con el teclado.',
+    'ondas es un reproductor de música con estética de terminal — la ola rompe, la lista es la pantalla, y todo se hace con el teclado.',
   'sobre.texto2': 'uno de los side projects de {autor}, hechos para estudiar IA.',
   'changelog.atual': '[en uso]',
 

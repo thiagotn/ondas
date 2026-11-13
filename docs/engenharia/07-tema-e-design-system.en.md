@@ -159,13 +159,16 @@ is **not** derived from a theme.
 
 A one-way flow: `themeCssVars()` in the domain → `applyTheme()` → `setProperty` on the root
 (`packages/web/src/theme/applyTheme.ts:17-19`). The ten CSS Modules only **consume** `var(--…)`: 243
-references across 28 distinct names, and **no module declares a colour of its own**.
+references across 28 distinct names, and, with one exception told right below, **no module declares a colour of its own**.
 
-Two exceptions, both justifiable: the logo component injects an animation-speed variable inline
-(`packages/web/src/components/CassetteLogo.tsx:49`), and the wallpaper passes `backgroundImage` and
-`filter` inline, because both depend on runtime data.
+Three exceptions, all justifiable. The logo component injects an animation-speed variable inline
+(`packages/web/src/components/WaveLogo.tsx`), and the wallpaper passes `backgroundImage` and
+`filter` inline, because both depend on runtime data. The third is the only colour a module
+declares: the foam on the logo's wave (`packages/web/src/components/wave.module.css`) is the accent
+mixed with white, because foam has to be light in all nine themes and no token is light in both
+dark and light at once.
 
-There are three `@keyframes` in the entire project. The comment at
+There are five `@keyframes` in the entire project. The comment at
 `packages/web/src/styles/global.css:116` says what that means in practice: *"O cursor é o único
 movimento da interface."* — the cursor is the interface's only motion.
 

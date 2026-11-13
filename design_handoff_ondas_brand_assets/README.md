@@ -1,5 +1,9 @@
 # Handoff: Ondas — cassette logo, splash and app icons (incremental)
 
+> **Superseded.** The cassette was replaced by the wave mark in ondas 1.7.0. The current brand
+> handoff is [`design_handoff_ondas_brand_onda/`](../design_handoff_ondas_brand_onda/README.md);
+> this one is kept as history.
+
 **Context:** the Ondas PWA (React + TS + Vite, monorepo `packages/core` + `packages/web`) **is already implemented**. This package adds **only** the brand: the animated cassette logo, the splash screen and the PWA icons/manifest. Don't change anything else.
 
 The files here are **design references**. Recreate them following the existing codebase's patterns. `reference/Ondas Terminal.dc.html` shows the logo applied and animated (open it in a browser; `support.js` must sit next to it).

@@ -158,13 +158,16 @@ Centralizar a coluna inteira, barra incluída, parece certo no mockup e fica err
 
 Fluxo de mão única: `themeCssVars()` no domínio → `applyTheme()` → `setProperty` na raiz
 (`packages/web/src/theme/applyTheme.ts:17-19`). Os dez CSS Modules só **consomem** `var(--…)`: 243
-referências sobre 28 nomes distintos, e **nenhum módulo declara cor própria**.
+referências sobre 28 nomes distintos, e, com uma exceção contada logo abaixo, **nenhum módulo declara cor própria**.
 
-Duas exceções, as duas justificáveis: o componente do logo injeta uma variável de velocidade de
-animação inline (`packages/web/src/components/CassetteLogo.tsx:49`), e o papel de parede passa
-`backgroundImage` e `filter` inline, porque os dois dependem de dados em tempo de execução.
+Três exceções, as três justificáveis. O componente do logo injeta uma variável de velocidade de
+animação inline (`packages/web/src/components/WaveLogo.tsx`), e o papel de parede passa
+`backgroundImage` e `filter` inline, porque os dois dependem de dados em tempo de execução. A
+terceira é a única cor que um módulo declara: a espuma da onda do logo
+(`packages/web/src/components/wave.module.css`) é o destaque misturado com branco, porque espuma
+tem de ser clara nos nove temas e nenhum token é claro no escuro e no claro ao mesmo tempo.
 
-Há três `@keyframes` no projeto inteiro. O comentário em `packages/web/src/styles/global.css:116`
+Há cinco `@keyframes` no projeto inteiro. O comentário em `packages/web/src/styles/global.css:116`
 diz o que isso significa na prática: *"O cursor é o único movimento da interface."*
 
 ## O que foi descartado

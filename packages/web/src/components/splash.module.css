@@ -14,7 +14,9 @@
 }
 
 .logo {
-  width: min(220px, 56vw);
+  /* A marca é quase quadrada (48×46); a fita era larga (64×42). Com a largura
+     antiga ela ficaria meio corpo mais alta e empurraria a barra para baixo. */
+  width: min(170px, 44vw);
 }
 
 .wordmark {

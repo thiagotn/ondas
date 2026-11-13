@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 
-const SRC = join(here, '..', '..', '..', 'design_handoff_ondas_brand_assets', 'assets', 'splash.svg');
+const SRC = join(here, '..', '..', '..', 'design_handoff_ondas_brand_onda', 'assets', 'splash.svg');
 const OUT = join(here, '..', 'public', 'splash');
 const BG = '#1e1e2e';
 

@@ -1,5 +1,21 @@
 [
   {
+    "versao": "1.7.0",
+    "data": "2026-11-13",
+    "itens": [
+      {
+        "pt-BR": "marca nova: a Grande Onda de Kanagawa, com o sol vermelho atrás, no lugar da fita cassete. A onda se mexe enquanto a música toca, e o sol nasce conforme a faixa avança",
+        "en": "new mark: the Great Wave off Kanagawa, with the red sun behind it, replaces the cassette tape. The wave moves while music plays, and the sun rises as the track advances",
+        "es": "marca nueva: la Gran Ola de Kanagawa, con el sol rojo detrás, en lugar de la cinta de casete. La ola se mueve mientras suena la música, y el sol sale a medida que avanza la pista"
+      },
+      {
+        "pt-BR": "o ícone do app, o favicon e a tela de abertura do iOS acompanham a marca nova — em quem já instalou o app, o ícone pode demorar a trocar",
+        "en": "the app icon, the favicon and the iOS launch screen follow the new mark — if you already installed the app, the icon may take a while to change",
+        "es": "el icono de la app, el favicon y la pantalla de inicio de iOS acompañan a la marca nueva — si ya instalaste la app, el icono puede tardar en cambiar"
+      }
+    ]
+  },
+  {
     "versao": "1.6.0",
     "data": "2026-11-13",
     "itens": [

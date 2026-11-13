@@ -15,7 +15,7 @@ import { useNetwork } from '../hooks/useNetwork';
 import { usePlayerOverlay } from '../hooks/usePlayerOverlay';
 import { useWide } from '../hooks/useWide';
 import s from './bottombar.module.css';
-import { CassetteLogo } from './CassetteLogo';
+import { WaveLogo } from './WaveLogo';
 import { Waveform } from './Waveform';
 
 /** Toast → linha do player → status line. */
@@ -51,7 +51,7 @@ function PlayerRow({ track }: { track: Track }) {
     <div className={s.player} onClick={openPlayer} role="presentation">
       <span className={`${s.mode} ${mode === 'PLAY' ? s.modePlay : s.modeIdle}`}>{mode}</span>
       <span className={s.logo}>
-        <CassetteLogo playing={playing} progress={played} />
+        <WaveLogo playing={playing} progress={played} />
       </span>
       <span className={s.lines}>
         <button

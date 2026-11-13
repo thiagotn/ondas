@@ -24,7 +24,7 @@ import { usePlayerOverlay } from '../hooks/usePlayerOverlay';
 import { useWide } from '../hooks/useWide';
 import { useCatalog } from '../query/catalog';
 import { PlayIcon } from './BottomBar';
-import { CassetteLogo } from './CassetteLogo';
+import { WaveLogo } from './WaveLogo';
 import s from './overlay.module.css';
 import { TrackArt } from './TrackArt';
 import { Waveform } from './Waveform';
@@ -77,7 +77,7 @@ export function FullPlayer({ track }: { track: Track }) {
                 <TrackArt sources={capa} />
               ) : (
                 <div className={s.coverLogo}>
-                  <CassetteLogo playing={playing} progress={played} label />
+                  <WaveLogo playing={playing} progress={played} />
                 </div>
               )}
             </div>

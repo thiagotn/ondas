@@ -251,8 +251,8 @@ export const EN: Record<Chave, Frase> = {
   'busca.aria': 'Search track, artist or genre',
 
   'splash.pular': 'skip intro',
-  'splash.tagline': 'side A · independent streaming',
-  'splash.carregando': 'rewinding · loading metadata',
+  'splash.tagline': 'the great wave · independent streaming',
+  'splash.carregando': 'tide coming in · loading metadata',
   'splash.pronto': 'ready ▶',
 
   'idioma.rodape': 'j/k move · enter switch · esc close',
@@ -274,7 +274,7 @@ export const EN: Record<Chave, Frase> = {
   'upload.adicionarArquivo': '[+ file]',
 
   'login.janela': 'ondas — login',
-  'login.ladoA': 'side A',
+  'login.assinatura': 'the great wave',
   'login.intro': 'ondas v{versao} — independent music streaming',
   'login.introLinha2': 'type your credentials or continue as a visitor.',
   'login.entrarCompleto': 'sign in — full catalog + offline',
@@ -323,7 +323,7 @@ export const EN: Record<Chave, Frase> = {
   'sobre.bugsDica':
     'found a problem? open an issue on github with: what happened, what you expected, the steps to reproduce, the version above and your device and browser.',
   'sobre.texto1':
-    'ondas is a music player with a terminal aesthetic — the tape rolls, the list is the screen, and everything is done from the keyboard.',
+    'ondas is a music player with a terminal aesthetic — the wave breaks, the list is the screen, and everything is done from the keyboard.',
   'sobre.texto2': 'one of {autor}\u2019s side projects, built to study AI.',
   'changelog.atual': '[running]',
 

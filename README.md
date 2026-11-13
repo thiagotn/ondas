@@ -28,6 +28,7 @@ pnpm preview    # serve o build em :4173 (service worker ativo)
 | `pnpm test` | Vitest em `core` (325 testes) |
 | `pnpm test:e2e` | Playwright na web (build + preview + smoke) |
 | `pnpm release` | propaga a versão da nota para os `package.json` e gera o `CHANGELOG.md` (`--check` só confere) |
+| `pnpm --filter @ondas/web icons` | regenera favicon e ícones do sistema a partir dos SVGs da marca |
 | `pnpm --filter @ondas/web splash` | regenera as telas de abertura do iOS a partir do `splash.svg` da marca |
 
 Antes do primeiro `test:e2e`: `pnpm --filter @ondas/web exec playwright install chromium`.
@@ -581,11 +582,14 @@ Decisões que valem registrar:
   wallpaper. O desfoque mora na camada do wallpaper (`filter`), porque um
   `backdrop-filter` na raiz criaria um containing block e quebraria todo overlay
   `position: fixed` — full player, gate, picker e abertura.
-- **A marca é um componente, não uma imagem.** O logo (`components/CassetteLogo`)
-  é SVG inline pintado com as CSS vars do tema, então trocar de tema o recolore
-  na hora e um só componente serve abertura, login, barra de abas, linha do
-  player e a capa ausente. Os PNGs em `public/` são só para o sistema
-  operacional (ícone instalado, favicon, abertura do iOS).
+- **A marca é um componente, não uma imagem.** O logo (`components/WaveLogo`: a
+  Grande Onda de Kanagawa com o sol vermelho atrás) é SVG inline pintado com as
+  CSS vars do tema, então trocar de tema o recolore na hora e um só componente
+  serve abertura, login, barra de abas, linha do player e a capa ausente. A onda
+  se mexe com o áudio e o sol nasce conforme a faixa avança. Os PNGs em `public/`
+  são só para o sistema operacional (ícone instalado, favicon, abertura do iOS) e
+  saem dos SVGs de `design_handoff_ondas_brand_onda/` por `pnpm --filter
+  @ondas/web icons` e `splash`.
 - **Áudio offline fora do Service Worker.** O SW só pré-cacheia o app shell; as
   faixas baixadas são gravadas e lidas pelo `CacheOfflineStore`, para o índice da
   biblioteca e os bytes em disco nunca divergirem.
