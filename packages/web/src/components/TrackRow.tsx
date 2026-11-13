@@ -17,11 +17,6 @@ export interface TrackRowProps {
    */
   showShare: boolean;
   /**
-   * Lista enxuta do estreito: some com o `#acervo`, que lá só empurra a
-   * duração.
-   */
-  compact: boolean;
-  /**
    * O modo de seleção está ligado: o corpo da linha MARCA em vez de tocar.
    *
    * É o idioma do celular, onde montar uma playlist com um toque por faixa não
@@ -45,7 +40,6 @@ export function TrackRow({
   row,
   showArt,
   showShare,
-  compact,
   selecionando,
   onPlay,
   onOpen,
@@ -138,11 +132,14 @@ export function TrackRow({
           </span>
           <span className={s.meta}>
             <span className={s.artist}>{track.artist}</span>{' '}
-            {/* Faixa do acervo tem gênero `acervo` sempre (o worker o fixa), e
-                na tela estreita `#acervo` é ruído que empurra a duração. Vale
-                para a minha e para a compartilhada — as duas vêm do acervo. */}
+            {/* Faixa do acervo tem gênero `acervo` sempre (o worker o fixa), então
+                `#acervo` não diz nada sobre a música: só repete, em toda linha,
+                de onde ela veio. Saiu primeiro da tela estreita, onde empurrava
+                a duração, e depois da larga também. Vale para a minha e para a
+                compartilhada — as duas vêm do acervo. O filtro por gênero e o
+                recorte `--acervo` continuam: o que sai é só a etiqueta da linha. */}
             {/* E o retrato do histórico não guarda gênero: `#` sozinho seria lixo. */}
-            {!!track.genre && !(compact && (row.minha || row.owner)) && (
+            {!!track.genre && !(row.minha || row.owner) && (
               <>
                 <span style={{ color: row.genreColor }}>#{track.genre}</span>{' '}
               </>
@@ -161,8 +158,8 @@ export function TrackRow({
           `[de <nome>]` fica, e NA TELA ESTREITA TAMBÉM: é a única marca de que
           a faixa é de outra pessoa, e sem ela a faixa pareceria sua numa lista
           misturada (em-alta e busca), onde o chip do recorte não ajuda. A
-          largura existe: a linha do acervo já abre mão do `#acervo` no
-          compacto (ver o gênero acima). */}
+          largura existe: a linha do acervo não leva `#acervo` (ver o gênero
+          acima). */}
       {row.owner && (
         <span className={`${s.tag} ${s.tagDe}`}>{t('faixa.de', { dono: row.owner })}</span>
       )}

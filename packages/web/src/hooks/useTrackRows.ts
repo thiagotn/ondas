@@ -41,7 +41,7 @@ export interface RowModel {
   durLabel: string;
   /** Capa pequena da lista, seguida dos nós alternativos. */
   artSources: string[];
-  /** Faixa do acervo pessoal. A linha não a marca: `#acervo` sem dono já diz. */
+  /** Faixa do acervo pessoal. A linha não a marca: é o `[de <nome>]` da faixa alheia que separa as duas. */
   minha: boolean;
   /**
    * Nome de quem compartilhou, vazio quando a faixa é minha ou é do catálogo

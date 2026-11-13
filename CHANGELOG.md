@@ -7,6 +7,10 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.9.0 — 2026-11-13
+
+- as faixas do acervo não levam mais a etiqueta `#acervo` na lista, também na tela larga — ela aparecia igual em toda linha. O filtro `acervo` e o recorte `--acervo` da biblioteca continuam
+
 ## 1.8.0 — 2026-11-13
 
 - `ondas --about` mostra a marca da onda no lugar do nome em blocos, e a linha de bugs ficou só com o link `[reportar um bug]` — o texto que explicava o que informar ocupava meia tela no celular

@@ -67,7 +67,6 @@ export function TrackList({ rows, emptyText, loading, playlistID }: TrackListPro
             row={row}
             showArt={wide}
             showShare={wide}
-            compact={!wide}
             selecionando={selecionando}
             onPlay={(index) => void controller.play(index)}
             // A linha de fora do catálogo abre o ENDEREÇO da faixa em vez de

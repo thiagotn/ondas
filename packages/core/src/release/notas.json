@@ -1,5 +1,16 @@
 [
   {
+    "versao": "1.9.0",
+    "data": "2026-11-13",
+    "itens": [
+      {
+        "pt-BR": "as faixas do acervo não levam mais a etiqueta `#acervo` na lista, também na tela larga — ela aparecia igual em toda linha. O filtro `acervo` e o recorte `--acervo` da biblioteca continuam",
+        "en": "archive tracks no longer carry the `#acervo` tag in the list, on wide screens too — it showed up the same on every row. The `acervo` filter and the library’s `--archive` view are still there",
+        "es": "las pistas del archivo ya no llevan la etiqueta `#acervo` en la lista, tampoco en pantalla ancha — aparecía igual en cada fila. El filtro `acervo` y la vista `--archivo` de la biblioteca siguen ahí"
+      }
+    ]
+  },
+  {
     "versao": "1.8.0",
     "data": "2026-11-13",
     "itens": [

@@ -876,9 +876,14 @@ test('o acervo aparece só logado, sem selo na linha, e some ao sair', async ({ 
 
   // `^01` prova que é a PRIMEIRA da lista, não só que está nela.
   await expect(page.getByRole('button', { name: /^01 Fita Caseira/ })).toBeVisible();
-  // A linha não leva selo de dono em largura nenhuma: `#acervo` sem
-  // `[de <nome>]` já diz que a faixa é minha.
+  // A linha não leva selo de dono em largura nenhuma: faixa do acervo sem
+  // `[de <nome>]` é minha.
   await expect(page.getByText('[meu]')).toHaveCount(0);
+  // Nem a etiqueta `#acervo`, em largura nenhuma: toda faixa do acervo tem esse
+  // "gênero", então ela só repetia, linha após linha, de onde a faixa veio. As
+  // do catálogo público continuam com o gênero delas.
+  await expect(page.getByText('#acervo')).toHaveCount(0);
+  await expect(page.getByText('#ambient').first()).toBeVisible();
   // A linha do prompt passa a admitir as duas fontes.
   await expect(page.getByText(/\+ acervo \(1\)/)).toBeVisible();
 
