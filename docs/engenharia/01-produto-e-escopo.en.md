@@ -75,7 +75,7 @@ free tracks, cannot download and cannot play `[pro]`.
 | Public catalogue | yes | yes |
 | `[pro]` tracks | no (opens a notice) | yes |
 | Download for offline listening | no | yes |
-| Private library | does not exist | goes to the front of the list, tagged `[meu]` |
+| Private library | does not exist | goes to the front of the list, under the `#acervo` genre |
 | Session | **ephemeral** — reloading returns to login | 30 days |
 | Theme, likes, downloads | persist | persist |
 

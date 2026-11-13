@@ -74,7 +74,7 @@ livre, não baixa e não toca `[pro]`.
 | Catálogo público | sim | sim |
 | Faixas `[pro]` | não (abre um aviso) | sim |
 | Download para ouvir offline | não | sim |
-| Acervo privado | não existe | entra na frente da lista, marcado `[meu]` |
+| Acervo privado | não existe | entra na frente da lista, com o gênero `#acervo` |
 | Sessão | **efêmera** — recarregar volta ao login | 30 dias |
 | Tema, curtidas, downloads | persistem | persistem |
 

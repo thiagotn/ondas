@@ -1,5 +1,16 @@
 [
   {
+    "versao": "1.5.0",
+    "data": "2026-11-13",
+    "itens": [
+      {
+        "pt-BR": "a lista de faixas ficou mais limpa: saem os selos `[meu]` e `[off]`. O `#acervo` já diz que a faixa é sua, e o ✓ verde no botão de download já diz que ela está no aparelho",
+        "en": "the track list is cleaner: the `[mine]` and `[off]` tags are gone. `#acervo` already says the track is yours, and the green ✓ on the download button already says it is on the device",
+        "es": "la lista de pistas quedó más limpia: se van las marcas `[mío]` y `[off]`. `#acervo` ya dice que la pista es tuya, y el ✓ verde en el botón de descarga ya dice que está en el aparato"
+      }
+    ]
+  },
+  {
     "versao": "1.4.0",
     "data": "2026-11-12",
     "itens": [

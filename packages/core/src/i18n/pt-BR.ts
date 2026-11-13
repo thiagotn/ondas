@@ -11,7 +11,7 @@ import type { Frase } from './motor.js';
  * de outra gente), `background-opacity`/`background-blur`/`wallpaper` e
  * `login:`/`password:` — esses já eram inglês dentro de uma interface em
  * português, porque pertencem ao registro de arquivo de configuração, não à
- * prosa. Os glifos `[x]`, `[ ]`, `[pro]`, `[off]`, `[meu]` também ficam de
+ * prosa. Os glifos `[x]`, `[ ]`, `[pro]` também ficam de
  * fora: são marcas, não palavras.
  *
  * Os nomes de comando e de caminho (`ondas trending`, `~/em-alta`) ESTÃO
@@ -271,7 +271,6 @@ export const PT_BR = {
   'tema.enviarImagem': '[enviar imagem…]',
 
   // ── linha da faixa ───────────────────────────────────────────
-  'faixa.meu': '[meu]',
   'faixa.de': '[de {dono}]',
   'faixa.dispensar': 'dispensar {faixa}',
 

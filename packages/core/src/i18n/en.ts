@@ -243,7 +243,6 @@ export const EN: Record<Chave, Frase> = {
   'tema.wallNenhum': 'none',
   'tema.enviarImagem': '[upload image…]',
 
-  'faixa.meu': '[mine]',
   'faixa.de': '[from {dono}]',
   'faixa.dispensar': 'dismiss {faixa}',
 

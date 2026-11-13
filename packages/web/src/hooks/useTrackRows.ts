@@ -41,11 +41,11 @@ export interface RowModel {
   durLabel: string;
   /** Capa pequena da lista, seguida dos nós alternativos. */
   artSources: string[];
-  /** Faixa do acervo pessoal — a lista marca com `[meu]`. */
+  /** Faixa do acervo pessoal. A linha não a marca: `#acervo` sem dono já diz. */
   minha: boolean;
   /**
    * Nome de quem compartilhou, vazio quando a faixa é minha ou é do catálogo
-   * público. A lista marca com `[de <nome>]`, onde marcaria `[meu]`.
+   * público. A lista marca com `[de <nome>]`.
    */
   owner: string;
   /** Marcada no modo de seleção: a calha mostra `[x]` e o toque marca. */
@@ -97,9 +97,8 @@ export function useTrackRows(visible: readonly Track[], all: readonly Track[]): 
         genreColor: genreAnsiVar(track.genre),
         durLabel: fmtTime(track.dur),
         artSources: artworkSources(track.artThumb || track.art, hosts),
-        // `[meu]` é sobre ser MINHA, não sobre vir do acervo: uma faixa que
-        // outra pessoa compartilhou vem do acervo e não é minha, e marcá-la
-        // `[meu]` seria dizer o contrário do que a tela quer dizer.
+        // `minha` é sobre ser MINHA, não sobre vir do acervo: uma faixa que
+        // outra pessoa compartilhou vem do acervo e não é minha.
         minha: track.source === 'acervo' && !track.owner,
         owner: track.source === 'acervo' ? (track.owner ?? '') : '',
         marcada: !!marcadas[track.id],

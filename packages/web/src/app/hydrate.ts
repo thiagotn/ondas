@@ -11,7 +11,7 @@ import { BACKGROUND_KEY, libraryStore, LIBRARY_KEY, sessionStore, uiStore } from
  * Carrega o que foi persistido: sessão, curtidas, preferências de fundo e o
  * índice offline. O índice é
  * conferido contra a Cache API — o iOS evacua armazenamento de PWAs ociosas, e
- * uma faixa marcada como `[off]` que não existe mais não pode continuar listada.
+ * uma faixa marcada como baixada que não existe mais não pode continuar listada.
  */
 export async function hydrate(): Promise<void> {
   const [snapshot, session, background] = await Promise.all([

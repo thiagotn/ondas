@@ -99,7 +99,7 @@ export class CacheOfflineStore implements OfflineStore {
     await this.requestPersistence();
     const c = await this.cache();
     // Sem Cache API não existe offline. Antes isto devolvia o tamanho como se
-    // tivesse gravado, e a faixa ficava marcada `[off]` sem bytes nenhum
+    // tivesse gravado, e a faixa ficava marcada como baixada sem bytes nenhum
     // atrás (o `reconcile` do boot acabava desfazendo).
     if (!c) throw new Error(t('erro.semOffline'));
 

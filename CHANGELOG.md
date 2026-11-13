@@ -7,6 +7,10 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.5.0 — 2026-11-13
+
+- a lista de faixas ficou mais limpa: saem os selos `[meu]` e `[off]`. O `#acervo` já diz que a faixa é sua, e o ✓ verde no botão de download já diz que ela está no aparelho
+
 ## 1.4.0 — 2026-11-12
 
 - tema, idioma e os ajustes do fundo (transparência e desfoque) agora seguem a sua conta: escolha num aparelho e os outros abrem do mesmo jeito. A imagem de fundo que você enviou continua só no aparelho em que foi enviada — nos outros, o fundo usa a capa da faixa

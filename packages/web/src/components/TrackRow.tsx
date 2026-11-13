@@ -17,9 +17,8 @@ export interface TrackRowProps {
    */
   showShare: boolean;
   /**
-   * Lista enxuta do estreito: some com [meu], [off] e o #acervo. O ✓ verde do
-   * botão de download já diz que a faixa está no aparelho, e o filtro/ordem
-   * do acervo já diz de quem ela é — os selos só competiam com o título.
+   * Lista enxuta do estreito: some com o `#acervo`, que lá só empurra a
+   * duração.
    */
   compact: boolean;
   /**
@@ -41,7 +40,7 @@ export interface TrackRowProps {
   onMark(id: string): void;
 }
 
-/** `[01] [capa] titulo / artista #genero m:ss  [pro] [off] [ 42%]  ♥  ↓` */
+/** `[01] [capa] titulo / artista #genero m:ss  [de nome] [pro] [ 42%]  ♥  ↓` */
 export function TrackRow({
   row,
   showArt,
@@ -153,26 +152,21 @@ export function TrackRow({
         </span>
       </button>
 
-      {/* Antes de [pro] e [off]: a origem da faixa é o que o dono procura
-          primeiro na linha. [meu] e [pro] nunca aparecem juntos — faixa do
-          acervo vem com premium: false e o selo [pro] só existe sem sessão.
+      {/* A linha não tem selo para "é minha" nem para "está no aparelho": as
+          duas coisas já estão escritas nela. Faixa do acervo sem `[de <nome>]`
+          é minha, e o ✓ verde do botão de download nasce da mesma condição
+          (`row.cached`) que um `[off]` nasceria. Os dois selos existiram, e só
+          repetiam a linha.
 
-          [meu] e [de <nome>] se excluem pela mesma régua: as duas marcas
-          respondem "de quem é esta faixa", e `minha` já é falso quando há
-          dono (ver `useTrackRows`). */}
-      {row.minha && !compact && <span className={`${s.tag} ${s.tagMeu}`}>{t('faixa.meu')}</span>}
-      {/* `[de <nome>]` fica NA TELA ESTREITA TAMBÉM, e `[meu]` não. A assimetria
-          é de propósito: "é minha" é a suposição padrão de quem abre o próprio
-          acervo, então esconder `[meu]` no celular não engana ninguém — já
-          esconder o dono faria a faixa de outra pessoa parecer sua numa lista
-          misturada (em-alta e busca), onde o chip do recorte não ajuda. E a
-          largura existe: a linha do acervo já abre mão do `#acervo` no compacto
-          (ver o gênero acima). */}
+          `[de <nome>]` fica, e NA TELA ESTREITA TAMBÉM: é a única marca de que
+          a faixa é de outra pessoa, e sem ela a faixa pareceria sua numa lista
+          misturada (em-alta e busca), onde o chip do recorte não ajuda. A
+          largura existe: a linha do acervo já abre mão do `#acervo` no
+          compacto (ver o gênero acima). */}
       {row.owner && (
         <span className={`${s.tag} ${s.tagDe}`}>{t('faixa.de', { dono: row.owner })}</span>
       )}
       {row.locked && <span className={`${s.tag} ${s.tagPro}`}>[pro]</span>}
-      {row.cached && !compact && <span className={`${s.tag} ${s.tagOff}`}>[off]</span>}
       {row.dlLabel && <span className={`${s.tag} ${s.tagDl}`}>[{row.dlLabel}]</span>}
 
       <button

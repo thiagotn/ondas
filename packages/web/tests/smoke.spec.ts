@@ -750,7 +750,7 @@ test('login libera o catálogo, e a conta sai da biblioteca para `ondas whoami`'
   await expect(page).not.toHaveURL(/account=1/);
 });
 
-test('o acervo aparece só logado, marcado como [meu], e some ao sair', async ({ page }) => {
+test('o acervo aparece só logado, sem selo na linha, e some ao sair', async ({ page }) => {
   // A linha da lista é um botão cujo nome acessível traz índice, título,
   // artista e gênero. Usar isso em vez de getByText evita casar com o título
   // que a barra de baixo mostra da faixa atual.
@@ -774,12 +774,9 @@ test('o acervo aparece só logado, marcado como [meu], e some ao sair', async ({
 
   // `^01` prova que é a PRIMEIRA da lista, não só que está nela.
   await expect(page.getByRole('button', { name: /^01 Fita Caseira/ })).toBeVisible();
-  // O selo [meu] só existe no largo; no estreito a lista é enxuta.
-  if (page.viewportSize()!.width >= 860) {
-    await expect(page.getByText('[meu]')).toBeVisible();
-  } else {
-    await expect(page.getByText('[meu]')).toBeHidden();
-  }
+  // A linha não leva selo de dono em largura nenhuma: `#acervo` sem
+  // `[de <nome>]` já diz que a faixa é minha.
+  await expect(page.getByText('[meu]')).toHaveCount(0);
   // A linha do prompt passa a admitir as duas fontes.
   await expect(page.getByText(/\+ acervo \(1\)/)).toBeVisible();
 
@@ -791,7 +788,7 @@ test('o acervo aparece só logado, marcado como [meu], e some ao sair', async ({
   await page.getByRole('button', { name: 'tudo', exact: true }).click();
   await expect(linha('Maré Baixa')).toBeVisible();
 
-  // Saindo, o acervo some — e o selo [meu] com ele. `[sair]` agora vive em
+  // Saindo, o acervo some. `[sair]` agora vive em
   // `ondas whoami`, não na biblioteca.
   await abrirConta(page);
   await page.getByRole('button', { name: '[sair]' }).click();
@@ -802,7 +799,6 @@ test('o acervo aparece só logado, marcado como [meu], e some ao sair', async ({
   await page.getByRole('button', { name: /continuar como visitante/ }).click();
   await expect(linha('Maré Baixa')).toBeVisible();
   await expect(linha('Fita Caseira')).toBeHidden();
-  await expect(page.getByText('[meu]')).toBeHidden();
   await expect(page.getByText(/\+ acervo/)).toBeHidden();
 });
 
@@ -1178,8 +1174,9 @@ test('sem espaço no aparelho avisa diferente de sem rede', async ({ page }) => 
   // tentar de novo contra um telefone cheio.
   await expect(page.getByText(/sem espaço no aparelho/)).toBeVisible();
   await expect(page.getByText('falha no download')).toBeHidden();
-  // E nada ficou marcado como baixado.
-  await expect(page.getByText('[off]')).toBeHidden();
+  // E nada ficou marcado como baixado: o ✓ do botão é a marca, e ele troca
+  // o rótulo para "remover do aparelho".
+  await expect(page.getByRole('button', { name: 'remover do aparelho' })).toHaveCount(0);
 });
 
 test('o painel mostra quanto espaço ainda cabe', async ({ page }) => {
@@ -2212,7 +2209,7 @@ test('a faixa de outra conta fica em --compartilhadas, e a minha em --acervo', a
   await logar(page);
   await page.keyboard.press('3');
 
-  // `--acervo` é o padrão de quem tem conta: só a minha, e marcada [meu].
+  // `--acervo` é o padrão de quem tem conta: só a minha.
   await expect(page.getByRole('button', { name: '--acervo' })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -2225,10 +2222,9 @@ test('a faixa de outra conta fica em --compartilhadas, e a minha em --acervo', a
   await expect(page.getByRole('button', { name: /Vinda de Longe/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Fita Caseira/ })).toHaveCount(0);
 
-  // E a linha diz de quem é, onde a minha diria [meu]. As duas marcas se
-  // excluem: é a mesma pergunta respondida de dois jeitos.
+  // E a linha diz de quem é — a única marca de dono que existe: a minha
+  // não leva nenhuma.
   await expect(page.getByText('[de mayumi]')).toBeVisible();
-  await expect(page.getByText('[meu]')).toHaveCount(0);
 
   // O prompt escreve o chip em português, não o id `shared` da URL.
   await expect(page.getByText('ondas ls --compartilhadas')).toBeVisible();

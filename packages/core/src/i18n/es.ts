@@ -241,7 +241,6 @@ export const ES: Record<Chave, Frase> = {
   'tema.wallNenhum': 'ninguno',
   'tema.enviarImagem': '[subir imagen…]',
 
-  'faixa.meu': '[mío]',
   'faixa.de': '[de {dono}]',
   'faixa.dispensar': 'descartar {faixa}',
 

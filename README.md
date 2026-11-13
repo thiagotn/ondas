@@ -164,7 +164,7 @@ Logado, o catálogo passa a ter duas origens: o Audius (público) e o acervo (pr
 `loadCatalog` de `core` busca as duas **em paralelo** e são independentes — acervo fora do ar não
 derruba o catálogo público e vice-versa; quem falha some da lista em vez de virar erro de tela.
 
-As faixas próprias entram **na frente**, marcadas com `[meu]`, e o gênero `acervo` vira um filtro
+As faixas próprias entram **na frente**, e o gênero `acervo` vira um filtro
 de graça nos chips. A linha do prompt admite as duas:
 `# 13 faixas · fonte: audius api (ao vivo) + acervo (1)`.
 
@@ -288,7 +288,7 @@ regra viva, não lista congelada. "Só para esta pessoa" é uma **relação** (a
 
 Na tela isso é um recorte novo: **`--compartilhadas`**, entre `--acervo` e `--offline`. `--acervo`
 continua sendo estritamente *as minhas*. O que separa os dois é um campo que a API só manda quando
-a faixa **não** é sua — a linha então aparece como `[de mayumi]` onde a sua apareceria como `[meu]`,
+a faixa **não** é sua — a linha então aparece como `[de mayumi]`, e a sua não leva marca nenhuma (o `#acervo` já diz),
 e esse rótulo fica visível no celular também, porque numa lista misturada (em-alta, busca) nada mais
 diria de quem é.
 
