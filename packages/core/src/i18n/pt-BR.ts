@@ -75,6 +75,7 @@ export const PT_BR = {
   'vazio.curtidasSemConta': 'curtidas exigem login.',
   'vazio.acervo': 'vazio — envie um arquivo com [{botaoArquivo}].',
   'vazio.acervoSemConta': 'o acervo exige login.',
+  'vazio.acervoSemEnvio': 'vazio — o envio de arquivos ainda não está liberado para esta conta.',
   'vazio.playlistsSemConta': 'playlists exigem login.',
   'vazio.playlistDecaida': {
     one: '{n} faixa desta playlist não está no catálogo de hoje — faixa pública sai de {home} com o tempo; a do acervo fica.',
@@ -92,6 +93,8 @@ export const PT_BR = {
   'vazio.historico': 'vazio — o que você ouvir aparece aqui.',
   'vazio.historicoSemConta': 'o histórico exige login.',
   'vazio.acervoNaHome': 'o acervo está vazio — envie um arquivo em {biblioteca}.',
+  'vazio.acervoNaHomeSemEnvio':
+    'o acervo está vazio — religue o catálogo público em [{janelaConta}].',
   'vazio.nenhumaFaixa': 'nenhuma faixa.',
 
   // ── buffer e espaço ──────────────────────────────────────────
@@ -192,6 +195,22 @@ export const PT_BR = {
   'conta.limparDownloads': '[limpar downloads]',
   'conta.apagarQuantas': 'apagar {n}?',
   'conta.sairNaoApaga': 'sair não apaga os downloads deste aparelho.',
+  'conta.renomear': '[renomear]',
+  'conta.nomeNovo': 'nome novo',
+  'conta.senha': 'senha',
+  'conta.trocarSenha': '[trocar senha]',
+  'conta.senhaAtual': 'senha atual',
+  'conta.senhaNova': 'senha nova ({minimo}+ caracteres)',
+  'conta.salvar': '[salvar]',
+  'conta.cancelar': '[cancelar]',
+  'conta.envio': 'envio',
+  'conta.envioFechado':
+    'ainda não liberado para esta conta — por enquanto dá para ouvir, curtir e montar playlists',
+  'conta.apagarConta': '[apagar a conta]',
+  'conta.apagarAviso':
+    'apaga a conta, as curtidas, as playlists, o histórico e os arquivos enviados. não tem volta.',
+  'conta.apagarSenha': 'sua senha, para confirmar',
+  'conta.apagarDeVez': '[apagar de vez]',
 
   // ── rodapé e barra inferior ──────────────────────────────────
   'barra.abrirPlayer': 'Abrir player',
@@ -290,6 +309,18 @@ export const PT_BR = {
   'login.introLinha2': 'digite suas credenciais ou continue como visitante.',
   'login.entrarCompleto': 'entrar — catálogo completo + offline',
   'login.visitante': 'continuar como visitante — só faixas grátis',
+  'login.pedirConta': 'pedir uma conta — o pedido passa por análise',
+  'cadastro.janela': 'ondas — pedir conta',
+  'cadastro.intro': 'peça uma conta para experimentar o ondas e contar o que achou.',
+  'cadastro.introLinha2': 'o pedido passa por análise, e contas novas ainda não enviam arquivos.',
+  'cadastro.nomePlaceholder': 'como quer ser chamado',
+  'cadastro.senhaPlaceholder': '{minimo}+ caracteres',
+  'cadastro.mensagemPlaceholder': 'opcional — por que quer experimentar?',
+  'cadastro.enviar': 'enviar o pedido',
+  'cadastro.voltar': 'voltar ao login',
+  'cadastro.recebido': 'pedido recebido — sua conta está em análise.',
+  'cadastro.recebidoLinha2':
+    'não há e-mail de aviso: tente entrar mais tarde, e a tela de login diz se o pedido foi aprovado.',
 
   // ── rota da faixa ────────────────────────────────────────────
   'faixa.voltarHome': '[{home}]',
@@ -305,6 +336,8 @@ export const PT_BR = {
   'semRede.faixasNaoSairam': 'sem rede — as faixas não saíram',
   'semRede.ordemNaoSalva': 'sem rede — a ordem não foi salva',
   'semRede.historicoNaoLimpo': 'sem rede — o histórico não foi limpo',
+  'semRede.contaNaoMudou': 'sem rede — nada mudou na conta',
+  'semRede.pedidoNaoEnviado': 'sem rede — o pedido não foi enviado',
   'tecla.espaco': 'espaço',
   'erro.semOffline': 'este navegador não guarda faixas offline',
   'erro.streamIndisponivel': 'stream indisponível',
@@ -316,6 +349,10 @@ export const PT_BR = {
   'sobre.versao': 'versão',
   'sobre.feitoCom': 'feito com',
   'sobre.notas': '[notas da versão]',
+  'sobre.bugs': 'bugs',
+  'sobre.reportar': '[reportar um bug]',
+  'sobre.bugsDica':
+    'achou um problema? abra uma issue no github com: o que aconteceu, o que você esperava, os passos para repetir, a versão acima e o aparelho e navegador.',
   'sobre.texto1':
     'ondas é um player de música com estética de terminal — a fita roda, a lista é a tela, e tudo se faz pelo teclado.',
   // `{autor}` fica no catálogo, e não no componente, porque é no meio da frase
@@ -370,6 +407,8 @@ export const PT_BR = {
   'toast.nenhumaPlaylistAinda':
     'nenhuma playlist ainda — use [{botaoPlaylist}] para criar a primeira',
   'toast.sessaoExpirada': 'sessão expirada — entre de novo',
+  'toast.nomeSalvo': 'nome salvo',
+  'toast.senhaTrocada': 'senha trocada',
   'toast.falhaLerImagem': 'não foi possível ler a imagem',
 
   // ── erros vindos do servidor, por código ─────────────────────
@@ -380,14 +419,19 @@ export const PT_BR = {
   'erro.arquivo_vazio': 'o arquivo chegou vazio',
   'erro.banco_indisponivel': 'banco indisponível',
   'erro.cadastro_fechado': 'cadastro fechado',
+  'erro.cadastro_negado': 'o pedido de conta foi negado',
+  'erro.conta_em_analise': 'sua conta ainda está em análise — tente de novo mais tarde',
+  'erro.conta_nao_encontrada': 'conta não encontrada',
   'erro.credenciais_invalidas': 'credenciais inválidas',
   'erro.destinatarios_demais': 'destinatários demais num pedido',
   'erro.destino_indisponivel': 'destino não disponível',
   'erro.destino_repetido': 'o mesmo destino em `com` e `sem`',
   'erro.email_em_uso': 'e-mail já cadastrado',
   'erro.email_invalido': 'e-mail inválido',
+  'erro.envio_nao_permitido': 'o envio de arquivos ainda não está liberado para esta conta',
   'erro.faixa_nao_encontrada': 'faixa não encontrada',
   'erro.faixa_sem_arquivo': 'faixa sem este arquivo',
+  'erro.falha_apagar_conta': 'não foi possível apagar a conta',
   'erro.falha_buscar_faixa': 'erro ao buscar a faixa',
   'erro.falha_compartilhar': 'não foi possível compartilhar',
   'erro.falha_confirmar_envio': 'não foi possível confirmar o envio',
@@ -396,6 +440,7 @@ export const PT_BR = {
   'erro.falha_enfileirar': 'não foi possível enfileirar',
   'erro.falha_entrar': 'não foi possível entrar',
   'erro.falha_ler_acervo': 'não foi possível ler o acervo',
+  'erro.falha_ler_contas': 'não foi possível ler as contas',
   'erro.falha_ler_curtidas': 'não foi possível ler as curtidas',
   'erro.falha_ler_historico': 'não foi possível ler o histórico',
   'erro.falha_ler_marcador': 'não foi possível ler o marcador',
@@ -404,6 +449,7 @@ export const PT_BR = {
   'erro.falha_preparar_envio': 'não foi possível preparar o envio',
   'erro.falha_remover': 'não foi possível remover',
   'erro.falha_resolver_destino': 'não foi possível resolver o destino',
+  'erro.falha_salvar_conta': 'não foi possível salvar a conta',
   'erro.falha_salvar_curtidas': 'não foi possível salvar as curtidas',
   'erro.falha_salvar_historico': 'não foi possível salvar o histórico',
   'erro.falha_salvar_marcador': 'não foi possível salvar o marcador',
@@ -424,6 +470,7 @@ export const PT_BR = {
   'erro.playlist_nao_encontrada': 'playlist não encontrada',
   'erro.playlist_nome_em_uso': 'já existe uma playlist com esse nome',
   'erro.requisicao_invalida': 'requisição inválida',
+  'erro.senha_atual_incorreta': 'senha atual incorreta',
   'erro.resposta_inesperada': 'resposta inesperada do servidor',
   'erro.senha_curta': 'senha precisa de {minimo}+ caracteres',
   'erro.servidor_indisponivel': 'servidor indisponível — tente de novo',

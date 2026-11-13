@@ -135,12 +135,17 @@ func pgIdent(nome string) string {
 
 // CriarUsuario insere uma conta direto no banco. Os testes do acervo precisam
 // de um dono, não de exercitar o cadastro — isso é assunto dos testes de auth.
+//
+// A conta nasce APROVADA e podendo enviar, que é o oposto do padrão das colunas
+// (migração 0011): o que quase todo teste quer é uma conta estabelecida. Quem
+// precisa de um pedido em análise, ou de uma conta sem envio, muda a linha
+// depois.
 func CriarUsuario(t *testing.T, pool *pgxpool.Pool, email string) string {
 	t.Helper()
 	var id string
 	err := pool.QueryRow(context.Background(), `
-		INSERT INTO users (email, name, password_hash)
-		VALUES ($1, split_part($1, '@', 1), 'hash-de-teste')
+		INSERT INTO users (email, name, password_hash, status, pode_enviar)
+		VALUES ($1, split_part($1, '@', 1), 'hash-de-teste', 'aprovada', true)
 		RETURNING id`, email).Scan(&id)
 	if err != nil {
 		t.Fatalf("criar usuário %s: %v", email, err)

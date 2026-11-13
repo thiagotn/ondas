@@ -10,6 +10,14 @@ import s from './shell.module.css';
 const GITHUB = 'https://github.com/thiagotn';
 
 /**
+ * Onde se reporta um bug: o seletor de modelos de issue do repositório. O
+ * `/choose` cai no formulário de `.github/ISSUE_TEMPLATE/bug.yml`, que pede o
+ * mesmo que a frase daqui resume — a frase existe para a pessoa já chegar lá
+ * com a versão e os passos na mão.
+ */
+const ISSUES = 'https://github.com/thiagotn/ondas/issues/new/choose';
+
+/**
  * `ondas --about` — o que o ondas é, e de quem.
  *
  * A quarta janela de referência, no mesmo molde das outras três (`whoami`,
@@ -76,6 +84,13 @@ export function AboutOverlay() {
             <div className={s.panelRow}>
               <span className={s.panelLabel}>{t('sobre.feitoCom')}</span>
               <span className={s.panelValue}>react · typescript · vite</span>
+            </div>
+            <div className={s.panelRow}>
+              <span className={s.panelLabel}>{t('sobre.bugs')}</span>
+              <span className={`${s.panelValue} ${s.panelMuted}`}>{t('sobre.bugsDica')}</span>
+              <a className={s.link} href={ISSUES} target="_blank" rel="noreferrer">
+                {t('sobre.reportar')}
+              </a>
             </div>
           </div>
         </div>

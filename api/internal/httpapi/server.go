@@ -28,9 +28,15 @@ type Server struct {
 	users    *auth.Users
 	sessions *auth.Sessions
 	limiter  *auth.Limiter
-	tracks   *acervo.Tracks
-	jobs     *acervo.Jobs
-	likes    *likes.Likes
+	// Freios próprios, para um não gastar a cota do outro: pedidos de conta
+	// por IP, senha errada numa ação de conta (por conta), e token de admin
+	// errado por IP.
+	cadastroLimiter *auth.Limiter
+	senhaLimiter    *auth.Limiter
+	adminLimiter    *auth.Limiter
+	tracks          *acervo.Tracks
+	jobs            *acervo.Jobs
+	likes           *likes.Likes
 	// As playlists da conta. Como as curtidas, não dependem de R2 nenhum.
 	playlists *playlists.Playlists
 	// O marcador (onde a conta parou) e o histórico do que ela ouviu.
@@ -46,18 +52,24 @@ type Server struct {
 
 func New(cfg *config.Config, pool *pgxpool.Pool) *Server {
 	s := &Server{
-		cfg:       cfg,
-		pool:      pool,
-		users:     auth.NewUsers(pool),
-		sessions:  auth.NewSessions(cfg.SessionSecret, time.Duration(cfg.SessionMaxAgeS)*time.Second),
-		limiter:   auth.NewLimiter(cfg.LoginAttempts, time.Duration(cfg.LoginWindowS)*time.Second),
-		tracks:    acervo.NewTracks(pool),
-		jobs:      acervo.NewJobs(pool),
-		likes:     likes.NewLikes(pool),
-		playlists: playlists.NewPlaylists(pool),
-		history:   history.NewHistory(pool),
-		audius:    audius.New(audius.Opcoes{}),
-		ogLimiter: auth.NewLimiter(60, time.Minute),
+		cfg:      cfg,
+		pool:     pool,
+		users:    auth.NewUsers(pool),
+		sessions: auth.NewSessions(cfg.SessionSecret, time.Duration(cfg.SessionMaxAgeS)*time.Second),
+		limiter:  auth.NewLimiter(cfg.LoginAttempts, time.Duration(cfg.LoginWindowS)*time.Second),
+		// O cadastro é a única rota pública que GRAVA, e cada pedido custa um
+		// argon2: dez por hora por IP sobra para uma casa inteira pedir conta,
+		// e não sobra para encher a fila do admin.
+		cadastroLimiter: auth.NewLimiter(10, time.Hour),
+		senhaLimiter:    auth.NewLimiter(cfg.LoginAttempts, time.Duration(cfg.LoginWindowS)*time.Second),
+		adminLimiter:    auth.NewLimiter(cfg.LoginAttempts, time.Duration(cfg.LoginWindowS)*time.Second),
+		tracks:          acervo.NewTracks(pool),
+		jobs:            acervo.NewJobs(pool),
+		likes:           likes.NewLikes(pool),
+		playlists:       playlists.NewPlaylists(pool),
+		history:         history.NewHistory(pool),
+		audius:          audius.New(audius.Opcoes{}),
+		ogLimiter:       auth.NewLimiter(60, time.Minute),
 	}
 	if !cfg.AcervoConfigurado() {
 		slog.Warn("acervo desligado: sem credencial de R2 (R2_ACCOUNT_ID/KEY/SECRET)")
@@ -105,6 +117,27 @@ func (s *Server) Router() http.Handler {
 			// desligar o catálogo de alguém não é isso. `exigirSessao` nem
 			// olha o header, então o token aqui simplesmente não abre porta.
 			r.With(s.exigirSessao).Patch("/prefs", s.prefs)
+
+			// A conta administrando a si mesma: nome, senha, e ir embora.
+			// Sessão e NUNCA token, pela régua de sempre — e as duas que não
+			// têm volta pedem a senha de novo no corpo (ver conta.go).
+			r.With(s.exigirSessao).Patch("/conta", s.renomearConta)
+			r.With(s.exigirSessao).Post("/senha", s.trocarSenha)
+			r.With(s.exigirSessao).Post("/conta/apagar", s.apagarConta)
+		})
+
+		// Administração: quem entra na plataforma e quem pode enviar arquivo.
+		//
+		// Token próprio (`X-Ondas-Admin-Token`), NUNCA sessão e nunca o token
+		// do bot: não existe papel de admin em `users`, então não há cookie que
+		// abra esta porta, e a PWA não tem tela para isto. Quem consome é a
+		// `ondasctl` (cmd/ondasctl).
+		r.Route("/admin", func(r chi.Router) {
+			r.Use(s.exigirAdmin)
+			r.Get("/contas", s.listarContas)
+			r.Post("/contas/{id}/aprovar", s.aprovarConta)
+			r.Post("/contas/{id}/negar", s.negarConta)
+			r.Patch("/contas/{id}/envio", s.definirEnvio)
 		})
 
 		// Curtidas: sessão, NUNCA token, pela mesma régua do PATCH /auth/prefs
@@ -184,10 +217,13 @@ func (s *Server) Router() http.Handler {
 			// worker que gravasse uma mídia baixada de qualquer URL.
 			r.Group(func(r chi.Router) {
 				r.Use(s.exigirSessaoOuToken)
-				r.Post("/ingest", s.ingerir)
+				// `exigirEnvio` nas três que ENTRAM com faixa, e não na
+				// consulta de status: quem perdeu o direito de enviar ainda
+				// pode saber o fim do que já tinha enviado.
+				r.With(s.exigirEnvio).Post("/ingest", s.ingerir)
 				r.Get("/ingest/{id}", s.statusIngestao)
-				r.Post("/upload", s.pedirVagaDeUpload)
-				r.Post("/upload/{id}/finalizar", s.finalizarUpload)
+				r.With(s.exigirEnvio).Post("/upload", s.pedirVagaDeUpload)
+				r.With(s.exigirEnvio).Post("/upload/{id}/finalizar", s.finalizarUpload)
 			})
 
 			// Mexer no acervo que já existe: só sessão, nunca token.
@@ -232,10 +268,22 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 	escreverJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// signup recebe um PEDIDO de conta.
+//
+// Dois desfechos, e o status HTTP é o que os separa:
+//
+//	202 — o pedido entrou em análise. Sem cookie: a conta existe, mas não entra
+//	      até o admin aprovar (`ondasctl contas aprovar`).
+//	201 — e-mail da allowlist: a conta nasce aprovada e já sai logada, como era
+//	      o cadastro antes da migração 0011.
+//
+// Em nenhum dos dois a conta nasce podendo enviar arquivo.
 func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 	var req struct {
+		Name     string `json:"name"`
 		Email    string `json:"email"`
 		Password string `json:"password"`
+		Mensagem string `json:"mensagem"`
 	}
 	if !lerJSON(w, r, &req) {
 		return
@@ -244,10 +292,25 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 		escreverErro(w, http.StatusForbidden, "cadastro fechado")
 		return
 	}
-	user, err := s.users.Create(r.Context(), req.Email, req.Password)
+	ip := clienteIP(r)
+	if !s.cadastroLimiter.Permitido(ip) {
+		slog.Warn("cadastro bloqueado por tentativas", "ip", ip)
+		escreverErro(w, http.StatusTooManyRequests, "muitas tentativas — espere alguns minutos")
+		return
+	}
+	status := auth.StatusPendente
+	if s.cfg.SignupSemAnalise(req.Email) {
+		status = auth.StatusAprovada
+	}
+	user, err := s.users.Create(r.Context(), auth.Nova{
+		Email: req.Email, Senha: req.Password, Nome: req.Name, Mensagem: req.Mensagem, Status: status,
+	})
 	switch {
-	case errors.Is(err, auth.ErrEmailInvalido):
+	case errors.Is(err, auth.ErrEmailInvalido), errors.Is(err, auth.ErrNomeInvalido):
 		escreverErro(w, http.StatusBadRequest, err.Error())
+		return
+	case errors.Is(err, auth.ErrMensagemLonga):
+		escreverErro(w, http.StatusBadRequest, "requisição inválida")
 		return
 	case errors.Is(err, auth.ErrSenhaCurta):
 		// O mínimo vai separado: em en e es ele não cai no mesmo ponto da frase.
@@ -260,6 +323,11 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		slog.Error("signup", "erro", err)
 		escreverErro(w, http.StatusInternalServerError, "não foi possível criar a conta")
+		return
+	}
+	if status == auth.StatusPendente {
+		slog.Info("pedido de conta", "conta", user.ID, "ip", ip)
+		escreverJSON(w, http.StatusAccepted, map[string]string{"status": auth.StatusPendente})
 		return
 	}
 	s.gravarCookie(w, user.ID)
@@ -291,6 +359,21 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.limiter.Esquecer(ip)
+	// O estado do pedido só é dito a quem ACERTOU a senha: é assim que a pessoa
+	// fica sabendo da decisão (a plataforma não manda e-mail), sem que a
+	// resposta vire um oráculo de quem pediu conta. Para qualquer outro, e-mail
+	// em análise e e-mail inexistente dão o mesmo "credenciais inválidas".
+	//
+	// 403 e não 401: o cliente lê 401 como sessão morta.
+	switch user.Status {
+	case auth.StatusAprovada:
+	case auth.StatusPendente:
+		escreverErro(w, http.StatusForbidden, "conta em análise")
+		return
+	default:
+		escreverErro(w, http.StatusForbidden, "cadastro negado")
+		return
+	}
 	s.gravarCookie(w, user.ID)
 	escreverJSON(w, http.StatusOK, user)
 }

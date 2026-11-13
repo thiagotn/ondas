@@ -15,6 +15,7 @@ import { ChangelogRoute } from './routes/ChangelogRoute';
 import { HomeRoute } from './routes/HomeRoute';
 import { LibraryRoute } from './routes/LibraryRoute';
 import { LoginRoute } from './routes/LoginRoute';
+import { SignupRoute } from './routes/SignupRoute';
 import { SearchRoute } from './routes/SearchRoute';
 import { PATHS } from './routes/paths';
 import { TrackRoute } from './routes/TrackRoute';
@@ -49,6 +50,8 @@ export function App() {
       <Routes>
         {/* O picker também existe no login, que fica fora do AppLayout. */}
         <Route path={PATHS.login} element={<LoginRoute />} />
+        {/* Fora do layout como o login: quem pede conta ainda não tem sessão. */}
+        <Route path={PATHS.signup} element={<SignupRoute />} />
         <Route element={<AppLayout />}>
           <Route path={PATHS.home} element={<HomeRoute />} />
           <Route path={PATHS.search} element={<SearchRoute />} />

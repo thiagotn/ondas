@@ -24,6 +24,18 @@ export function canDownload(session: Session): boolean {
   return !!session;
 }
 
+/**
+ * Enviar arquivo para o acervo exige conta COM o envio liberado.
+ *
+ * `!== false`, e não `=== true`: `podeEnviar` ausente é espelho local ou
+ * servidor de antes do campo, e ali toda conta enviava (ver `User`). É só o que
+ * decide se a tela oferece o painel — a recusa de verdade é do servidor, com
+ * `envio_nao_permitido`.
+ */
+export function canUpload(session: Session): boolean {
+  return !!session && session.podeEnviar !== false;
+}
+
 export type PlayDenial = 'locked';
 
 export interface PlayabilityContext {

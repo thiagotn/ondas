@@ -285,3 +285,192 @@ describe('HttpAuthService.restore', () => {
     expect(await auth.restore()).toBeNull();
   });
 });
+
+describe('HttpAuthService: a conta pode enviar arquivo?', () => {
+  it('`podeEnviar` do servidor chega ao usuário e ao espelho', async () => {
+    const store = memoria();
+    const fetchImpl = vi.fn(async () => resposta(200, { name: 'nova', podeEnviar: false }));
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    expect(await auth.login({ email: 'nova@b.co', password: 'senha-forte' })).toEqual({
+      name: 'nova',
+      podeEnviar: false,
+    });
+    expect(store.dados.get('user')).toEqual({ name: 'nova', podeEnviar: false });
+  });
+
+  it('servidor que não manda o campo não vira "não pode"', async () => {
+    const fetchImpl = vi.fn(async () => resposta(200, { name: 'antiga', podeEnviar: 'sim' }));
+    const auth = new HttpAuthService(memoria(), fetchImpl as unknown as typeof fetch);
+
+    // Só o booleano entra: o padrão mora num lugar só (`canUpload`).
+    expect(await auth.login({ email: 'a@b.co', password: 'senha-forte' })).toEqual({
+      name: 'antiga',
+    });
+  });
+});
+
+describe('HttpAuthService.signup', () => {
+  const pedido = { name: ' Fulana ', email: 'fulana@b.co', password: 'senha-forte' };
+
+  it('202 é pedido em análise: sem usuário e SEM espelho', async () => {
+    const store = memoria();
+    const fetchImpl = vi.fn(async () => resposta(202, { status: 'pendente' }));
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    expect(await auth.signup({ ...pedido, mensagem: '  quero testar ' })).toEqual({
+      status: 'pendente',
+    });
+    // Um espelho aqui faria o próximo boot offline abrir "logado" numa conta
+    // que o servidor ainda não deixou entrar.
+    expect(store.dados.has('user')).toBe(false);
+
+    const [rota, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(rota).toBe('/api/auth/signup');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({
+      name: 'Fulana',
+      email: 'fulana@b.co',
+      password: 'senha-forte',
+      mensagem: 'quero testar',
+    });
+  });
+
+  it('mensagem vazia não vai no corpo', async () => {
+    const fetchImpl = vi.fn(async () => resposta(202, { status: 'pendente' }));
+    const auth = new HttpAuthService(memoria(), fetchImpl as unknown as typeof fetch);
+
+    await auth.signup({ ...pedido, mensagem: '   ' });
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).not.toHaveProperty('mensagem');
+  });
+
+  it('201 é conta já aprovada: devolve a sessão e grava o espelho', async () => {
+    const store = memoria();
+    const fetchImpl = vi.fn(async () => resposta(201, { name: 'Fulana', podeEnviar: false }));
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    expect(await auth.signup(pedido)).toEqual({
+      status: 'aprovada',
+      user: { name: 'Fulana', podeEnviar: false },
+    });
+    expect(store.dados.get('user')).toEqual({ name: 'Fulana', podeEnviar: false });
+  });
+
+  it('200 com um corpo qualquer não vira "pedido recebido"', async () => {
+    // Um proxy no caminho devolvendo 200 não é o servidor aceitando o pedido.
+    const store = memoria();
+    const fetchImpl = vi.fn(async () => resposta(200, { status: 'pendente' }));
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    await expect(auth.signup(pedido)).rejects.toMatchObject({ codigo: 'resposta_inesperada' });
+    expect(store.dados.has('user')).toBe(false);
+  });
+
+  it('a recusa chega com o código da API', async () => {
+    const fetchImpl = vi.fn(async () =>
+      resposta(403, { error: 'cadastro fechado', code: 'cadastro_fechado' }),
+    );
+    const auth = new HttpAuthService(memoria(), fetchImpl as unknown as typeof fetch);
+
+    await expect(auth.signup(pedido)).rejects.toMatchObject({
+      name: 'AuthError',
+      codigo: 'cadastro_fechado',
+    });
+  });
+
+  it('recusa sem json fala de criar conta, e não de entrar', async () => {
+    const fetchImpl = vi.fn(async () => resposta(400));
+    const auth = new HttpAuthService(memoria(), fetchImpl as unknown as typeof fetch);
+
+    await expect(auth.signup(pedido)).rejects.toMatchObject({ codigo: 'falha_criar_conta' });
+  });
+});
+
+describe('HttpAuthService: a conta administrando a si mesma', () => {
+  it('renomear manda o PATCH e regrava o espelho', async () => {
+    const store = memoria({ user: { name: 'thiagotn' } });
+    const fetchImpl = vi.fn(async () => resposta(200, { name: 'Thiago' }));
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    expect(await auth.renomear('Thiago')).toEqual({ name: 'Thiago' });
+    const [rota, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(rota).toBe('/api/auth/conta');
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(String(init.body))).toEqual({ name: 'Thiago' });
+    expect(store.dados.get('user')).toEqual({ name: 'Thiago' });
+  });
+
+  it('trocar a senha manda a atual e a nova', async () => {
+    const fetchImpl = vi.fn(async () => resposta(200, { status: 'ok' }));
+    const auth = new HttpAuthService(memoria(), fetchImpl as unknown as typeof fetch);
+
+    await auth.trocarSenha('senha-velha', 'senha-nova-1');
+    const [rota, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(rota).toBe('/api/auth/senha');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({ atual: 'senha-velha', nova: 'senha-nova-1' });
+  });
+
+  it('senha atual errada é 403 com código — e a sessão continua de pé', async () => {
+    const store = memoria({ user: { name: 'thiagotn' } });
+    const fetchImpl = vi.fn(async () =>
+      resposta(403, { error: 'senha atual incorreta', code: 'senha_atual_incorreta' }),
+    );
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    await expect(auth.trocarSenha('errada', 'senha-nova-1')).rejects.toMatchObject({
+      codigo: 'senha_atual_incorreta',
+    });
+    expect(store.dados.has('user')).toBe(true);
+  });
+
+  it('apagar a conta tira o espelho só depois do aceite', async () => {
+    const store = memoria({ user: { name: 'thiagotn' } });
+    const fetchImpl = vi.fn(async () => resposta(200, { status: 'apagada' }));
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    await auth.apagarConta('senha-forte');
+    const [rota, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(rota).toBe('/api/auth/conta/apagar');
+    expect(JSON.parse(String(init.body))).toEqual({ senha: 'senha-forte' });
+    expect(store.dados.has('user')).toBe(false);
+  });
+
+  it('senha errada ao apagar deixa a pessoa logada', async () => {
+    const store = memoria({ user: { name: 'thiagotn' } });
+    const fetchImpl = vi.fn(async () =>
+      resposta(403, { error: 'senha atual incorreta', code: 'senha_atual_incorreta' }),
+    );
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    await expect(auth.apagarConta('errada')).rejects.toBeInstanceOf(AuthError);
+    expect(store.dados.has('user')).toBe(true);
+  });
+
+  it('sem rede ao apagar também: nada saiu do aparelho', async () => {
+    const store = memoria({ user: { name: 'thiagotn' } });
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    await expect(auth.apagarConta('senha-forte')).rejects.toBeInstanceOf(TypeError);
+    expect(store.dados.has('user')).toBe(true);
+  });
+
+  it('401 em qualquer uma derruba o espelho', async () => {
+    for (const acao of [
+      (a: HttpAuthService) => a.renomear('x'),
+      (a: HttpAuthService) => a.trocarSenha('a', 'senha-nova-1'),
+      (a: HttpAuthService) => a.apagarConta('a'),
+    ]) {
+      const store = memoria({ user: { name: 'thiagotn' } });
+      const fetchImpl = vi.fn(async () => resposta(401, { error: 'sessão expirada' }));
+      const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+      await expect(acao(auth)).rejects.toMatchObject({ codigo: 'sessao_expirada' });
+      expect(store.dados.has('user')).toBe(false);
+    }
+  });
+});

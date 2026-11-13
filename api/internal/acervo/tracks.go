@@ -188,6 +188,27 @@ func (r *Tracks) Criar(ctx context.Context, n Nova) (*Track, error) {
 		n.AudioKey, n.AudioType, n.SizeBytes, art, thumb, picos, n.Visibilidade))
 }
 
+// IDsDoDono lista os ids das faixas que PERTENCEM a esta conta — só as dela,
+// sem as compartilhadas nem as de `todos`. É o que a exclusão da conta percorre
+// para apagar cada faixa com a sua limpeza (R2, curtidas, playlists, histórico).
+func (r *Tracks) IDsDoDono(ctx context.Context, userID string) ([]string, error) {
+	linhas, err := r.pool.Query(ctx, `SELECT id FROM tracks WHERE user_id = $1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer linhas.Close()
+
+	ids := []string{}
+	for linhas.Next() {
+		var id string
+		if err := linhas.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, linhas.Err()
+}
+
 // Remover apaga a linha e devolve o que foi apagado, para que quem chamou
 // saiba quais objetos limpar no R2.
 func (r *Tracks) Remover(ctx context.Context, userID, id string) (*Track, error) {

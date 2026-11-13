@@ -78,6 +78,18 @@ export interface User {
    * nada (ver `decidirPrefs`).
    */
   prefs?: PrefsDaConta;
+  /**
+   * Esta conta pode enviar arquivo para o acervo (`podeEnviar` na API).
+   *
+   * Conta nova nasce sem isso: ela usa a plataforma inteira, menos o envio, até
+   * o admin liberar. Serve só para a tela não oferecer um botão que o servidor
+   * vai recusar — quem recusa de verdade é ele.
+   *
+   * OPCIONAL, e `undefined` vale `true`, pela mesma razão de `publico`: um
+   * espelho local gravado antes deste campo é de uma conta que já existia, e
+   * todas elas enviam. A leitura é uma só e mora em `canUpload` (`access.ts`).
+   */
+  podeEnviar?: boolean;
 }
 
 export type Session = User | null;

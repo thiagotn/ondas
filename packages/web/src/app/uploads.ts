@@ -1,8 +1,9 @@
-import { AcervoError, tituloDoArquivo, type EstadoEnvio } from '@ondas/core';
+import { AcervoError, canUpload, tErro, tituloDoArquivo, type EstadoEnvio } from '@ondas/core';
 import { create } from 'zustand';
 import { CATALOG_LOGADO_KEY } from '../query/catalog';
 import { queryClient } from '../query/client';
-import { acervoUploader } from './services';
+import { acervoUploader, auth } from './services';
+import { sessionStore } from './stores';
 
 export interface ItemEnvio {
   /** Id local da fila da tela — não é o id do envio na API. */
@@ -36,6 +37,11 @@ export const useUploads = create<Uploads>((set) => ({
   itens: [],
 
   async enviar(arquivos) {
+    // A tela já esconde o painel de quem não pode enviar (`canUpload`); isto é
+    // para o envio não depender de a tela ter lembrado. Quem recusa de verdade
+    // continua sendo o servidor.
+    if (!canUpload(sessionStore.getState().user)) return;
+
     const novos: ItemEnvio[] = arquivos.map((a) => ({
       id: `env-${++sequencia}`,
       nome: tituloDoArquivo(a.name) || a.name,
@@ -70,9 +76,22 @@ export const useUploads = create<Uploads>((set) => ({
         const acervo = err instanceof AcervoError ? err : null;
         mudar(item.id, {
           estado: 'erro',
-          erro: err instanceof Error ? err.message : 'falhou',
+          // O código da API traduzido quando esta versão o conhece; senão a
+          // frase que veio, como sempre foi.
+          erro: tErro(acervo?.codigo) ?? (err instanceof Error ? err.message : 'falhou'),
           ...(acervo?.semSessao ? { semSessao: true } : {}),
         });
+        // O admin tirou o envio desta conta com a tela aberta: a sessão que o
+        // navegador guarda ainda diz que pode. Relê-la tira o painel da tela
+        // (`canUpload`), e os arquivos que faltam da fila param aqui em vez de
+        // ouvirem o mesmo "não" um por um.
+        if (acervo?.codigo === 'envio_nao_permitido') {
+          const user = await auth.restore();
+          sessionStore.getState().setUser(user);
+          const resto = new Set(novos.slice(i + 1).map((n) => n.id));
+          set((st) => ({ itens: st.itens.filter((it) => !resto.has(it.id)) }));
+          break;
+        }
       }
     }
   },

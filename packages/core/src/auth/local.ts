@@ -1,5 +1,10 @@
 import { AuthError } from '../ports/auth.js';
-import type { AuthService, Credentials } from '../ports/auth.js';
+import type {
+  AuthService,
+  Credentials,
+  PedidoDeConta,
+  ResultadoDoPedido,
+} from '../ports/auth.js';
 import type { KeyValueStore } from '../ports/key-value-store.js';
 import { lePrefs, type PrefsDaConta } from '../prefs.js';
 import type { Session, User } from '../types.js';
@@ -58,5 +63,28 @@ export class LocalAuthService implements AuthService {
     const user: User = { ...atual, prefs: { ...atual.prefs, ...lePrefs(parcial) } };
     await this.store.set(SESSION_KEY, user);
     return user;
+  }
+
+  /** Sem servidor não há quem analise: o pedido já entra, como o login. */
+  async signup({ name, email, password }: PedidoDeConta): Promise<ResultadoDoPedido> {
+    const user = await this.login({ email, password });
+    const nome = name.trim();
+    return { status: 'aprovada', user: nome ? await this.renomear(nome) : user };
+  }
+
+  async renomear(name: string): Promise<User> {
+    const atual = await this.store.get<User>(SESSION_KEY);
+    if (!atual) throw new AuthError('sem sessão');
+    const user: User = { ...atual, name: name.trim() || atual.name };
+    await this.store.set(SESSION_KEY, user);
+    return user;
+  }
+
+  /** Não há senha guardada para trocar: o login local aceita qualquer uma. */
+  async trocarSenha(): Promise<void> {}
+
+  /** A "conta" é o espelho; apagar é esquecê-lo. */
+  async apagarConta(): Promise<void> {
+    await this.store.remove(SESSION_KEY);
   }
 }

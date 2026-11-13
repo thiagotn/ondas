@@ -639,6 +639,50 @@
   color: var(--ansi-3);
 }
 
+/* O formulário de uma ação de conta (renomear, trocar senha, apagar). Linha
+   própria dentro do `.panelRow`, como `.contaLimpar` e pelo mesmo motivo: ao
+   lado do valor ele seria espremido. Aqui os campos podem quebrar — no celular
+   as duas senhas não cabem lado a lado. */
+.contaForm {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding-bottom: 6px;
+}
+
+/* O campo é o da playlist (`.entrada`, em playlist.module.css): mesma borda,
+   mesma altura. */
+.contaEntrada {
+  flex: 1 1 14ch;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 6px;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  outline: none;
+  caret-color: var(--color-accent);
+}
+
+.contaEntrada:focus {
+  border-color: var(--color-accent);
+}
+
+.contaErro {
+  flex: 1 0 100%;
+  color: var(--ansi-1);
+}
+
+/* Sozinho na linha e encostado à esquerda: é a única ação do painel que não
+   pertence a linha nenhuma. */
+.contaApagar {
+  align-self: flex-start;
+}
+
 /* ── ondas --help ─────────────────────────────────────────────── */
 
 /* Mais folga que no painel de conta: aqui os grupos precisam se separar. */

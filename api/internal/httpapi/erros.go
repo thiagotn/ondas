@@ -24,14 +24,19 @@ const (
 	CodArquivoVazio          = "arquivo_vazio"
 	CodBancoIndisponivel     = "banco_indisponivel"
 	CodCadastroFechado       = "cadastro_fechado"
+	CodCadastroNegado        = "cadastro_negado"
+	CodContaEmAnalise        = "conta_em_analise"
+	CodContaNaoEncontrada    = "conta_nao_encontrada"
 	CodCredenciaisInvalidas  = "credenciais_invalidas"
 	CodDestinatariosDemais   = "destinatarios_demais"
 	CodDestinoIndisponivel   = "destino_indisponivel"
 	CodDestinoRepetido       = "destino_repetido"
 	CodEmailEmUso            = "email_em_uso"
 	CodEmailInvalido         = "email_invalido"
+	CodEnvioNaoPermitido     = "envio_nao_permitido"
 	CodFaixaNaoEncontrada    = "faixa_nao_encontrada"
 	CodFaixaSemArquivo       = "faixa_sem_arquivo"
+	CodFalhaApagarConta      = "falha_apagar_conta"
 	CodFalhaBuscarFaixa      = "falha_buscar_faixa"
 	CodFalhaCompartilhar     = "falha_compartilhar"
 	CodFalhaConfirmarEnvio   = "falha_confirmar_envio"
@@ -45,7 +50,9 @@ const (
 	CodFalhaLerPlaylists     = "falha_ler_playlists"
 	CodFalhaLiberarArquivo   = "falha_liberar_arquivo"
 	CodFalhaPrepararEnvio    = "falha_preparar_envio"
+	CodFalhaLerContas        = "falha_ler_contas"
 	CodFalhaRemover          = "falha_remover"
+	CodFalhaSalvarConta      = "falha_salvar_conta"
 	CodFalhaResolverDestino  = "falha_resolver_destino"
 	CodFalhaSalvarCurtidas   = "falha_salvar_curtidas"
 	CodFalhaSalvarHistorico  = "falha_salvar_historico"
@@ -61,6 +68,7 @@ const (
 	CodPlaylistNaoEncontrada = "playlist_nao_encontrada"
 	CodPlaylistNomeEmUso     = "playlist_nome_em_uso"
 	CodRequisicaoInvalida    = "requisicao_invalida"
+	CodSenhaAtualIncorreta   = "senha_atual_incorreta"
 	CodSenhaCurta            = "senha_curta"
 	CodSessaoExpirada        = "sessao_expirada"
 	CodTamanhoAusente        = "tamanho_ausente"
@@ -90,6 +98,14 @@ var codigoPorMensagem = map[string]string{
 	"a url precisa ser http(s)":                       CodURLEsquemaInvalido,
 	"banco indisponível":                              CodBancoIndisponivel,
 	"cadastro fechado":                                CodCadastroFechado,
+	"cadastro negado":                                 CodCadastroNegado,
+	"conta em análise":                                CodContaEmAnalise,
+	"conta não encontrada":                            CodContaNaoEncontrada,
+	"envio de arquivos não liberado para esta conta":  CodEnvioNaoPermitido,
+	"não foi possível apagar a conta":                 CodFalhaApagarConta,
+	"não foi possível ler as contas":                  CodFalhaLerContas,
+	"não foi possível salvar a conta":                 CodFalhaSalvarConta,
+	"senha atual incorreta":                           CodSenhaAtualIncorreta,
 	"credenciais inválidas":                           CodCredenciaisInvalidas,
 	"destinatários demais num pedido":                 CodDestinatariosDemais,
 	"destino não disponível":                          CodDestinoIndisponivel,

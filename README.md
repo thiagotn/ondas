@@ -61,17 +61,23 @@ a fase 3 da ADR 0013.)
 
 | Rota | O que faz |
 | --- | --- |
-| `POST /api/auth/signup` | cria conta (fechado por allowlist) e já devolve o cookie |
-| `POST /api/auth/login` | 8 tentativas por IP em 5min, depois 429 |
+| `POST /api/auth/signup` | **pede** uma conta: 202 e o pedido fica em análise; e-mail da allowlist recebe 201 e o cookie |
+| `POST /api/auth/login` | 8 tentativas por IP em 5min, depois 429; 403 `conta_em_analise` / `cadastro_negado` para quem acertou a senha e não foi aprovado |
 | `POST /api/auth/logout` | limpa o cookie |
 | `GET /api/auth/me` | sessão atual; 401 quando não há |
+| `PATCH /api/auth/conta` | troca o nome de exibição |
+| `POST /api/auth/senha` | troca a senha — pede a atual |
+| `POST /api/auth/conta/apagar` | apaga a conta, as faixas e os objetos — pede a senha |
+| `GET /api/admin/contas` | **admin**: lista as contas (`?status=`, `?email=`) — `X-Ondas-Admin-Token` |
+| `POST /api/admin/contas/{id}/aprovar` · `/negar` | **admin**: decide um pedido, ou suspende/devolve uma conta |
+| `PATCH /api/admin/contas/{id}/envio` | **admin**: liga ou desliga o envio de arquivos da conta |
 | `GET /api/healthz` / `readyz` | probes — `readyz` confere o banco, `healthz` não |
 | `GET /api/og/t/{seg}` | **pública**: meta tags da prévia de link (ver *Link de faixa*) |
 | `GET /api/acervo` | faixas do dono, no formato do `Track` do core — inclui `peaks`, a forma de onda medida na ingestão |
 | `GET /api/acervo/{id}/audio` | **302** para URL assinada do R2 |
 | `GET /api/acervo/{id}/art` | idem para a capa (`?p=thumb` para a de 150) |
 | `DELETE /api/acervo/{id}` | apaga a faixa e os objetos |
-| `POST /api/acervo/ingest` | enfileira ingestão por URL — cookie **ou** `X-Ondas-Token` |
+| `POST /api/acervo/ingest` | enfileira ingestão por URL — cookie **ou** `X-Ondas-Token`; 403 `envio_nao_permitido` para conta sem envio (vale para o upload também) |
 | `GET /api/acervo/ingest/{id}` | `pending \| processing \| ready \| error` |
 | `POST /api/acervo/upload` | reserva vaga e devolve **PUT assinado** do R2 — cookie **ou** `X-Ondas-Token` |
 | `POST /api/acervo/upload/{id}/finalizar` | enfileira a ingestão do arquivo já gravado — cookie **ou** `X-Ondas-Token` |
@@ -94,6 +100,42 @@ para o banco real não apague o acervo.
 ```bash
 TEST_DATABASE_URL='postgres://postgres:teste@127.0.0.1:55432/ondas_test' go test ./...
 ```
+
+### Cadastro e administração (`ondasctl`)
+
+Com `SIGNUP_OPEN=true`, qualquer pessoa pede uma conta em `/signup`. O pedido **não entra**: a conta
+nasce `pendente`, e quem decide é o admin. Não há e-mail de aviso — é o próprio login que responde
+"em análise", "negado" ou deixa entrar. A conta aprovada usa a plataforma inteira e administra a si
+mesma, mas **não envia arquivo** (`pode_enviar` nasce `false`); o envio é liberado conta por conta.
+As contas que já existiam antes da migração `0011` continuam aprovadas e enviando.
+
+Não existe papel de admin em `users` nem tela de administração: as rotas de `/api/admin` abrem com
+um token próprio, e quem as consome é a **`ondasctl`** (`api/cmd/ondasctl`), que só fala HTTP.
+
+```bash
+# Uma vez: gera o token NESTA máquina e imprime só o SHA-256, que é o que a API guarda.
+scripts/gerar-token-admin.sh                 # grava em ~/.config/ondas/admin-token
+# → ponha a soma em ADMIN_TOKEN_SHA256 (Secret do ondas-api) e SIGNUP_OPEN=true (ConfigMap)
+
+cd api && go build -o ~/bin/ondasctl ./cmd/ondasctl
+export ONDAS_ADMIN_TOKEN_FILE=~/.config/ondas/admin-token
+# export ONDAS_API_URL=http://localhost:8080   # o padrão é https://music.thiagotn.com
+
+ondasctl contas listar                       # a fila: pedidos em análise, do mais antigo ao mais novo
+ondasctl contas listar --status todas --json
+ondasctl contas aprovar fulana@exemplo.com   # id ou e-mail
+ondasctl contas negar   fulana@exemplo.com   # recusa — ou suspende, na hora, uma conta já aprovada
+ondasctl contas envio   fulana@exemplo.com on
+```
+
+Feita para script e para skill: toda saída tem `--json`, e o código de saída separa **0** (deu
+certo), **1** (a API recusou ou não respondeu) e **2** (uso ou configuração). O token nunca é
+argumento — argumento aparece no `ps` e fica no histórico do shell. Sem `ADMIN_TOKEN_SHA256` na API,
+`/api/admin` responde 404, como rota que não existe.
+
+Uma ressalva para quem automatizar com um agente: nome, e-mail e mensagem do pedido são **texto de
+um desconhecido**. A tabela da CLI já tira caractere de controle; o que um agente lê de `--json` é
+dado para mostrar ao admin, nunca instrução — a decisão de aprovar é sua.
 
 ### Ingestão (o contrato que o bot do Telegram vai chamar)
 
@@ -695,6 +737,23 @@ infra, em três lugares do repo `homelab` — `helm/apps/ondas/ingress*.yml`,
 `helm/cloudflared/configmap.yml` e o CNAME na Cloudflare. O molde
 `helm/apps/ondas/ingress-dominio-proprio.example.yml` traz o ingress pronto e o checklist; os dois
 domínios podem servir o mesmo pod em paralelo durante a migração.
+
+## Reportar bugs
+
+Achou algo quebrado? Abra uma issue em
+[github.com/thiagotn/ondas/issues](https://github.com/thiagotn/ondas/issues/new/choose) — o mesmo
+link está em `ondas --about` (tecla `7`), na linha `bugs`. O formulário
+([`.github/ISSUE_TEMPLATE/bug.yml`](./.github/ISSUE_TEMPLATE/bug.yml)) pede o mínimo que deixa um
+bug reproduzível:
+
+- **o que aconteceu** — com a frase de erro como apareceu, se houve uma;
+- **o que você esperava**;
+- **os passos para repetir**, do começo;
+- **a versão** — a que aparece em `ondas --about` e na tela de login;
+- **aparelho e navegador**, e se é o app instalado ou uma aba;
+- se estava **com conta ou como visitante**.
+
+A página é pública: não cole senha, token nem o seu e-mail de login.
 
 ## Limites conhecidos no iOS (aceitos na v1)
 

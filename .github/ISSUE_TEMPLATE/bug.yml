@@ -1,0 +1,76 @@
+name: Reportar um bug
+description: Algo no ondas não funcionou como devia.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por reportar. O mínimo que deixa um bug reproduzível são os quatro primeiros campos — o resto ajuda, mas não trava a abertura.
+
+        **Não cole senha, token nem o seu e-mail de login aqui: esta página é pública.**
+  - type: textarea
+    id: aconteceu
+    attributes:
+      label: O que aconteceu
+      description: O que você viu na tela. Se apareceu uma frase de erro, copie-a como está.
+      placeholder: "Cliquei em [baixar] na terceira faixa e a barra parou em 40%."
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: O que você esperava
+      placeholder: "Que a faixa terminasse de baixar e ganhasse o ✓."
+    validations:
+      required: true
+  - type: textarea
+    id: passos
+    attributes:
+      label: Passos para repetir
+      description: Do começo, um por linha. Se não acontece sempre, diga com que frequência.
+      placeholder: |
+        1. Entrar com a conta
+        2. Abrir ~/biblioteca
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: versao
+    attributes:
+      label: Versão do ondas
+      description: Está em `ondas --about` (tecla 7, ou o logo na barra) e na tela de login.
+      placeholder: "1.6.0"
+    validations:
+      required: true
+  - type: input
+    id: aparelho
+    attributes:
+      label: Aparelho e navegador
+      description: Diga também se é o app instalado (PWA) ou uma aba do navegador.
+      placeholder: "Pixel 7, Chrome 142, instalado"
+    validations:
+      required: true
+  - type: dropdown
+    id: sessao
+    attributes:
+      label: Como você estava usando
+      options:
+        - Com conta
+        - Como visitante
+        - Na tela de login ou de pedido de conta
+    validations:
+      required: true
+  - type: dropdown
+    id: idioma
+    attributes:
+      label: Idioma do app
+      options:
+        - pt-BR
+        - en
+        - es
+  - type: textarea
+    id: extra
+    attributes:
+      label: Algo mais
+      description: Captura de tela, o que aparece no console do navegador, se estava sem rede — o que você achar que ajuda.

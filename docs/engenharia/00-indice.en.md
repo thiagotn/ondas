@@ -58,6 +58,7 @@ The test-to-production ratio in `core` is 0.91:1. In the two riskiest Go package
 | 12 | [DevOps and GitOps](12-devops-gitops.en.md) | What CI can and cannot touch, and why it never talks to the cluster |
 | 13 | [QA](13-qa.en.md) | The discipline of removing the fix to see whether the test complains — and the four times it did not |
 | 14 | [Versioning and releases](14-versionamento-e-releases.en.md) | Why the release note is the source of every delivery, not its by-product |
+| 15 | [Sign-up and administration](15-cadastro-e-administracao.en.md) | How to open sign-up without opening the door: the request that is the account, the admin that is not a user and the CLI that goes through the API |
 
 ## Three ways to read this
 

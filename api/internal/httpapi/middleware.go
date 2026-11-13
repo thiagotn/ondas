@@ -2,6 +2,10 @@ package httpapi
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -84,6 +88,49 @@ func (s *Server) exigirSessao(next http.Handler) http.Handler {
 			escreverErro(w, http.StatusUnauthorized, "sessão expirada")
 			return
 		}
+		// Conta que o admin negou DEPOIS de ela ter entrado (é assim que se
+		// suspende alguém). O cookie é sem estado e continuaria valendo até
+		// vencer; é esta linha que faz a decisão valer no pedido seguinte.
+		if user.Status != auth.StatusAprovada {
+			s.limparCookie(w)
+			escreverErro(w, http.StatusUnauthorized, "sessão expirada")
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(comUsuario(r.Context(), user)))
 	})
+}
+
+// exigirEnvio recusa com 403 a conta que não pode entrar com faixa nova
+// (`users.pode_enviar`, migração 0011).
+//
+// Vem DEPOIS de `exigirSessaoOuToken`, e vale para os dois caminhos: pelo token
+// do bot o usuário no contexto é o dono configurado em `INGEST_USER_EMAIL`, e é
+// o direito dele que conta.
+//
+// 403 e nunca 401: o cliente trata 401 como sessão morta e manda a pessoa de
+// volta ao login, e aqui a sessão está perfeita — o que falta é permissão.
+func (s *Server) exigirEnvio(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !usuarioDe(r.Context()).PodeEnviar {
+			escreverErro(w, http.StatusForbidden, "envio de arquivos não liberado para esta conta")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// confereToken compara um token com o SHA-256 (em hex) que a configuração
+// guarda. É a conferência dos dois tokens de máquina, o do bot e o do admin.
+func confereToken(token, somaHex string) error {
+	soma := sha256.Sum256([]byte(token))
+	esperado, err := hex.DecodeString(strings.TrimSpace(somaHex))
+	if err != nil || len(esperado) != len(soma) {
+		return errors.New("soma do token malformada na configuração")
+	}
+	// Comparação em tempo constante: com `==` o tempo de resposta entrega o
+	// prefixo correto byte a byte.
+	if subtle.ConstantTimeCompare(soma[:], esperado) != 1 {
+		return errors.New("token não confere")
+	}
+	return nil
 }

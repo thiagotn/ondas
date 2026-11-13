@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canDownload, isLocked, isPremium, playability } from '../access.js';
+import { canDownload, canUpload, isLocked, isPremium, playability } from '../access.js';
 import { demoTracks } from '../catalog/demo.js';
 
 const tracks = demoTracks();
@@ -35,6 +35,21 @@ describe('canDownload', () => {
   it('exige sessão', () => {
     expect(canDownload(null)).toBe(false);
     expect(canDownload({ name: 'thiago' })).toBe(true);
+  });
+});
+
+describe('canUpload', () => {
+  it('exige sessão', () => {
+    expect(canUpload(null)).toBe(false);
+  });
+
+  it('só `false` explícito tira o envio', () => {
+    expect(canUpload({ name: 'nova', podeEnviar: false })).toBe(false);
+    expect(canUpload({ name: 'dona', podeEnviar: true })).toBe(true);
+    // Espelho gravado antes do campo existir: é de uma conta que já enviava.
+    // Se `undefined` valesse "não", o painel sumiria offline para quem sempre
+    // o teve — e offline não há como corrigir.
+    expect(canUpload({ name: 'antiga' })).toBe(true);
   });
 });
 

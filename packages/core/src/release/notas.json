@@ -1,5 +1,42 @@
 [
   {
+    "versao": "1.6.0",
+    "data": "2026-11-13",
+    "itens": [
+      {
+        "pt-BR": "dá para pedir uma conta: a tela de login ganhou `[c] pedir uma conta`. O pedido passa por análise, e é a própria tela de login que diz se ele foi aprovado",
+        "en": "you can now request an account: the login screen gained `[c] request an account`. Requests are reviewed, and the login screen itself tells you whether yours was approved",
+        "es": "ya se puede pedir una cuenta: la pantalla de login ganó `[c] pedir una cuenta`. La solicitud pasa por revisión, y la propia pantalla de login dice si fue aprobada"
+      },
+      {
+        "pt-BR": "contas novas ouvem, curtem e montam playlists, mas ainda não enviam arquivos — o painel de envio só aparece para quem tem o envio liberado",
+        "en": "new accounts can listen, like and build playlists, but cannot upload files yet — the upload panel only shows for accounts with uploads enabled",
+        "es": "las cuentas nuevas escuchan, dan me gusta y arman playlists, pero aún no suben archivos — el panel de subida solo aparece para quien tiene la subida habilitada"
+      },
+      {
+        "pt-BR": "`ondas whoami` deixa trocar o nome e a senha, e apagar a conta de vez — a senha é pedida de novo para as duas últimas",
+        "en": "`ondas whoami` lets you change your name and password, and delete the account for good — the password is asked again for the last two",
+        "es": "`ondas whoami` permite cambiar el nombre y la contraseña, y borrar la cuenta del todo — la contraseña se pide de nuevo para las dos últimas"
+      },
+      {
+        "pt-BR": "achou um bug? `ondas --about` agora diz o que informar e leva direto às issues do projeto no GitHub",
+        "en": "found a bug? `ondas --about` now says what to include and takes you straight to the project’s GitHub issues",
+        "es": "¿encontraste un bug? `ondas --about` ahora dice qué informar y lleva directo a las issues del proyecto en GitHub"
+      }
+    ]
+  },
+  {
+    "versao": "1.5.1",
+    "data": "2026-11-13",
+    "itens": [
+      {
+        "pt-BR": "entrar na conta logo depois de sair não derruba mais a sessão nova — acontecia em rede lenta, quando a saída anterior ainda não tinha terminado",
+        "en": "signing in right after signing out no longer drops the new session — it happened on a slow network, while the previous sign-out was still finishing",
+        "es": "entrar en la cuenta justo después de salir ya no tumba la sesión nueva — pasaba con red lenta, cuando la salida anterior aún no había terminado"
+      }
+    ]
+  },
+  {
     "versao": "1.5.0",
     "data": "2026-11-13",
     "itens": [

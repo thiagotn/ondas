@@ -7,6 +7,17 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.6.0 — 2026-11-13
+
+- dá para pedir uma conta: a tela de login ganhou `[c] pedir uma conta`. O pedido passa por análise, e é a própria tela de login que diz se ele foi aprovado
+- contas novas ouvem, curtem e montam playlists, mas ainda não enviam arquivos — o painel de envio só aparece para quem tem o envio liberado
+- `ondas whoami` deixa trocar o nome e a senha, e apagar a conta de vez — a senha é pedida de novo para as duas últimas
+- achou um bug? `ondas --about` agora diz o que informar e leva direto às issues do projeto no GitHub
+
+## 1.5.1 — 2026-11-13
+
+- entrar na conta logo depois de sair não derruba mais a sessão nova — acontecia em rede lenta, quando a saída anterior ainda não tinha terminado
+
 ## 1.5.0 — 2026-11-13
 
 - a lista de faixas ficou mais limpa: saem os selos `[meu]` e `[off]`. O `#acervo` já diz que a faixa é sua, e o ✓ verde no botão de download já diz que ela está no aparelho

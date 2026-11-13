@@ -456,6 +456,29 @@ describe('emptyText', () => {
   });
 });
 
+describe('emptyText para a conta que ainda não pode enviar', () => {
+  const semEnvio = { name: 'nova', podeEnviar: false };
+
+  it('o acervo vazio não manda apertar um botão que ela não tem', () => {
+    expect(
+      emptyText({ tab: 'library', seg: 'acervo', q: '', loading: false, user: semEnvio }),
+    ).toBe('vazio — o envio de arquivos ainda não está liberado para esta conta.');
+  });
+
+  it('com o catálogo público desligado, o caminho de volta é religá-lo', () => {
+    expect(
+      emptyText({
+        tab: 'home',
+        seg: 'liked',
+        q: '',
+        loading: false,
+        user: { ...semEnvio, publico: false },
+        publicOff: true,
+      }),
+    ).toBe('o acervo está vazio — religue o catálogo público em [ondas whoami].');
+  });
+});
+
 describe('emptyText com o catálogo público desligado', () => {
   const base = { q: '', loading: false, user: { name: 'a', publico: false }, publicOff: true };
 

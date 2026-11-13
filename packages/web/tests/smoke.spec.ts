@@ -218,7 +218,20 @@ function semearHistorico(page: Page, ...itens: Omit<ItemFalso, 'em'>[]) {
  */
 const prefsSemeadas = new WeakMap<
   Page,
-  { prefs: Record<string, unknown> | undefined; patches: Record<string, unknown>[]; recusados: number }
+  {
+    prefs: Record<string, unknown> | undefined;
+    patches: Record<string, unknown>[];
+    recusados: number;
+    /** `undefined` = servidor de antes do campo: nem manda a chave. */
+    podeEnviar: boolean | undefined;
+    /** O nome que a conta escolheu (`PATCH /auth/conta`); sem ele, o de sempre. */
+    nome: string | undefined;
+    /** A senha da conta de mentira, para as ações que a pedem de novo. */
+    senha: string;
+    /** Os pedidos de conta que chegaram ao `/signup`. */
+    pedidos: Record<string, unknown>[];
+    apagada: boolean;
+  }
 >();
 
 /** Põe preferências na conta ANTES do login, como se outro aparelho as tivesse escolhido. */
@@ -235,15 +248,25 @@ const contaFalsa = (page: Page) => prefsSemeadas.get(page)!;
 
 async function stubApi(page: Page) {
   let logado = false;
-  const conta: {
-    prefs: Record<string, unknown> | undefined;
-    patches: Record<string, unknown>[];
-    recusados: number;
-  } = { prefs: {}, patches: [], recusados: 0 };
+  const conta: NonNullable<ReturnType<typeof prefsSemeadas.get>> = {
+    prefs: {},
+    patches: [],
+    recusados: 0,
+    podeEnviar: undefined,
+    nome: undefined,
+    senha: 'senha-forte',
+    pedidos: [],
+    apagada: false,
+  };
   prefsSemeadas.set(page, conta);
   // `prefs` sai em toda resposta de auth quando o servidor as guarda — é a
-  // presença da chave que a PWA lê como "pode mandar".
-  const aparencia = () => (conta.prefs ? { prefs: conta.prefs } : {});
+  // presença da chave que a PWA lê como "pode mandar". `podeEnviar` vai junto
+  // aqui por ser a mesma regra: só sai quando o teste o semeou.
+  const aparencia = () => ({
+    ...(conta.prefs ? { prefs: conta.prefs } : {}),
+    ...(conta.podeEnviar === undefined ? {} : { podeEnviar: conta.podeEnviar }),
+  });
+  const nomeDe = (padrao: string) => conta.nome ?? padrao;
   // `true` de propósito, e não "realista".
   //
   // O usuário de teste TEM faixa no acervo, então um servidor de verdade
@@ -271,11 +294,90 @@ async function stubApi(page: Page) {
     if ((password ?? '').length < 8) {
       return route.fulfill({ status: 400, json: { error: 'senha precisa de 8+ caracteres' } });
     }
+    // Os dois estados de um pedido de conta, pelo e-mail: é o servidor quem
+    // sabe em que pé o pedido está, e a tela só repete o que ele disse.
+    if (email.startsWith('pendente@')) {
+      return route.fulfill({
+        status: 403,
+        json: { error: 'conta em análise', code: 'conta_em_analise' },
+      });
+    }
+    if (email.startsWith('negada@')) {
+      return route.fulfill({
+        status: 403,
+        json: { error: 'cadastro negado', code: 'cadastro_negado' },
+      });
+    }
+    if (conta.apagada) {
+      return route.fulfill({
+        status: 401,
+        json: { error: 'credenciais inválidas', code: 'credenciais_invalidas' },
+      });
+    }
     logado = true;
     return route.fulfill({
       status: 200,
-      json: { name: email.split('@')[0], email, publico, ...aparencia() },
+      json: { name: nomeDe(email.split('@')[0]), email, publico, ...aparencia() },
     });
+  });
+
+  // O pedido de conta. 202 sem cookie: a conta existe, mas não entra.
+  await page.route('**/api/auth/signup', async (route) => {
+    const corpo = JSON.parse(route.request().postData() ?? '{}');
+    if (!/.+@.+\..+/.test(corpo.email ?? '')) {
+      return route.fulfill({
+        status: 400,
+        json: { error: 'e-mail inválido', code: 'email_invalido' },
+      });
+    }
+    if ((corpo.password ?? '').length < 8) {
+      return route.fulfill({
+        status: 400,
+        json: {
+          error: 'senha precisa de 8+ caracteres',
+          code: 'senha_curta',
+          params: { minimo: 8 },
+        },
+      });
+    }
+    conta.pedidos.push(corpo);
+    return route.fulfill({ status: 202, json: { status: 'pendente' } });
+  });
+
+  // A conta mexendo em si mesma. Rotas OBRIGATÓRIAS pelo motivo da de `prefs`,
+  // logo abaixo: sem elas o PATCH/POST escaparia para o `vite preview`.
+  const senhaErrada = (route: Route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: 'senha atual incorreta', code: 'senha_atual_incorreta' },
+    });
+  const semSessao = (route: Route) =>
+    route.fulfill({ status: 401, json: { error: 'sessão expirada' } });
+
+  await page.route('**/api/auth/conta', async (route) => {
+    if (!logado) return semSessao(route);
+    conta.nome = String(JSON.parse(route.request().postData() ?? '{}').name ?? '').trim();
+    return route.fulfill({
+      status: 200,
+      json: { name: conta.nome, email: 'thiago@ondas.app', publico, ...aparencia() },
+    });
+  });
+
+  await page.route('**/api/auth/senha', async (route) => {
+    if (!logado) return semSessao(route);
+    const { atual, nova } = JSON.parse(route.request().postData() ?? '{}');
+    if (atual !== conta.senha) return senhaErrada(route);
+    conta.senha = nova;
+    return route.fulfill({ status: 200, json: { status: 'ok' } });
+  });
+
+  await page.route('**/api/auth/conta/apagar', async (route) => {
+    if (!logado) return semSessao(route);
+    const { senha } = JSON.parse(route.request().postData() ?? '{}');
+    if (senha !== conta.senha) return senhaErrada(route);
+    logado = false;
+    conta.apagada = true;
+    return route.fulfill({ status: 200, json: { status: 'apagada' } });
   });
 
   await page.route('**/api/auth/logout', async (route) => {
@@ -287,7 +389,7 @@ async function stubApi(page: Page) {
     logado
       ? route.fulfill({
           status: 200,
-          json: { name: 'thiago', email: 'thiago@ondas.app', publico, ...aparencia() },
+          json: { name: nomeDe('thiago'), email: 'thiago@ondas.app', publico, ...aparencia() },
         })
       : route.fulfill({ status: 401, json: { error: 'sessão expirada' } }),
   );
@@ -323,7 +425,7 @@ async function stubApi(page: Page) {
     }
     return route.fulfill({
       status: 200,
-      json: { name: 'thiago', email: 'thiago@ondas.app', publico, ...aparencia() },
+      json: { name: nomeDe('thiago'), email: 'thiago@ondas.app', publico, ...aparencia() },
     });
   });
 
@@ -3787,6 +3889,33 @@ test('contra uma API de antes das preferências, o aparelho segue só local', as
   expect(contaFalsa(page).recusados).toBe(0);
 });
 
+test('entrar logo depois de sair não é desfeito pelo logout que ainda corria', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+
+  // A rede lenta é o que abre a janela: o `[sair]` navega na hora, e o logout
+  // fica para trás esperando cada pedido. O `/login` fica de fora do atraso
+  // para o defeito não depender de quem chega primeiro — sem a espera no
+  // formulário, a sessão nova abria e o logout velho a fechava.
+  await page.route('**/api/**', async (route) => {
+    if (!route.request().url().includes('/auth/login')) {
+      await new Promise((f) => setTimeout(f, 400));
+    }
+    await route.fallback();
+  });
+
+  await page.keyboard.press('5');
+  const saiu = page.waitForResponse('**/api/auth/logout');
+  await page.getByRole('button', { name: /sair/ }).click();
+  await expect(page).toHaveURL(/login/);
+  await preencherLogin(page);
+
+  // O logout velho já respondeu, e a conta continua aberta.
+  await saiu;
+  await expect(page).not.toHaveURL(/login/);
+  await expect(page.getByRole('button', { name: /^01 Fita Caseira/ })).toBeVisible();
+});
+
 test('sair não muda a cara do app, e a fila de quem saiu não sobe para a próxima conta', async ({
   page,
 }) => {
@@ -3822,4 +3951,182 @@ test('sair não muda a cara do app, e a fila de quem saiu não sobe para a próx
   // O tema de quem saiu continua na tela, mas não é gravado em quem entrou —
   // nem pela fila, nem por uma segunda "primeira adoção".
   expect(contaFalsa(page).patches).toEqual([]);
+});
+
+// ── pedido de conta, e a conta administrando a si mesma ─────────────────
+
+test('pedir conta: o pedido fica em análise, e a tela diz como saber o resultado', async ({
+  page,
+}) => {
+  await page.goto('/login');
+  await skipSplash(page);
+
+  // A porta é o terceiro botão do login, e o endereço é próprio: é o link que
+  // se manda a quem quer experimentar.
+  await page.getByRole('button', { name: /pedir uma conta/ }).click();
+  await expect(page).toHaveURL(/\/signup$/);
+  await expect(page.getByText('ondas — pedir conta')).toBeVisible();
+  // Quem pede fica sabendo ANTES que conta nova não envia arquivo.
+  await expect(page.getByText(/contas novas ainda não enviam arquivos/)).toBeVisible();
+
+  // A recusa do servidor chega traduzida pelo código, com o número dele.
+  await page.getByPlaceholder('como quer ser chamado').fill('Fulana');
+  await page.getByPlaceholder('voce@email.com').fill('fulana@exemplo.test');
+  await page.getByPlaceholder('8+ caracteres').fill('curta');
+  await page.getByRole('button', { name: /enviar o pedido/ }).click();
+  await expect(page.getByText('error: senha precisa de 8+ caracteres')).toBeVisible();
+  expect(contaFalsa(page).pedidos).toEqual([]);
+
+  await page.getByPlaceholder('8+ caracteres').fill('senha-forte');
+  await page.getByPlaceholder(/por que quer experimentar/).fill('quero testar');
+  await page.getByPlaceholder(/por que quer experimentar/).press('Enter');
+
+  await expect(page.getByText('pedido recebido — sua conta está em análise.')).toBeVisible();
+  await expect(page.getByText(/a tela de login diz se o pedido foi aprovado/)).toBeVisible();
+  expect(contaFalsa(page).pedidos).toEqual([
+    { name: 'Fulana', email: 'fulana@exemplo.test', password: 'senha-forte', mensagem: 'quero testar' },
+  ]);
+  // Pedido não é sessão: recarregar não pode abrir o app.
+  expect(await page.evaluate(() => document.cookie)).toBe('');
+
+  await page.getByRole('button', { name: /voltar ao login/ }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/login$/);
+});
+
+test('o login diz em que pé está o pedido de conta', async ({ page }) => {
+  await page.goto('/login');
+  await skipSplash(page);
+
+  await page.getByPlaceholder('voce@email.com').fill('pendente@exemplo.test');
+  await page.getByPlaceholder('••••').fill('senha-forte');
+  await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
+  await expect(page.getByText(/sua conta ainda está em análise/)).toBeVisible();
+  await expect(page).toHaveURL(/\/login$/);
+
+  await page.getByPlaceholder('voce@email.com').fill('negada@exemplo.test');
+  await page.getByRole('button', { name: /entrar — catálogo completo/ }).click();
+  await expect(page.getByText('error: o pedido de conta foi negado')).toBeVisible();
+  await expect(page).toHaveURL(/\/login$/);
+});
+
+test('conta sem envio usa a biblioteca, mas não vê o painel de enviar', async ({ page }) => {
+  contaFalsa(page).podeEnviar = false;
+  await logar(page);
+
+  await page.getByRole('button', { name: /~\/biblioteca/ }).click();
+  // A lista está lá — ouvir, curtir e organizar continuam valendo…
+  await expect(page.getByRole('button', { name: /^01 Fita Caseira/ })).toBeVisible();
+  // …e o botão de envio não existe, em vez de existir e ser recusado.
+  await expect(page.getByRole('button', { name: '[+ arquivo]' })).toBeHidden();
+  await expect(page.getByText('enviar', { exact: true })).toBeHidden();
+
+  // `ondas whoami` é onde isso está explicado.
+  await abrirConta(page);
+  const conta = page.getByRole('dialog', { name: 'ondas whoami' });
+  await expect(conta.getByText(/ainda não liberado para esta conta/)).toBeVisible();
+});
+
+test('conta que pode enviar não ganha a linha de envio no whoami', async ({ page }) => {
+  await logar(page);
+  await page.getByRole('button', { name: /~\/biblioteca/ }).click();
+  await expect(page.getByRole('button', { name: '[+ arquivo]' })).toBeVisible();
+
+  await abrirConta(page);
+  const conta = page.getByRole('dialog', { name: 'ondas whoami' });
+  await expect(conta.getByText(/ainda não liberado/)).toBeHidden();
+});
+
+test('a conta troca o próprio nome e a própria senha', async ({ page }) => {
+  await logar(page);
+  await abrirConta(page);
+  const conta = page.getByRole('dialog', { name: 'ondas whoami' });
+
+  // ── nome ─────────────────────────────────────────────────────────
+  await conta.getByRole('button', { name: '[renomear]' }).click();
+  const nome = conta.getByRole('textbox', { name: 'nome novo' });
+  await expect(nome).toHaveValue('thiago');
+  // Esc fecha só o formulário: o painel de conta continua aberto.
+  await nome.press('Escape');
+  await expect(nome).toBeHidden();
+  await expect(conta).toBeVisible();
+
+  await conta.getByRole('button', { name: '[renomear]' }).click();
+  await conta.getByRole('textbox', { name: 'nome novo' }).fill('Thiago N');
+  await conta.getByRole('textbox', { name: 'nome novo' }).press('Enter');
+  await expect(page.getByText('nome salvo')).toBeVisible();
+  await expect(conta.getByText('Thiago N', { exact: true })).toBeVisible();
+  await expect(conta.getByRole('textbox', { name: 'nome novo' })).toBeHidden();
+
+  // ── senha ────────────────────────────────────────────────────────
+  await conta.getByRole('button', { name: '[trocar senha]' }).click();
+  await conta.getByLabel('senha atual').fill('nao-e-esta');
+  await conta.getByLabel(/senha nova/).fill('outra-senha-1');
+  await conta.getByRole('button', { name: '[salvar]' }).click();
+  // A recusa aparece NO formulário, e a pessoa continua logada: senha errada
+  // não é sessão morta.
+  await expect(conta.getByRole('alert')).toHaveText('error: senha atual incorreta');
+  await expect(page).not.toHaveURL(/login/);
+
+  await conta.getByLabel('senha atual').fill('senha-forte');
+  await conta.getByRole('button', { name: '[salvar]' }).click();
+  await expect(page.getByText('senha trocada')).toBeVisible();
+  await expect(conta.getByLabel('senha atual')).toBeHidden();
+  expect(contaFalsa(page).senha).toBe('outra-senha-1');
+
+  // O nome novo sobrevive ao reload: veio do servidor, não só do store.
+  // O painel reabre sozinho — o `?account=1` continua no endereço.
+  await page.reload();
+  await skipSplash(page);
+  await expect(conta.getByText('Thiago N', { exact: true })).toBeVisible();
+});
+
+test('apagar a conta pede a senha, e só o aceite do servidor tira a pessoa do app', async ({
+  page,
+}) => {
+  await logar(page);
+  await abrirConta(page);
+  const conta = page.getByRole('dialog', { name: 'ondas whoami' });
+
+  await conta.getByRole('button', { name: '[apagar a conta]' }).click();
+  await expect(conta.getByText(/não tem volta/)).toBeVisible();
+  // Sem senha não há o que enviar.
+  await expect(conta.getByRole('button', { name: '[apagar de vez]' })).toBeDisabled();
+
+  // Senha errada: nada some, e a pessoa continua onde estava.
+  await conta.getByLabel('sua senha, para confirmar').fill('nao-e-esta');
+  await conta.getByRole('button', { name: '[apagar de vez]' }).click();
+  await expect(conta.getByRole('alert')).toHaveText('error: senha atual incorreta');
+  expect(contaFalsa(page).apagada).toBe(false);
+  await expect(page).not.toHaveURL(/login/);
+
+  // Desistir fecha o formulário e esquece a senha digitada.
+  await conta.getByRole('button', { name: '[cancelar]' }).click();
+  await conta.getByRole('button', { name: '[apagar a conta]' }).click();
+  await expect(conta.getByLabel('sua senha, para confirmar')).toHaveValue('');
+
+  await conta.getByLabel('sua senha, para confirmar').fill('senha-forte');
+  await conta.getByRole('button', { name: '[apagar de vez]' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  expect(contaFalsa(page).apagada).toBe(true);
+
+  // E não sobrou sessão no aparelho: a raiz volta para o login.
+  await page.goto('/');
+  await skipSplash(page);
+  await expect(page).toHaveURL(/\/login$/);
+});
+
+test('`ondas --about` diz como reportar um bug e leva às issues do projeto', async ({ page }) => {
+  await logar(page);
+  await page.keyboard.press('7');
+  const sobre = page.getByRole('dialog', { name: 'ondas --about' });
+  await expect(sobre).toBeVisible();
+
+  // O mínimo que a issue precisa está escrito ali, antes do clique.
+  await expect(sobre.getByText(/os passos para repetir, a versão acima/)).toBeVisible();
+  const link = sobre.getByRole('link', { name: '[reportar um bug]' });
+  await expect(link).toHaveAttribute('href', 'https://github.com/thiagotn/ondas/issues/new/choose');
+  // Abre em outra aba: reportar não pode custar a música que está tocando.
+  await expect(link).toHaveAttribute('target', '_blank');
 });

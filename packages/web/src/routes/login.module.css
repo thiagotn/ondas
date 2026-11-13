@@ -183,3 +183,9 @@
 .key {
   color: var(--color-neutral-500);
 }
+
+/* A confirmação do pedido de conta: a única frase desta tela que é resposta, e
+   não instrução — por isso a cor de "deu certo", a mesma do rótulo dos campos. */
+.aviso {
+  color: var(--ansi-2);
+}

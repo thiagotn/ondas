@@ -2,9 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"crypto/sha256"
-	"crypto/subtle"
-	"encoding/hex"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -164,17 +161,18 @@ func (s *Server) usuarioDoToken(ctx context.Context, token string) (*auth.User, 
 	if !s.cfg.IngestPorTokenConfigurado() {
 		return nil, errors.New("token de ingestão não configurado")
 	}
-	soma := sha256.Sum256([]byte(token))
-	esperado, err := hex.DecodeString(strings.TrimSpace(s.cfg.IngestTokenSHA256))
-	if err != nil || len(esperado) != len(soma) {
-		return nil, errors.New("INGEST_TOKEN_SHA256 malformado")
+	if err := confereToken(token, s.cfg.IngestTokenSHA256); err != nil {
+		return nil, err
 	}
-	// Comparação em tempo constante: com `==` o tempo de resposta entrega o
-	// prefixo correto byte a byte.
-	if subtle.ConstantTimeCompare(soma[:], esperado) != 1 {
-		return nil, errors.New("token não confere")
+	user, err := s.users.PorEmail(ctx, s.cfg.IngestUserEmail)
+	if err != nil {
+		return nil, err
 	}
-	return s.users.PorEmail(ctx, s.cfg.IngestUserEmail)
+	// A mesma régua de `exigirSessao`: conta negada não entra, nem pelo token.
+	if user.Status != auth.StatusAprovada {
+		return nil, errors.New("a conta dona do token não está aprovada")
+	}
+	return user, nil
 }
 
 func (s *Server) listarAcervo(w http.ResponseWriter, r *http.Request) {
@@ -253,8 +251,8 @@ func (s *Server) removerFaixa(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	t, err := s.tracks.Remover(r.Context(), user.ID, id)
-	if errors.Is(err, acervo.ErrNaoEncontrada) || errors.Is(errors.Unwrap(err), acervo.ErrNaoEncontrada) {
+	err := s.apagarFaixa(r.Context(), user.ID, id)
+	if errors.Is(err, acervo.ErrNaoEncontrada) {
 		escreverErro(w, http.StatusNotFound, "faixa não encontrada")
 		return
 	}
@@ -263,6 +261,20 @@ func (s *Server) removerFaixa(w http.ResponseWriter, r *http.Request) {
 		escreverErro(w, http.StatusInternalServerError, "não foi possível remover")
 		return
 	}
+	escreverJSON(w, http.StatusOK, map[string]string{"status": "removida"})
+}
+
+// apagarFaixa remove a faixa do dono e tudo que apontava para ela: curtidas,
+// itens de playlist, histórico e os objetos no R2.
+//
+// É função própria porque dois caminhos apagam faixa — o DELETE de uma, e a
+// exclusão da conta, que apaga todas — e a limpeza do que não tem FK não pode
+// existir em um só deles.
+func (s *Server) apagarFaixa(ctx context.Context, userID, id string) error {
+	t, err := s.tracks.Remover(ctx, userID, id)
+	if err != nil {
+		return err
+	}
 	// A curtida da faixa sai junto. Sem FK (ver a migração 0006), ninguém faz
 	// isso por nós, e a linha ficaria apontando para o nada. O id aqui é o
 	// PREFIXADO, porque é assim que ele chega ao navegador e é assim que foi
@@ -270,20 +282,20 @@ func (s *Server) removerFaixa(w http.ResponseWriter, r *http.Request) {
 	//
 	// Melhor-esforço, como a limpeza do R2 logo abaixo: a faixa já foi
 	// removida, e uma curtida órfã não é motivo para a resposta acusar erro.
-	if err := s.likes.RemoverFaixa(r.Context(), prefixoID+id); err != nil {
+	if err := s.likes.RemoverFaixa(ctx, prefixoID+id); err != nil {
 		slog.Error("curtida órfã", "faixa", id, "erro", err)
 	}
 	// E das playlists, pela mesma razão e com o mesmo id prefixado: a tabela de
 	// itens também não tem FK para `tracks` (migração 0008). Sem esta linha a
 	// faixa apagada continuaria contando como item, e a playlist mostraria
 	// "3 itens" com duas faixas na tela.
-	if err := s.playlists.RemoverFaixa(r.Context(), prefixoID+id); err != nil {
+	if err := s.playlists.RemoverFaixa(ctx, prefixoID+id); err != nil {
 		slog.Error("item de playlist órfão", "faixa", id, "erro", err)
 	}
 	// E do histórico e do marcador de quem a ouviu — de TODAS as contas, porque
 	// faixa compartilhada entra no histórico de quem recebeu. No histórico a
 	// linha órfã ainda mostraria título e artista de algo que o dono apagou.
-	if err := s.history.RemoverFaixa(r.Context(), prefixoID+id); err != nil {
+	if err := s.history.RemoverFaixa(ctx, prefixoID+id); err != nil {
 		slog.Error("histórico órfão", "faixa", id, "erro", err)
 	}
 	// A linha já foi apagada; se a limpeza do R2 falhar, o objeto fica órfão
@@ -293,11 +305,17 @@ func (s *Server) removerFaixa(w http.ResponseWriter, r *http.Request) {
 		if k == "" {
 			continue
 		}
-		if err := s.r2.Remover(r.Context(), k); err != nil {
+		// Sem R2 só se chega aqui pela exclusão de conta (as rotas do acervo
+		// respondem 503 antes): o objeto fica, e o log diz qual.
+		if s.r2 == nil {
+			slog.Error("objeto órfão no R2: acervo desligado", "key", k)
+			continue
+		}
+		if err := s.r2.Remover(ctx, k); err != nil {
 			slog.Error("objeto órfão no R2", "key", k, "erro", err)
 		}
 	}
-	escreverJSON(w, http.StatusOK, map[string]string{"status": "removida"})
+	return nil
 }
 
 func (s *Server) ingerir(w http.ResponseWriter, r *http.Request) {

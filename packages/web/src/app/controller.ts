@@ -1,4 +1,5 @@
 import {
+  AuthError,
   faixaPorNumero,
   firstPlayable,
   fmtMB,
@@ -12,9 +13,11 @@ import {
   showsPublicCatalog,
   stepIndex,
   t,
+  tErro,
   valeRetomar,
   type Chave,
   type Locale,
+  type Params,
   type Pendencia,
   type QueueContext,
   type ThemeId,
@@ -766,7 +769,32 @@ export async function escolherIdioma(destino: Locale): Promise<void> {
   trocarIdioma(destino);
 }
 
-export async function logout(): Promise<void> {
+/** O logout que ainda está correndo, se houver — ver `saida`. */
+let saindo: Promise<void> | null = null;
+
+export function logout(): Promise<void> {
+  // Um de cada vez: dois cliques no `[sair]` são a mesma saída.
+  saindo ??= executarLogout().finally(() => {
+    saindo = null;
+  });
+  return saindo;
+}
+
+/**
+ * Resolve quando não há logout em curso. Nunca rejeita.
+ *
+ * Existe para o login. O `[sair]` leva a tela para o login NA HORA e deixa o
+ * logout terminando atrás — ele ainda sobe curtidas, ordem, histórico e
+ * aparência antes de matar o cookie, e numa rede lenta isso leva segundos.
+ * Quem entrasse nesse intervalo era deslogado logo em seguida: o
+ * `auth.logout()` atrasado matava o cookie NOVO, e o `setUser(null)` levava a
+ * tela de volta ao login. Entrar espera a saída acabar.
+ */
+export function saida(): Promise<void> {
+  return saindo ? saindo.catch(() => undefined) : Promise.resolve();
+}
+
+async function executarLogout(): Promise<void> {
   // A fila sobe ANTES de o cookie morrer. Curtir e sair em seguida é um gesto
   // só, e o debounce de `registrar` pode nem ter disparado ainda: depois do
   // `auth.logout()` o PATCH só levaria 401, e a curtida morreria no caminho.
@@ -781,6 +809,19 @@ export async function logout(): Promise<void> {
   // debounce.
   await prefs.subirPendente();
   await auth.logout();
+  await limparContaDoAparelho();
+}
+
+/**
+ * O que sobra NESTE NAVEGADOR de uma conta que acabou de deixar de existir
+ * para ele — porque saiu, ou porque foi apagada.
+ *
+ * Era o fim do logout, e saiu de lá quando apagar a conta passou a existir. O
+ * que as duas saídas têm em comum mora aqui; o que as separa é o que vem
+ * antes: sair SOBE o que estava pendente e mata o cookie, apagar não tem para
+ * onde subir.
+ */
+async function limparContaDoAparelho(): Promise<void> {
   // Da aparência só a FILA sai: o tema e o fundo ficam na tela (sair não muda
   // a cara do app), mas o que ainda ia subir subiria para a próxima conta.
   //
@@ -815,6 +856,84 @@ export async function logout(): Promise<void> {
   }
   // Marca de seleção é da tela, e a tela é de quem entrou agora.
   uiStore.getState().sairDaSelecao();
+}
+
+/**
+ * A frase de uma recusa numa ação de conta: o código da API traduzido, a frase
+ * dela como reserva, e "sem rede" para o que nem chegou lá.
+ */
+function fraseDaConta(err: unknown): string {
+  return err instanceof AuthError
+    ? (tErro(err.codigo, err.params as Params | undefined) ?? err.message)
+    : t('semRede.contaNaoMudou');
+}
+
+/**
+ * Sessão que morreu com o painel de conta aberto: o espelho já saiu (quem o
+ * tira é o `HttpAuthService`), falta a tela saber. O mesmo tratamento do 401
+ * em qualquer outra chamada — a pessoa cai no login em vez de ver um erro.
+ */
+function sessaoMorreu(err: unknown): boolean {
+  if (!(err instanceof AuthError) || err.codigo !== 'sessao_expirada') return false;
+  sessionStore.getState().setUser(null);
+  uiStore.getState().flash(t('toast.sessaoExpirada'));
+  return true;
+}
+
+/**
+ * Troca o nome de exibição da conta. Devolve a frase do erro, ou `null` quando
+ * deu certo — quem chama é um formulário, e é ele que decide onde mostrá-la.
+ */
+export async function renomearConta(nome: string): Promise<string | null> {
+  try {
+    const user = await auth.renomear(nome);
+    sessionStore.getState().setUser(user);
+    uiStore.getState().flash(t('toast.nomeSalvo'));
+    return null;
+  } catch (err) {
+    if (sessaoMorreu(err)) return null;
+    return fraseDaConta(err);
+  }
+}
+
+/** Troca a senha. Mesma convenção de `renomearConta`. */
+export async function trocarSenha(atual: string, nova: string): Promise<string | null> {
+  try {
+    await auth.trocarSenha(atual, nova);
+    uiStore.getState().flash(t('toast.senhaTrocada'));
+    return null;
+  } catch (err) {
+    if (sessaoMorreu(err)) return null;
+    return fraseDaConta(err);
+  }
+}
+
+/**
+ * Apaga a conta — no servidor primeiro, e só com o aceite dele o aparelho é
+ * limpo. Senha errada ou rede fora deixam tudo como estava, com a pessoa
+ * logada.
+ *
+ * NÃO sobe as pendências antes, ao contrário do logout: curtida, ordem e
+ * histórico iriam para uma conta que vai deixar de existir no pedido seguinte.
+ *
+ * Os downloads ficam, como no logout (`conta.sairNaoApaga`): são arquivos deste
+ * navegador, e há um botão próprio para eles logo abaixo.
+ */
+export async function apagarConta(senha: string): Promise<string | null> {
+  // Um `[sair]` ainda em curso terminaria matando um cookie que já não vale —
+  // inofensivo —, mas subiria pendências no meio da exclusão. Um de cada vez.
+  await saida();
+  try {
+    await auth.apagarConta(senha);
+  } catch (err) {
+    if (sessaoMorreu(err)) return null;
+    return fraseDaConta(err);
+  }
+  // Sem aviso passageiro: quem o desenha é o `AppLayout`, e a tela seguinte é
+  // o login, que fica fora dele — o aviso só apareceria DEPOIS do próximo
+  // login, na conta de outra pessoa. Cair no login já é a resposta.
+  await limparContaDoAparelho();
+  return null;
 }
 
 /**

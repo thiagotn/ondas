@@ -1,4 +1,5 @@
 import {
+  canUpload,
   defaultLibrarySegment,
   emptyText,
   hiddenInSegment,
@@ -134,7 +135,10 @@ export function LibraryRoute() {
           organizar o que já existe. */}
       {/* Nem no histórico, pela mesma razão: ele é registro do que se ouviu, e
           o painel de envio empurraria a primeira linha para baixo à toa. */}
-      {user && seg !== 'playlists' && seg !== 'history' && <UploadPanel />}
+      {/* E só para quem pode enviar: conta nova usa tudo, menos isto (ver
+          `canUpload`). Quem não pode não vê botão nenhum — a explicação está no
+          texto de vazio de `--acervo` e em `ondas whoami`. */}
+      {canUpload(user) && seg !== 'playlists' && seg !== 'history' && <UploadPanel />}
       {/* `--acervo`, `--compartilhadas` e `--playlists` só com conta, pela mesma
           razão do painel de envio: sem sessão o catálogo não traz faixa do
           acervo nenhuma e playlist é da conta, então os chips seriam listas

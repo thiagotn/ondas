@@ -1,3 +1,4 @@
+import { canUpload } from './access.js';
 import { fmtBytes, fmtTime } from './format.js';
 import { faixasDoHistorico } from './historico/fila.js';
 import { t as traduzir } from './i18n/index.js';
@@ -507,9 +508,12 @@ export function emptyText(args: {
       return traduzir(user ? 'vazio.curtidas' : 'vazio.curtidasSemConta');
     }
     if (seg === 'acervo') {
-      return user
+      if (!user) return traduzir('vazio.acervoSemConta');
+      // Conta sem envio não tem o botão na tela (ver `canUpload`): mandar
+      // apertá-lo seria apontar para o nada.
+      return canUpload(user)
         ? traduzir('vazio.acervo', { botaoArquivo: BOTAO_ARQUIVO })
-        : traduzir('vazio.acervoSemConta');
+        : traduzir('vazio.acervoSemEnvio');
     }
     // As playlists ficam DEPOIS do ramo de `publicOff` acima de propósito: com
     // o catálogo público desligado, "religue em [ondas whoami]" é mais útil que
@@ -545,7 +549,13 @@ export function emptyText(args: {
   // em-alta vazia com o catálogo público desligado não é "nenhuma faixa": é o
   // acervo ainda vazio. A frase genérica mandaria a pessoa procurar o que não
   // existe, em vez de dizer os dois caminhos que ela tem.
-  if (publicOff) return traduzir('vazio.acervoNaHome', { biblioteca: traduzir('cwd.library') });
+  if (publicOff) {
+    // "Envie um arquivo" só serve a quem pode enviar. Para os outros o único
+    // caminho de volta é religar o catálogo público.
+    return canUpload(user)
+      ? traduzir('vazio.acervoNaHome', { biblioteca: traduzir('cwd.library') })
+      : traduzir('vazio.acervoNaHomeSemEnvio', { janelaConta: JANELA_CONTA });
+  }
   return traduzir('vazio.nenhumaFaixa');
 }
 

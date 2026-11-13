@@ -58,6 +58,7 @@ A razão teste/produção em `core` é 0,91:1. Nos dois pacotes Go de maior risc
 | 12 | [DevOps e GitOps](12-devops-gitops.md) | O que o CI pode e não pode tocar, e por que ele não fala com o cluster |
 | 13 | [QA](13-qa.md) | A disciplina de tirar a correção para ver se o teste reclama — e as quatro vezes em que ele não reclamou |
 | 14 | [Versionamento e releases](14-versionamento-e-releases.md) | Por que a nota de versão é a fonte, e não o subproduto, de cada entrega |
+| 15 | [Cadastro e administração](15-cadastro-e-administracao.md) | Como abrir o cadastro sem abrir a porta: o pedido que é a conta, o admin que não é um usuário e a CLI que passa pela API |
 
 ## Três jeitos de ler
 

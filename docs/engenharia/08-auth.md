@@ -230,10 +230,14 @@ o Postgres. Vale mais ter isso escrito do que ter um Redis a mais para operar.
 
 ## Cadastro fechado por padrão
 
-`api/internal/config/config.go:86-96`. `SIGNUP_OPEN` é `false` por default e a allowlist nasce
-**vazia** — a configuração de partida não permite nenhum cadastro. O handler responde 403 antes de
-tocar o banco (`api/internal/httpapi/server.go:165-168`), e a comparação é feita em minúsculas nos
-dois lados, com entradas vazias descartadas (o que protege de um `"a@b.c,"` que liberaria tudo).
+`SIGNUP_OPEN` é `false` por default e a allowlist nasce **vazia** (`api/internal/config/config.go`)
+— a configuração de partida não permite nenhum cadastro. O handler responde 403 antes de tocar o
+banco, e a comparação é feita em minúsculas nos dois lados, com entradas vazias descartadas (o que
+protege de um `"a@b.c,"` que liberaria tudo).
+
+Desde a 1.6, **aberto não quer mais dizer "cria e entra"**: com `SIGNUP_OPEN=true` o cadastro é um
+pedido que nasce em análise e espera o admin, e a allowlist virou "estes pulam a análise". O estado
+da conta, o token de admin e a CLI estão no [documento 15](15-cadastro-e-administracao.md).
 
 A unicidade do e-mail é um índice funcional, não uma constraint direta:
 `CREATE UNIQUE INDEX users_email_lower_idx ON users (lower(email))`
@@ -258,7 +262,8 @@ A resposta está na forma do roteador, e não num campo de permissão.
 | Pública | sem credencial | `healthz`, `readyz`, `og/t/{seg}`, `signup`, `login`, `logout` |
 | Sessão **ou** token | entrar com faixa nova | `POST ingest`, `GET ingest/{id}`, `POST upload`, `POST upload/{id}/finalizar` |
 | Só sessão | mexer no que já existe | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}`, `PATCH {id}/compartilhamento` |
-| Só sessão | mexer na própria conta | `GET /auth/me`, `PATCH /auth/prefs` |
+| Só sessão | mexer na própria conta | `GET /auth/me`, `PATCH /auth/prefs`, `PATCH /auth/conta`, `POST /auth/senha`, `POST /auth/conta/apagar` |
+| Só token de **admin** | decidir quem entra e quem envia | `GET /admin/contas`, `POST /admin/contas/{id}/aprovar`, `POST /admin/contas/{id}/negar`, `PATCH /admin/contas/{id}/envio` |
 | Só sessão | mexer no próprio gosto | `GET /likes`, `PATCH /likes` |
 | Só sessão | organizar a própria biblioteca | `GET /playlists`, `POST /playlists`, `PATCH /playlists/{id}`, `DELETE /playlists/{id}`, `PATCH /playlists/{id}/itens` |
 | Só sessão | o que a própria conta ouviu | `GET /playback`, `PUT /playback`, `GET /history`, `POST /history`, `DELETE /history` |

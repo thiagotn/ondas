@@ -232,11 +232,15 @@ problem, is Postgres. Having that written down is worth more than having one mor
 
 ## Sign-up closed by default
 
-`api/internal/config/config.go:86-96`. `SIGNUP_OPEN` defaults to `false` and the allowlist starts
-**empty** — the starting configuration permits no sign-up at all. The handler returns 403 before
-touching the database (`api/internal/httpapi/server.go:165-168`), and the comparison is lowercased
-on both sides, with empty entries discarded (which protects against an `"a@b.c,"` that would open
-everything).
+`SIGNUP_OPEN` defaults to `false` and the allowlist starts **empty**
+(`api/internal/config/config.go`) — the starting configuration permits no sign-up at all. The
+handler returns 403 before touching the database, and the comparison is lowercased on both sides,
+with empty entries discarded (which protects against an `"a@b.c,"` that would open everything).
+
+Since 1.6, **open no longer means "create and sign in"**: with `SIGNUP_OPEN=true` sign-up is a
+request that starts under review and waits for the admin, and the allowlist became "these skip the
+review". The account state, the admin token and the CLI are in
+[document 15](15-cadastro-e-administracao.en.md).
 
 Email uniqueness is a functional index, not a direct constraint:
 `CREATE UNIQUE INDEX users_email_lower_idx ON users (lower(email))`
@@ -261,7 +265,8 @@ The answer is in the router's shape, not in a permission field.
 | Public | no credential | `healthz`, `readyz`, `og/t/{seg}`, `signup`, `login`, `logout` |
 | Session **or** token | bringing in a new track | `POST ingest`, `GET ingest/{id}`, `POST upload`, `POST upload/{id}/finalizar` |
 | Session only | touching what already exists | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}`, `PATCH {id}/compartilhamento` |
-| Session only | touching one's own account | `GET /auth/me`, `PATCH /auth/prefs` |
+| Session only | touching one's own account | `GET /auth/me`, `PATCH /auth/prefs`, `PATCH /auth/conta`, `POST /auth/senha`, `POST /auth/conta/apagar` |
+| **Admin** token only | deciding who gets in and who uploads | `GET /admin/contas`, `POST /admin/contas/{id}/aprovar`, `POST /admin/contas/{id}/negar`, `PATCH /admin/contas/{id}/envio` |
 | Session only | touching one's own taste | `GET /likes`, `PATCH /likes` |
 | Session only | organising one's own library | `GET /playlists`, `POST /playlists`, `PATCH /playlists/{id}`, `DELETE /playlists/{id}`, `PATCH /playlists/{id}/itens` |
 | Session only | what one's own account listened to | `GET /playback`, `PUT /playback`, `GET /history`, `POST /history`, `DELETE /history` |

@@ -216,8 +216,14 @@ export class AcervoUploader<A extends ArquivoEnviavel> {
       typeof json === 'object' && json && typeof (json as { error?: unknown }).error === 'string'
         ? (json as { error: string }).error
         : `a API respondeu ${res.status}`;
+    const codigo =
+      typeof json === 'object' && json && typeof (json as { code?: unknown }).code === 'string'
+        ? (json as { code: string }).code
+        : undefined;
     // 401 aqui é sessão que caiu no meio do envio: a tela manda para o login
-    // em vez de mostrar erro técnico.
-    throw new AcervoError(msg, res.status === 401);
+    // em vez de mostrar erro técnico. O código segue junto para a tela poder
+    // traduzir a frase — e reconhecer `envio_nao_permitido`, que não é culpa
+    // do arquivo.
+    throw new AcervoError(msg, res.status === 401, codigo);
   }
 }

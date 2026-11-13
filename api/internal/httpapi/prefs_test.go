@@ -209,7 +209,8 @@ func TestLoginDevolveAAparenciaDaConta(t *testing.T) {
 	// Pelo repositório, e não por `dbtest.CriarUsuario`: aquele grava um hash de
 	// mentira, e este teste precisa de uma senha que o login aceite.
 	const senha = "senha-de-teste"
-	eu, err := auth.NewUsers(pool).Create(context.Background(), "eu@exemplo.test", senha)
+	eu, err := auth.NewUsers(pool).Create(context.Background(),
+		auth.Nova{Email: "eu@exemplo.test", Senha: senha, Status: auth.StatusAprovada})
 	require.NoError(t, err)
 
 	w := httptest.NewRecorder()

@@ -22,11 +22,25 @@ type Config struct {
 	SessionCookie   string `envconfig:"SESSION_COOKIE" default:"ondas_session"`
 	SessionInsecure bool   `envconfig:"SESSION_INSECURE" default:"false"`
 
-	// Cadastro aberto? Com `false`, só quem já tem conta entra — o padrão,
-	// porque o acervo é pessoal.
+	// A plataforma aceita PEDIDOS de conta? Com `false` (o padrão) só quem já
+	// tem conta entra.
+	//
+	// Desde a migração 0011, aberto não quer mais dizer "cria e entra": o
+	// pedido nasce em análise e espera o admin (`/api/admin`, `ondasctl`).
 	SignupOpen bool `envconfig:"SIGNUP_OPEN" default:"false"`
-	// Quando o cadastro está fechado, estes e-mails ainda podem se cadastrar.
+	// Estes e-mails pulam a análise: a conta nasce aprovada e já entra, com o
+	// cadastro aberto ou fechado. É a decisão do admin tomada de antemão.
 	SignupAllowlist string `envconfig:"SIGNUP_ALLOWLIST"`
+
+	// Token do ADMIN, guardado como SHA-256 do valor real, pelo mesmo motivo
+	// do `INGEST_TOKEN_SHA256` abaixo: a API só precisa conferir.
+	//
+	// É outro token, e não o do bot com mais poder, de propósito. O do bot mora
+	// num node que baixa mídia da internet; o do admin decide quem entra na
+	// plataforma. Um vazando não pode levar o outro junto.
+	//
+	// Vazio (o padrão) = as rotas de `/api/admin` não existem (404).
+	AdminTokenSHA256 string `envconfig:"ADMIN_TOKEN_SHA256"`
 
 	// Tentativas de login por IP numa janela, antes de começar a recusar.
 	// Fica aqui e não no Traefik porque o Traefik não enxerga o IP real
@@ -93,12 +107,23 @@ func Load() (*Config, error) {
 	return &cfg, nil
 }
 
-// AllowedSignup diz se este e-mail pode criar conta com o cadastro fechado.
+// AllowedSignup diz se este e-mail pode pedir conta: ou o cadastro está aberto,
+// ou ele está na allowlist.
 func (c *Config) AllowedSignup(email string) bool {
 	if c.SignupOpen {
 		return true
 	}
 	return naLista(c.SignupAllowlist, email)
+}
+
+// SignupSemAnalise diz se a conta deste e-mail nasce aprovada (allowlist).
+func (c *Config) SignupSemAnalise(email string) bool {
+	return naLista(c.SignupAllowlist, email)
+}
+
+// AdminConfigurado diz se há token de admin. Sem ele `/api/admin` responde 404.
+func (c *Config) AdminConfigurado() bool {
+	return strings.TrimSpace(c.AdminTokenSHA256) != ""
 }
 
 // DestinoPermitidoPorToken diz se o token de máquina pode publicar faixa para

@@ -1,6 +1,11 @@
 import type { ErroDaApi } from '../types.js';
 import { AuthError } from '../ports/auth.js';
-import type { AuthService, Credentials } from '../ports/auth.js';
+import type {
+  AuthService,
+  Credentials,
+  PedidoDeConta,
+  ResultadoDoPedido,
+} from '../ports/auth.js';
 import type { KeyValueStore } from '../ports/key-value-store.js';
 import { lePrefs, type PrefsDaConta } from '../prefs.js';
 import type { Session, User } from '../types.js';
@@ -13,6 +18,10 @@ const ROTAS = {
   logout: '/api/auth/logout',
   me: '/api/auth/me',
   prefs: '/api/auth/prefs',
+  signup: '/api/auth/signup',
+  conta: '/api/auth/conta',
+  senha: '/api/auth/senha',
+  apagar: '/api/auth/conta/apagar',
 } as const;
 
 interface RespostaUsuario {
@@ -20,6 +29,7 @@ interface RespostaUsuario {
   email?: unknown;
   publico?: unknown;
   prefs?: unknown;
+  podeEnviar?: unknown;
 }
 
 interface RespostaErro {
@@ -134,6 +144,88 @@ export class HttpAuthService implements AuthService {
     return this.gravarPrefs({ prefs: parcial }, opts?.keepalive ? { keepalive: true } : {});
   }
 
+  /**
+   * Pede uma conta. NÃO grava espelho quando o pedido fica em análise: não há
+   * sessão, e um espelho ali faria o próximo boot offline abrir "logado" numa
+   * conta que o servidor ainda não deixou entrar.
+   *
+   * O que separa os dois desfechos é o status HTTP — 202 em análise, 201 já
+   * aprovada (allowlist) —, e não o corpo: um proxy que devolvesse 200 com
+   * outra coisa não pode virar "pedido recebido".
+   */
+  async signup(pedido: PedidoDeConta): Promise<ResultadoDoPedido> {
+    const mensagem = pedido.mensagem?.trim();
+    const res = await this.pedir(ROTAS.signup, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: pedido.name.trim(),
+        email: pedido.email,
+        password: pedido.password,
+        ...(mensagem ? { mensagem } : {}),
+      }),
+    });
+    if (!res.ok) {
+      const { msg, erro } = await recusa(res, FALHA_CRIAR_CONTA);
+      throw new AuthError(msg, erro);
+    }
+    if (res.status === 202) return { status: 'pendente' };
+    const user = res.status === 201 ? leUsuario(await res.json()) : null;
+    if (!user)
+      throw new AuthError('resposta inesperada do servidor', {
+        codigo: 'resposta_inesperada',
+      });
+    await this.store.set(SESSION_KEY, user);
+    return { status: 'aprovada', user };
+  }
+
+  /** Troca o nome de exibição. O espelho acompanha, como em `setPublico`. */
+  async renomear(name: string): Promise<User> {
+    const res = await this.pedirDaConta(ROTAS.conta, 'PATCH', { name });
+    const user = leUsuario(await res.json());
+    if (!user)
+      throw new AuthError('resposta inesperada do servidor', {
+        codigo: 'resposta_inesperada',
+      });
+    await this.store.set(SESSION_KEY, user);
+    return user;
+  }
+
+  async trocarSenha(atual: string, nova: string): Promise<void> {
+    await this.pedirDaConta(ROTAS.senha, 'POST', { atual, nova });
+  }
+
+  /**
+   * Apaga a conta no servidor. O espelho só sai DEPOIS do aceite: senha errada
+   * ou rede fora deixam a pessoa exatamente onde estava, logada.
+   */
+  async apagarConta(senha: string): Promise<void> {
+    await this.pedirDaConta(ROTAS.apagar, 'POST', { senha });
+    await this.store.remove(SESSION_KEY);
+  }
+
+  /**
+   * Um pedido de conta com sessão: o 401 derruba o espelho (a sessão morreu com
+   * a pessoa olhando o painel), e qualquer outra recusa vira `AuthError` com o
+   * código da API.
+   */
+  private async pedirDaConta(rota: string, method: string, corpo: unknown): Promise<Response> {
+    const res = await this.pedir(rota, {
+      method,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(corpo),
+    });
+    if (res.status === 401) {
+      await this.store.remove(SESSION_KEY);
+      throw new AuthError('sessão expirada', { codigo: 'sessao_expirada' });
+    }
+    if (!res.ok) {
+      const { msg, erro } = await recusa(res, FALHA_SALVAR_CONTA);
+      throw new AuthError(msg, erro);
+    }
+    return res;
+  }
+
   private async gravarPrefs(corpo: unknown, init: RequestInit = {}): Promise<User> {
     const res = await this.pedir(ROTAS.prefs, {
       ...init,
@@ -187,6 +279,9 @@ function leUsuario(bruto: unknown): User | null {
   const pref = {
     ...(typeof u.publico === 'boolean' ? { publico: u.publico } : {}),
     ...(u.prefs && typeof u.prefs === 'object' ? { prefs: lePrefs(u.prefs) } : {}),
+    // A mesma regra de `publico`: só o booleano entra, e a ausência (servidor
+    // de antes do campo) continua significando "pode" — ver `canUpload`.
+    ...(typeof u.podeEnviar === 'boolean' ? { podeEnviar: u.podeEnviar } : {}),
   };
   if (typeof u.name === 'string' && u.name) return { name: u.name, ...pref };
   // Resposta sem `name` mas com e-mail ainda dá um nome exibível.
@@ -202,7 +297,10 @@ function leUsuario(bruto: unknown): User | null {
  * Sem JSON — um 502 do proxy — não há código, e o status vira um código local
  * para a tela não ficar sem o que dizer em en e es.
  */
-async function recusa(res: Response): Promise<{ msg: string; erro: ErroDaApi }> {
+async function recusa(
+  res: Response,
+  reserva: { msg: string; erro: ErroDaApi } = FALHA_ENTRAR,
+): Promise<{ msg: string; erro: ErroDaApi }> {
   try {
     const corpo = (await res.json()) as RespostaErro;
     const codigo = typeof corpo.code === 'string' && corpo.code ? corpo.code : undefined;
@@ -228,5 +326,18 @@ async function recusa(res: Response): Promise<{ msg: string; erro: ErroDaApi }> 
       erro: { codigo: 'servidor_indisponivel' },
     };
   }
-  return { msg: 'não foi possível entrar', erro: { codigo: 'falha_entrar' } };
+  return reserva;
 }
+
+// A última reserva de `recusa`, para a recusa que veio sem JSON e sem um status
+// que diga algo: cada operação tem a sua, senão o cadastro que falhou diria
+// "não foi possível entrar".
+const FALHA_ENTRAR = { msg: 'não foi possível entrar', erro: { codigo: 'falha_entrar' } };
+const FALHA_CRIAR_CONTA = {
+  msg: 'não foi possível criar a conta',
+  erro: { codigo: 'falha_criar_conta' },
+};
+const FALHA_SALVAR_CONTA = {
+  msg: 'não foi possível salvar a conta',
+  erro: { codigo: 'falha_salvar_conta' },
+};

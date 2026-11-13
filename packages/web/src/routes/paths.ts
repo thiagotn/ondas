@@ -12,6 +12,11 @@ export const PATHS = {
   library: '/library',
   login: '/login',
   /**
+   * O pedido de conta. Path próprio, e não um modo da tela de login, porque é o
+   * endereço que se manda a quem quer experimentar: o convite É o link.
+   */
+  signup: '/signup',
+  /**
    * As notas de versão. Path e não param de overlay porque é tela de conteúdo:
    * dá para mandar o endereço a alguém, e o voltar sai dela em vez de fechar
    * uma janela. Não é aba — `tabForPath` devolve `undefined` aqui, como em

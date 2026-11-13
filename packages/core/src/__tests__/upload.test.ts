@@ -154,6 +154,25 @@ describe('AcervoUploader', () => {
     expect((erro as AcervoError).semSessao).toBe(true);
   });
 
+  it('o código da recusa da API acompanha o erro', async () => {
+    const { impl } = fetchFalso({
+      upload: resposta(403, {
+        error: 'envio de arquivos não liberado para esta conta',
+        code: 'envio_nao_permitido',
+      }),
+    });
+    const enviarBytes = vi.fn();
+    const erro = await new AcervoUploader({ enviarBytes, fetchImpl: impl, esperar: semEspera })
+      .enviar(arquivo)
+      .catch((e: unknown) => e);
+
+    expect(erro).toBeInstanceOf(AcervoError);
+    expect((erro as AcervoError).codigo).toBe('envio_nao_permitido');
+    // 403 não é sessão morta: a tela não pode mandar a pessoa para o login.
+    expect((erro as AcervoError).semSessao).toBe(false);
+    expect(enviarBytes).not.toHaveBeenCalled();
+  });
+
   it('repassa o erro da ingestão', async () => {
     const { impl } = fetchFalso({
       ingest: [resposta(200, { id: 'job-1', status: 'error', error: 'o arquivo não tem faixa de áudio' })],

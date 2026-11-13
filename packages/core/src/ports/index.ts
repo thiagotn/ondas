@@ -7,7 +7,13 @@ export type {
 export type { OfflineStore, OfflineUsage } from './offline-store.js';
 export type { KeyValueStore } from './key-value-store.js';
 export type { Connectivity } from './connectivity.js';
-export type { AuthService, Credentials } from './auth.js';
+export { SENHA_MINIMA } from './auth.js';
+export type {
+  AuthService,
+  Credentials,
+  PedidoDeConta,
+  ResultadoDoPedido,
+} from './auth.js';
 export { AuthError } from './auth.js';
 export type { LikesService } from './likes.js';
 export { LikesError } from './likes.js';

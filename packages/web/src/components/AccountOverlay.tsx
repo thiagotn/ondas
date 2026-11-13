@@ -17,6 +17,7 @@ import { libraryStore, useLibrary, useSession } from '../app/stores';
 import { useAccountOverlay } from '../hooks/useAccountOverlay';
 import { useWide } from '../hooks/useWide';
 import { PATHS } from '../routes/paths';
+import { ApagarConta, LinhasDaConta, Renomear } from './ContaPropria';
 import o from './overlay.module.css';
 import s from './shell.module.css';
 
@@ -67,17 +68,20 @@ export function AccountOverlay() {
               <span className={s.panelLabel}>{t('conta.conta')}</span>
               <span className={s.panelValue}>{whoAmI(user)}</span>
               {user ? (
-                <button
-                  type="button"
-                  className={s.logout}
-                  onClick={() => {
-                    void controller.logout();
-                    leaveGuest();
-                    navigate(PATHS.login);
-                  }}
-                >
-                  {t('ui.sair')}
-                </button>
+                <>
+                  <Renomear user={user} />
+                  <button
+                    type="button"
+                    className={s.logout}
+                    onClick={() => {
+                      void controller.logout();
+                      leaveGuest();
+                      navigate(PATHS.login);
+                    }}
+                  >
+                    {t('ui.sair')}
+                  </button>
+                </>
               ) : (
                 <button type="button" className={s.link} onClick={() => navigate(PATHS.login)}>
                   {t('ui.entrar')}
@@ -88,6 +92,10 @@ export function AccountOverlay() {
               <span className={s.panelLabel}>{t('conta.plano')}</span>
               <span className={s.panelValue}>{planLabel(user)}</span>
             </div>
+
+            {/* O que a conta muda em si mesma. Acima do divisor pela mesma
+                razão do catálogo, logo abaixo: é do servidor, e segue a pessoa. */}
+            {user && <LinhasDaConta user={user} />}
 
             {/* Fica NESTE painel, acima do divisor, porque é um campo da conta:
                 desligar aqui vale no celular também. O `buffer`, logo abaixo do
@@ -176,6 +184,17 @@ export function AccountOverlay() {
               curtidas saíram desta frase quando viraram da conta: sair APAGA
               as deste navegador, e entrar de novo as traz de volta. */}
           {user && count > 0 && <span className={o.contaSecao}>{t('conta.sairNaoApaga')}</span>}
+
+          {/* Por último, depois de tudo que é reversível. Dá no mesmo lugar que
+              o `[sair]`: sem sessão não há o que este painel mostrar. */}
+          {user && (
+            <ApagarConta
+              aoApagar={() => {
+                leaveGuest();
+                navigate(PATHS.login);
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
