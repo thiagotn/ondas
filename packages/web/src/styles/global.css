@@ -4,6 +4,16 @@
 @import '@fontsource/jetbrains-mono/700.css';
 
 :root {
+  /* Recuos da área segura. O `index.html` pede `viewport-fit=cover` e barra de
+     status `black-translucent`: instalado no iPhone, o app desenha POR BAIXO do
+     relógio, do notch e da barrinha de início, e é ele quem tem de recuar. Fora
+     do PWA instalado os quatro valem 0. Quem ocupa uma borda da tela soma o
+     recuo ao próprio padding — o fundo continua indo até a borda, só o conteúdo
+     desce. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
   /* Fallbacks: valem só até o primeiro `applyTheme()` (Catppuccin Mocha). */
   --color-bg: #1e1e2e;
   --color-text: #cdd6f4;

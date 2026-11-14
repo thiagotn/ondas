@@ -7,6 +7,10 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.9.1 — 2026-11-14
+
+- instalado no iPhone, o app não fica mais com a barra de abas escondida atrás do relógio e do notch: o topo, as janelas e o player cheio recuam até a área livre da tela, também com o aparelho deitado
+
 ## 1.9.0 — 2026-11-13
 
 - as faixas do acervo não levam mais a etiqueta `#acervo` na lista, também na tela larga — ela aparecia igual em toda linha. O filtro `acervo` e o recorte `--acervo` da biblioteca continuam

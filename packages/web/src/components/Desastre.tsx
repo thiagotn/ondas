@@ -33,7 +33,7 @@ export class Desastre extends Component<{ children: ReactNode }, { erro: Error |
     return (
       <div
         style={{
-          padding: '24px 16px',
+          padding: 'calc(24px + env(safe-area-inset-top, 0px)) 16px 24px',
           color: 'var(--color-text, #cdd6f4)',
           background: 'var(--color-bg, #1e1e2e)',
           minHeight: '100dvh',

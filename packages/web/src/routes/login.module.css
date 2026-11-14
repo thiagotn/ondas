@@ -7,14 +7,15 @@
   display: flex;
   flex-direction: column;
   background: var(--color-bg-a, transparent);
+  padding-bottom: var(--safe-bottom);
 }
 
 .topbar {
-  height: 40px;
+  height: calc(40px + var(--safe-top));
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 14px;
+  padding: var(--safe-top) calc(14px + var(--safe-right)) 0 calc(14px + var(--safe-left));
   background: var(--color-surface-a, var(--color-surface));
   border-bottom: 1px solid var(--color-neutral-800);
   color: var(--color-neutral-500);
@@ -53,7 +54,7 @@
 
 .content {
   flex: 1;
-  padding: 28px 20px;
+  padding: 28px calc(20px + var(--safe-right)) 28px calc(20px + var(--safe-left));
   display: flex;
   flex-direction: column;
   gap: 18px;

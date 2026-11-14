@@ -11,7 +11,8 @@
   background: var(--color-bg-a, var(--color-bg));
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
-  padding: 12px;
+  padding: calc(12px + var(--safe-top)) calc(12px + var(--safe-right)) calc(12px + var(--safe-bottom))
+    calc(12px + var(--safe-left));
 }
 
 .backdrop {
@@ -22,7 +23,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: calc(16px + var(--safe-top)) calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom))
+    calc(16px + var(--safe-left));
 }
 
 /* Mais claro que o backdrop comum: o picker agora ajusta a transparência, e
@@ -449,6 +451,7 @@
 /* A lista rola aqui dentro para o rótulo da borda não ser cortado. */
 .pickerList {
   max-height: calc(100vh - 80px);
+  max-height: calc(100dvh - 80px - var(--safe-top) - var(--safe-bottom));
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -612,6 +615,7 @@
 .atalhosCorpo,
 .sobreCorpo {
   max-height: calc(100vh - 80px);
+  max-height: calc(100dvh - 80px - var(--safe-top) - var(--safe-bottom));
   overflow-y: auto;
   display: flex;
   flex-direction: column;

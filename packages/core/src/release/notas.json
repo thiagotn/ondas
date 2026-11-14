@@ -1,5 +1,16 @@
 [
   {
+    "versao": "1.9.1",
+    "data": "2026-11-14",
+    "itens": [
+      {
+        "pt-BR": "instalado no iPhone, o app não fica mais com a barra de abas escondida atrás do relógio e do notch: o topo, as janelas e o player cheio recuam até a área livre da tela, também com o aparelho deitado",
+        "en": "installed on an iPhone, the app no longer hides the tab bar behind the clock and the notch: the top bar, the dialogs and the full player now stay inside the free area of the screen, in landscape too",
+        "es": "instalada en el iPhone, la app ya no deja la barra de pestañas escondida detrás del reloj y del notch: la parte superior, las ventanas y el reproductor completo se quedan dentro del área libre de la pantalla, también con el teléfono en horizontal"
+      }
+    ]
+  },
+  {
     "versao": "1.9.0",
     "data": "2026-11-13",
     "itens": [
