@@ -1,5 +1,16 @@
 [
   {
+    "versao": "1.9.2",
+    "data": "2026-11-16",
+    "itens": [
+      {
+        "pt-BR": "em `ondas whoami`, no celular, um nome longo ou em forma de e-mail não fica mais por baixo do `[renomear]`: o nome aparece inteiro e as ações descem para a linha de baixo",
+        "en": "in `ondas whoami`, on a phone, a long or e-mail-shaped name no longer ends up underneath `[rename]`: the name shows in full and the actions move to the line below",
+        "es": "en `ondas whoami`, en el móvil, un nombre largo o con forma de correo ya no queda debajo de `[renombrar]`: el nombre se ve entero y las acciones bajan a la línea siguiente"
+      }
+    ]
+  },
+  {
     "versao": "1.9.1",
     "data": "2026-11-14",
     "itens": [

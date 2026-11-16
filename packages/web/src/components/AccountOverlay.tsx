@@ -64,29 +64,31 @@ export function AccountOverlay() {
 
         <div className={o.contaCorpo}>
           <div className={s.panel}>
-            <div className={s.panelRow}>
+            <div className={`${s.panelRow} ${o.contaLinha}`}>
               <span className={s.panelLabel}>{t('conta.conta')}</span>
-              <span className={s.panelValue}>{whoAmI(user)}</span>
-              {user ? (
-                <>
-                  <Renomear user={user} />
-                  <button
-                    type="button"
-                    className={s.logout}
-                    onClick={() => {
-                      void controller.logout();
-                      leaveGuest();
-                      navigate(PATHS.login);
-                    }}
-                  >
-                    {t('ui.sair')}
+              <span className={`${s.panelValue} ${o.contaNome}`}>{whoAmI(user)}</span>
+              <span className={o.contaAcoes}>
+                {user ? (
+                  <>
+                    <Renomear user={user} />
+                    <button
+                      type="button"
+                      className={s.logout}
+                      onClick={() => {
+                        void controller.logout();
+                        leaveGuest();
+                        navigate(PATHS.login);
+                      }}
+                    >
+                      {t('ui.sair')}
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className={s.link} onClick={() => navigate(PATHS.login)}>
+                    {t('ui.entrar')}
                   </button>
-                </>
-              ) : (
-                <button type="button" className={s.link} onClick={() => navigate(PATHS.login)}>
-                  {t('ui.entrar')}
-                </button>
-              )}
+                )}
+              </span>
             </div>
             <div className={s.panelRow}>
               <span className={s.panelLabel}>{t('conta.plano')}</span>

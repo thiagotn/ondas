@@ -7,6 +7,10 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.9.2 — 2026-11-16
+
+- em `ondas whoami`, no celular, um nome longo ou em forma de e-mail não fica mais por baixo do `[renomear]`: o nome aparece inteiro e as ações descem para a linha de baixo
+
 ## 1.9.1 — 2026-11-14
 
 - instalado no iPhone, o app não fica mais com a barra de abas escondida atrás do relógio e do notch: o topo, as janelas e o player cheio recuam até a área livre da tela, também com o aparelho deitado

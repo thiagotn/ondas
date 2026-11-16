@@ -4087,6 +4087,49 @@ test('a conta troca o próprio nome e a própria senha', async ({ page }) => {
   await expect(conta.getByText('Thiago N', { exact: true })).toBeVisible();
 });
 
+// Nome sem espaço não quebra de linha: no celular ele era espremido pelo
+// `flex` e pintado por baixo do `[renomear]`. Agora são as ações que descem.
+test('nome longo no whoami não fica por baixo das ações da linha', async ({ page }) => {
+  await logar(page);
+  await abrirConta(page);
+  const conta = page.getByRole('dialog', { name: 'ondas whoami' });
+  const renomear = conta.getByRole('button', { name: '[renomear]' });
+  const sair = conta.getByRole('button', { name: '[sair]' });
+
+  // Um e-mail comum, e o teto de 40 caracteres num nome sem espaço nenhum.
+  for (const nome of ['mayumi.tati@gmail.com', 'n'.repeat(40)]) {
+    await renomear.click();
+    await conta.getByRole('textbox', { name: 'nome novo' }).fill(nome);
+    await conta.getByRole('textbox', { name: 'nome novo' }).press('Enter');
+    const texto = conta.getByText(nome, { exact: true });
+    await expect(texto).toBeVisible();
+
+    const caixa = async (l: Locator) => (await l.boundingBox())!;
+    // A caixa do TEXTO, e não a do elemento: espremido, o elemento fica
+    // estreito e bem-comportado enquanto as letras vazam para fora dele.
+    const n = await texto.evaluate((el) => {
+      const faixa = document.createRange();
+      faixa.selectNodeContents(el);
+      const r = faixa.getBoundingClientRect();
+      return { x: r.x, y: r.y, width: r.width, height: r.height };
+    });
+    const painel = await caixa(conta);
+    expect(n.x + n.width, `${nome}: o nome não sai do painel`).toBeLessThanOrEqual(
+      painel.x + painel.width,
+    );
+    // As duas ações andam juntas: descer só o `[sair]` deixava uma em cada linha.
+    const [r, s] = [await caixa(renomear), await caixa(sair)];
+    expect(Math.abs(r.y + r.height / 2 - (s.y + s.height / 2))).toBeLessThan(2);
+    for (const acao of [renomear, sair]) {
+      const a = await caixa(acao);
+      const separados =
+        a.x >= n.x + n.width || a.x + a.width <= n.x || a.y >= n.y + n.height || a.y + a.height <= n.y;
+      expect(separados, `${nome}: a ação não pode cobrir o nome`).toBe(true);
+      expect(a.x + a.width).toBeLessThanOrEqual(painel.x + painel.width);
+    }
+  }
+});
+
 test('apagar a conta pede a senha, e só o aceite do servidor tira a pessoa do app', async ({
   page,
 }) => {

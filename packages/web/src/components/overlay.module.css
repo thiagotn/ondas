@@ -639,6 +639,49 @@
   gap: 10px;
 }
 
+/* O nome na linha `conta`. O `.panelValue` comum é `flex: 1; min-width: 0` e
+   se deixa espremer; texto corrido quebra por dentro, mas um nome sem espaço —
+   um e-mail — não quebra, e vazava para baixo do `[renomear]`.
+
+   `flex-basis: auto` faz a quebra de linha do flex contar a largura REAL do
+   nome: quando ele não cabe ao lado das ações, são elas que descem. O
+   `max-width` é a linha menos o rótulo (9ch) e o vão: sem ele um nome longo
+   desceria sozinho e deixaria o rótulo órfão. Nome maior que isso (são até 40
+   caracteres) quebra por dentro em vez de vazar.
+
+   `.conta .contaNome`, com o painel na frente: o `flex: 1` do `.panelValue`
+   mora em outro módulo, e entre duas classes soltas quem vence é a ordem em
+   que o bundle as emite — que não é esta. */
+.conta .contaNome {
+  flex: 1 1 auto;
+  max-width: calc(100% - 9ch - 12px);
+  overflow-wrap: anywhere;
+}
+
+/* As ações da linha `conta`, juntas: soltas na linha, o `[sair]` descia sozinho
+   e deixava o `[renomear]` para trás. Na linha do nome quem as empurra para a
+   direita é o `flex: 1` dele; quando descem, é esta margem que as mantém do
+   mesmo lado. */
+.contaAcoes {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 12px;
+}
+
+/* Com o formulário de renomear aberto o grupo vira a linha inteira, que é o
+   que o `.contaForm` espera do pai. */
+.contaAcoes:has(form) {
+  flex: 1 0 100%;
+}
+
+/* O vão de 12px do `.panelRow` é entre colunas; entre o nome e as ações que
+   desceram ele abria um buraco — o botão já traz a própria altura de toque. */
+.conta .contaLinha {
+  row-gap: 2px;
+}
+
 .contaConfirma {
   color: var(--ansi-3);
 }
