@@ -184,6 +184,7 @@ export const PT_BR = {
 
   // ── conta (`ondas whoami`) ───────────────────────────────────
   'conta.conta': 'conta',
+  'conta.email': 'e-mail',
   'conta.plano': 'plano',
   'conta.catalogo': 'catálogo',
   'conta.catalogoPublico': 'incluir o catálogo público (audius) na lista',

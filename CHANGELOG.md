@@ -7,6 +7,10 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.10.0 — 2026-11-22
+
+- `ondas whoami` mostra o e-mail da conta, numa linha logo abaixo do nome: depois de renomear, é ela que diz com qual conta você entrou
+
 ## 1.9.3 — 2026-11-22
 
 - a tela de erro ("a tela quebrou") também recua do notch e da barrinha de início: com o iPhone deitado o texto não fica mais atrás do recorte, e os botões de recarregar e limpar dados não ficam por baixo da barrinha

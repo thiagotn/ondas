@@ -30,8 +30,8 @@ describe('LocalAuthService', () => {
 
   it('autentica e persiste o usuário derivado do e-mail', async () => {
     const user = await auth.login({ email: 'Thiago.TN@Email.com', password: 'senha' });
-    expect(user).toEqual({ name: 'thiago.tn' });
-    expect(store.data.get(SESSION_KEY)).toEqual({ name: 'thiago.tn' });
+    expect(user).toEqual({ name: 'thiago.tn', email: 'Thiago.TN@Email.com' });
+    expect(store.data.get(SESSION_KEY)).toEqual({ name: 'thiago.tn', email: 'Thiago.TN@Email.com' });
   });
 
   it('recusa e-mail inválido', async () => {
@@ -51,7 +51,7 @@ describe('LocalAuthService', () => {
   it('restaura e encerra a sessão', async () => {
     expect(await auth.restore()).toBeNull();
     await auth.login({ email: 'a@b.co', password: 'abcd' });
-    expect(await auth.restore()).toEqual({ name: 'a' });
+    expect(await auth.restore()).toEqual({ name: 'a', email: 'a@b.co' });
     await auth.logout();
     expect(await auth.restore()).toBeNull();
   });

@@ -1,5 +1,16 @@
 [
   {
+    "versao": "1.10.0",
+    "data": "2026-11-22",
+    "itens": [
+      {
+        "pt-BR": "`ondas whoami` mostra o e-mail da conta, numa linha logo abaixo do nome: depois de renomear, é ela que diz com qual conta você entrou",
+        "en": "`ondas whoami` now shows the account's email on a line right below the name: after renaming, that is what tells you which account you signed in with",
+        "es": "`ondas whoami` muestra el correo de la cuenta, en una línea justo debajo del nombre: después de renombrar, es la que dice con qué cuenta entraste"
+      }
+    ]
+  },
+  {
     "versao": "1.9.3",
     "data": "2026-11-22",
     "itens": [

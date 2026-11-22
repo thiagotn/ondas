@@ -51,8 +51,13 @@ const (
 )
 
 type User struct {
-	ID    string `json:"-"`
-	Email string `json:"-"`
+	ID string `json:"-"`
+	// O e-mail com que a pessoa entra. Sai em toda resposta de auth para o
+	// `ondas whoami` mostrar de quem é a sessão: o nome de exibição é livre
+	// (`PATCH /auth/conta`), e depois de renomear nada mais na tela dizia com
+	// qual conta se entrou. Só vai para o próprio dono — este tipo nunca é
+	// serializado para outra pessoa.
+	Email string `json:"email"`
 	Name  string `json:"name"`
 	// O catálogo público entra na lista desta conta ou não (migração 0005).
 	//
@@ -85,9 +90,9 @@ type User struct {
 // Conta é a linha de `users` como o ADMIN a vê.
 //
 // Separada de `User` porque as duas respostas têm públicos opostos: `User` vai
-// para o próprio dono, pelo navegador, e por isso esconde id e e-mail; `Conta`
-// só sai nas rotas de `/api/admin`, e o admin precisa justamente do e-mail e da
-// mensagem para decidir.
+// para o próprio dono, pelo navegador, e por isso esconde o id e não traz nada
+// da análise; `Conta` só sai nas rotas de `/api/admin`, e o admin precisa
+// justamente do id, do status e da mensagem para decidir.
 type Conta struct {
 	ID         string     `json:"id"`
 	Email      string     `json:"email"`

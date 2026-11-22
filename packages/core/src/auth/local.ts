@@ -28,7 +28,7 @@ export class LocalAuthService implements AuthService {
     if (password.length < MIN_PASSWORD) throw new AuthError('senha precisa de 4+ caracteres');
     // Sem `publico`: ausente já significa "mostra" (`showsPublicCatalog`), e
     // repetir o padrão aqui seria um segundo lugar para mantê-lo.
-    const user: User = { name: email.split('@')[0]!.toLowerCase() };
+    const user: User = { name: email.split('@')[0]!.toLowerCase(), email: email.trim() };
     await this.store.set(SESSION_KEY, user);
     return user;
   }

@@ -165,6 +165,7 @@ export const EN: Record<Chave, Frase> = {
   'ui.erro': 'error:',
 
   'conta.conta': 'account',
+  'conta.email': 'email',
   'conta.plano': 'plan',
   'conta.catalogo': 'catalog',
   'conta.catalogoPublico': 'include the public catalog (audius) in the list',

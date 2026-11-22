@@ -845,6 +845,9 @@ test('login libera o catálogo, e a conta sai da biblioteca para `ondas whoami`'
   const conta = page.getByRole('dialog', { name: 'ondas whoami' });
   await expect(conta.getByText('catálogo completo + offline')).toBeVisible();
   await expect(conta.getByText('0 faixas · 0,0 MB')).toBeVisible();
+  // O e-mail com que se entrou: o nome é livre, e é esta linha que diz qual
+  // conta é.
+  await expect(conta.getByText('thiago@ondas.app', { exact: true })).toBeVisible();
 
   // Esc fecha uma camada e devolve o endereço.
   await page.keyboard.press('Escape');

@@ -277,6 +277,9 @@ function leUsuario(bruto: unknown): User | null {
   // servidor antigo parecer um que nunca recebeu escolha — e o aparelho tentaria
   // subir as suas para uma rota que as recusa.
   const pref = {
+    // Só para mostrar no `ondas whoami`; servidor antigo não manda, e aí a
+    // linha simplesmente não aparece.
+    ...(typeof u.email === 'string' && u.email ? { email: u.email } : {}),
     ...(typeof u.publico === 'boolean' ? { publico: u.publico } : {}),
     ...(u.prefs && typeof u.prefs === 'object' ? { prefs: lePrefs(u.prefs) } : {}),
     // A mesma regra de `publico`: só o booleano entra, e a ausência (servidor

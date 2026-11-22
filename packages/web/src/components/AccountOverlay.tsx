@@ -90,6 +90,15 @@ export function AccountOverlay() {
                 )}
               </span>
             </div>
+            {/* O nome é livre desde o `[renomear]`; esta linha é a que diz com
+                qual conta se entrou. Só aparece quando o servidor mandou o
+                e-mail — um espelho antigo, sem rede, ainda não o tem. */}
+            {user?.email && (
+              <div className={s.panelRow}>
+                <span className={s.panelLabel}>{t('conta.email')}</span>
+                <span className={`${s.panelValue} ${o.contaEmail}`}>{user.email}</span>
+              </div>
+            )}
             <div className={s.panelRow}>
               <span className={s.panelLabel}>{t('conta.plano')}</span>
               <span className={s.panelValue}>{planLabel(user)}</span>

@@ -162,6 +162,7 @@ export const ES: Record<Chave, Frase> = {
   'ui.erro': 'error:',
 
   'conta.conta': 'cuenta',
+  'conta.email': 'correo',
   'conta.plano': 'plan',
   'conta.catalogo': 'catálogo',
   'conta.catalogoPublico': 'incluir el catálogo público (audius) en la lista',

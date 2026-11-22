@@ -124,6 +124,8 @@ func TestPedidoFicaEmAnaliseAteOAdminAprovar(t *testing.T) {
 	require.NotEmpty(t, w.Result().Cookies())
 	corpo := corpoDe(t, w)
 	require.Equal(t, "Fulana", corpo["name"])
+	// O e-mail volta para o dono: é o que o `ondas whoami` mostra.
+	require.Equal(t, "nova@exemplo.test", corpo["email"])
 	// A conta aprovada usa a plataforma, e ainda assim não envia arquivo.
 	require.Equal(t, false, corpo["podeEnviar"])
 }

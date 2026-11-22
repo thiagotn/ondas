@@ -34,8 +34,8 @@ describe('HttpAuthService.login', () => {
     const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
 
     const user = await auth.login({ email: 'thiagotn@gmail.com', password: 'senha-forte' });
-    expect(user).toEqual({ name: 'thiagotn' });
-    expect(store.dados.get('user')).toEqual({ name: 'thiagotn' });
+    expect(user).toEqual({ name: 'thiagotn', email: 'thiagotn@gmail.com' });
+    expect(store.dados.get('user')).toEqual({ name: 'thiagotn', email: 'thiagotn@gmail.com' });
 
     const [rota, init] = fetchImpl.mock.calls[0]!;
     expect(rota).toBe('/api/auth/login');
@@ -216,6 +216,25 @@ describe('HttpAuthService.restore', () => {
 
     expect(await auth.restore()).toEqual({ name: 'thiagotn' });
     expect(store.dados.get('user')).toEqual({ name: 'thiagotn' });
+  });
+
+  it('o e-mail do servidor chega ao usuário e ao espelho', async () => {
+    const store = memoria({});
+    const fetchImpl = vi.fn(async () =>
+      resposta(200, { name: 'thiagotn', email: 'thiago@ondas.app' }),
+    );
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    expect(await auth.restore()).toEqual({ name: 'thiagotn', email: 'thiago@ondas.app' });
+    expect(store.dados.get('user')).toEqual({ name: 'thiagotn', email: 'thiago@ondas.app' });
+  });
+
+  it('servidor de antes do campo não inventa e-mail', async () => {
+    const store = memoria({});
+    const fetchImpl = vi.fn(async () => resposta(200, { name: 'thiagotn', email: '' }));
+    const auth = new HttpAuthService(store, fetchImpl as unknown as typeof fetch);
+
+    expect(await auth.restore()).toEqual({ name: 'thiagotn' });
   });
 
   it('lê o `publico` do servidor quando ele vem', async () => {

@@ -658,6 +658,16 @@
   overflow-wrap: anywhere;
 }
 
+/* E-mail não tem espaço onde quebrar: sem isto um endereço longo estouraria a
+   linha no celular. Selecionável porque é o tipo de texto que se copia — a
+   exceção do toque longo (ver `styles/global.css`). */
+.contaEmail {
+  overflow-wrap: anywhere;
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 /* As ações da linha `conta`, juntas: soltas na linha, o `[sair]` descia sozinho
    e deixava o `[renomear]` para trás. Na linha do nome quem as empurra para a
    direita é o `flex: 1` dele; quando descem, é esta margem que as mantém do

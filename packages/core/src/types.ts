@@ -55,6 +55,15 @@ export interface Track {
 export interface User {
   name: string;
   /**
+   * O e-mail com que a conta entra (`email` na API). Só serve para o
+   * `ondas whoami` dizer de quem é a sessão — o nome é livre e pode não lembrar
+   * o e-mail em nada.
+   *
+   * OPCIONAL: um espelho local gravado antes deste campo, ou uma API antiga,
+   * não o têm. Ausente = a linha não aparece, e o próximo `/me` a traz.
+   */
+  email?: string;
+  /**
    * O catálogo público entra na lista desta conta ou não. Vem do servidor em
    * toda resposta de auth (`publico` na API), e mora na conta porque é escolha
    * sobre o que se quer ouvir — segue para qualquer aparelho, ao contrário do
