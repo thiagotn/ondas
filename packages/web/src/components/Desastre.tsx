@@ -33,10 +33,17 @@ export class Desastre extends Component<{ children: ReactNode }, { erro: Error |
     return (
       <div
         style={{
-          padding: 'calc(24px + env(safe-area-inset-top, 0px)) 16px 24px',
+          // `env()` direto, e não `var(--safe-*)`: esta tela é a que sobra quando
+          // o resto quebrou, e não pode depender de o `global.css` ter chegado.
+          padding:
+            'calc(24px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) ' +
+            'calc(24px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px))',
           color: 'var(--color-text, #cdd6f4)',
           background: 'var(--color-bg, #1e1e2e)',
           minHeight: '100dvh',
+          // Pelo mesmo motivo: sem o reset do `global.css`, o padding somaria aos
+          // 100dvh e a tela rolaria exatamente a altura dos recuos.
+          boxSizing: 'border-box',
           font: '13px/1.6 ui-monospace, monospace',
         }}
       >

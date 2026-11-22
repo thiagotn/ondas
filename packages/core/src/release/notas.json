@@ -1,5 +1,16 @@
 [
   {
+    "versao": "1.9.3",
+    "data": "2026-11-22",
+    "itens": [
+      {
+        "pt-BR": "a tela de erro (\"a tela quebrou\") também recua do notch e da barrinha de início: com o iPhone deitado o texto não fica mais atrás do recorte, e os botões de recarregar e limpar dados não ficam por baixo da barrinha",
+        "en": "the error screen (\"a tela quebrou\") now stays clear of the notch and the home bar too: with the iPhone in landscape the text no longer sits behind the cutout, and the reload and clear-data buttons no longer end up under the home bar",
+        "es": "la pantalla de error (\"a tela quebrou\") también se aparta del notch y de la barra de inicio: con el iPhone en horizontal el texto ya no queda detrás del recorte, y los botones de recargar y limpiar datos ya no quedan debajo de la barra"
+      }
+    ]
+  },
+  {
     "versao": "1.9.2",
     "data": "2026-11-16",
     "itens": [

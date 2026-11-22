@@ -7,6 +7,10 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.9.3 — 2026-11-22
+
+- a tela de erro ("a tela quebrou") também recua do notch e da barrinha de início: com o iPhone deitado o texto não fica mais atrás do recorte, e os botões de recarregar e limpar dados não ficam por baixo da barrinha
+
 ## 1.9.2 — 2026-11-16
 
 - em `ondas whoami`, no celular, um nome longo ou em forma de e-mail não fica mais por baixo do `[renomear]`: o nome aparece inteiro e as ações descem para a linha de baixo
