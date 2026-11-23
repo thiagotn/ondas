@@ -4,6 +4,11 @@ const ROTA = '/api/acervo';
 
 /** Quanto tempo esperar a ingestão terminar antes de desistir de acompanhar. */
 const PRAZO_PADRAO_MS = 240_000;
+/**
+ * O mesmo, para um LINK. Bem mais longo: um link de página espera o node do
+ * Hermes pegá-lo, baixar do site e subir o arquivo, antes de o worker começar.
+ */
+const PRAZO_DE_LINK_MS = 900_000;
 /** Intervalo entre consultas ao status do job. */
 const INTERVALO_MS = 2_000;
 
@@ -19,7 +24,17 @@ export interface ArquivoEnviavel {
   readonly size: number;
 }
 
-export type EstadoEnvio = 'preparando' | 'enviando' | 'processando' | 'pronto' | 'erro';
+/**
+ * `baixando` só existe para link de página: é o tempo em que o arquivo ainda
+ * não existe do nosso lado — o node está trazendo do site.
+ */
+export type EstadoEnvio =
+  | 'preparando'
+  | 'enviando'
+  | 'baixando'
+  | 'processando'
+  | 'pronto'
+  | 'erro';
 
 export interface ProgressoEnvio {
   estado: EstadoEnvio;
@@ -53,7 +68,9 @@ interface Job {
   id?: unknown;
   status?: unknown;
   error?: unknown;
+  code?: unknown;
   trackId?: unknown;
+  tipo?: unknown;
 }
 
 /**
@@ -133,6 +150,39 @@ export class AcervoUploader<A extends ArquivoEnviavel> {
     return trackId;
   }
 
+  /**
+   * Traz uma faixa por LINK: uma URL direta de mídia, ou a página de um vídeo
+   * do YouTube / de uma faixa do SoundCloud.
+   *
+   * Aqui não há bytes para enviar: a API enfileira, e quem baixa é o worker
+   * (mídia) ou o node (página). O acompanhamento é o mesmo job de sempre, só
+   * que com mais paciência — e dizendo `baixando` enquanto o job ainda é de
+   * página, que é quando nem arquivo existe do nosso lado.
+   *
+   * Quem decide o que o link é, e se a conta pode, é o servidor: esta função
+   * manda a URL como veio.
+   */
+  async ingerirLink(url: string, opcoes: OpcoesDeEnvio = {}): Promise<string> {
+    const avisar = (p: ProgressoEnvio) => opcoes.aoMudar?.(p);
+    avisar({ estado: 'preparando', fracao: 0 });
+
+    const res = await this.pedir(`${ROTA}/ingest`, { url }, opcoes.signal);
+    const job = (await this.corpo(res)) as Job;
+    if (typeof job.id !== 'string' || !job.id) {
+      throw new AcervoError('a API aceitou o link mas não devolveu o job');
+    }
+    const estadoDe = (j: Job): EstadoEnvio => (j.tipo === 'pagina' ? 'baixando' : 'processando');
+    avisar({ estado: estadoDe(job), fracao: 1 });
+
+    const trackId = await this.acompanhar(
+      job.id,
+      { ...opcoes, prazoMs: opcoes.prazoMs ?? PRAZO_DE_LINK_MS },
+      (j) => avisar({ estado: estadoDe(j), fracao: 1 }),
+    );
+    avisar({ estado: 'pronto', fracao: 1, trackId });
+    return trackId;
+  }
+
   private async pedirVaga(arquivo: A, signal?: AbortSignal): Promise<{ id: string; url: string }> {
     const res = await this.pedir(`${ROTA}/upload`, { bytes: arquivo.size }, signal);
     const corpo = (await this.corpo(res)) as Vaga;
@@ -160,7 +210,11 @@ export class AcervoUploader<A extends ArquivoEnviavel> {
   }
 
   /** Consulta o job até ele sair de pending/processing. */
-  private async acompanhar(jobID: string, opcoes: OpcoesDeEnvio): Promise<string> {
+  private async acompanhar(
+    jobID: string,
+    opcoes: OpcoesDeEnvio,
+    aCadaConsulta?: (job: Job) => void,
+  ): Promise<string> {
     const prazo = opcoes.prazoMs ?? PRAZO_PADRAO_MS;
     const limite = Date.now() + prazo;
     for (;;) {
@@ -178,14 +232,23 @@ export class AcervoUploader<A extends ArquivoEnviavel> {
         return job.trackId;
       }
       if (job.status === 'error') {
+        // O `code` vai junto: sem ele a tela só tinha a frase do worker, em
+        // pt-BR, para mostrar a quem lê em inglês ou espanhol.
         throw new AcervoError(
           typeof job.error === 'string' && job.error ? job.error : 'a ingestão falhou',
+          false,
+          typeof job.code === 'string' && job.code ? job.code : undefined,
         );
       }
+      aCadaConsulta?.(job);
       if (Date.now() + INTERVALO_MS >= limite) {
         // Não é falha definitiva: o worker continua: a faixa deve aparecer
         // sozinha no catálogo depois. A tela precisa poder dizer isso.
-        throw new AcervoError('o arquivo subiu, mas o processamento está demorando');
+        throw new AcervoError(
+          'o arquivo subiu, mas o processamento está demorando',
+          false,
+          'acompanhamento_demorou',
+        );
       }
       await this.esperar(INTERVALO_MS);
     }

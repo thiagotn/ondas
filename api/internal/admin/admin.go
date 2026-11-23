@@ -32,6 +32,7 @@ var (
 const (
 	chaveCadastroAberto = "cadastro_aberto"
 	chaveEnvImportado   = "env_importado"
+	chaveCotaBloqueia   = "cota_bloqueia"
 
 	// O plano de toda conta que ninguém mudou (semeado na migração 0012).
 	PlanoPadrao = "padrao"
@@ -68,6 +69,72 @@ func (p *Painel) CadastroAberto(ctx context.Context) (bool, error) {
 
 func (p *Painel) DefinirCadastroAberto(ctx context.Context, aberto bool) error {
 	return gravarConfig(ctx, p.pool, chaveCadastroAberto, boolTexto(aberto))
+}
+
+// CotaBloqueia diz se passar da cota RECUSA faixa nova (migração 0013). Sem a
+// linha é `false`: aqui o estado sem decisão é o de antes da chave existir, em
+// que a cota só era medida — um banco que perdeu a linha não pode começar a
+// recusar envio sozinho.
+func (p *Painel) CotaBloqueia(ctx context.Context) (bool, error) {
+	var valor string
+	err := p.pool.QueryRow(ctx, `SELECT valor FROM config WHERE chave = $1`, chaveCotaBloqueia).Scan(&valor)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("admin: cota bloqueia: %w", err)
+	}
+	return valor == "true", nil
+}
+
+func (p *Painel) DefinirCotaBloqueia(ctx context.Context, bloqueia bool) error {
+	return gravarConfig(ctx, p.pool, chaveCotaBloqueia, boolTexto(bloqueia))
+}
+
+// ErrSemEspaco é a recusa por cota. Carrega os dois números para a tela poder
+// dizer quanto falta, em vez de só "não".
+type ErrSemEspaco struct {
+	UsadoBytes int64
+	CotaBytes  int64
+}
+
+func (e *ErrSemEspaco) Error() string { return MensagemSemEspaco }
+
+// MensagemSemEspaco é a frase da recusa, num lugar só: o handler a escreve na
+// resposta e o worker a grava no job, e é por ela que o código do erro é
+// achado depois (`codigoPorMensagem`, no httpapi).
+const MensagemSemEspaco = "sem espaço no acervo: a conta chegou ao limite do plano"
+
+// ConferirCota diz se cabem mais `bytes` no acervo da conta `dono` — a que vai
+// ser DONA da faixa, não quem pediu.
+//
+// `nil` quando cabe, quando a chave está desligada, e quando a conta não
+// existe (quem cuida disso é a ingestão, que falha no FK). `*ErrSemEspaco`
+// quando não cabe.
+//
+// Não é transacional de propósito: dois envios simultâneos podem passar
+// juntos e a conta terminar um pouco acima. O que a cota impede é crescer sem
+// teto, e para isso a conferência seguinte basta — travar a conta a cada envio
+// custaria mais do que o que protege.
+func (p *Painel) ConferirCota(ctx context.Context, dono string, bytes int64) error {
+	bloqueia, err := p.CotaBloqueia(ctx)
+	if err != nil {
+		return err
+	}
+	if !bloqueia {
+		return nil
+	}
+	uso, err := p.UsoDaConta(ctx, dono)
+	if errors.Is(err, ErrNaoEncontrado) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if uso.UsadoBytes+bytes > uso.CotaBytes {
+		return &ErrSemEspaco{UsadoBytes: uso.UsadoBytes, CotaBytes: uso.CotaBytes}
+	}
+	return nil
 }
 
 func boolTexto(b bool) string {
@@ -289,14 +356,16 @@ func (p *Painel) AtualizarPlano(ctx context.Context, id string, nome *string, co
 
 // Uso é quanto uma conta ocupa e quanto ela tem.
 //
-// `CotaBytes` é a soma do plano com o extra avulso. Nesta versão o número só é
-// MOSTRADO — nada recusa envio por causa dele. Quando recusar, os três pontos
-// são: o pedido de vaga e a finalização do upload (`httpapi/upload.go`) e o
-// worker depois de baixar uma URL (`worker.processar`), sempre contra a conta
-// que vai ser DONA da faixa, não contra quem pediu.
+// `CotaBytes` é a soma do plano com o extra avulso. Quem RECUSA por causa dele
+// é `ConferirCota`, quando a chave `cota_bloqueia` está ligada — sempre contra a
+// conta que vai ser DONA da faixa, não contra quem pediu.
 type Uso struct {
 	UsadoBytes int64 `json:"usadoBytes"`
 	CotaBytes  int64 `json:"cotaBytes"`
+	// Passar da cota recusa faixa nova? Vai junto para a tela da conta poder
+	// dizer a verdade — "envio bloqueado" quando bloqueia, e não quando o admin
+	// desligou a chave. Quem preenche é o handler; `UsoDaConta` não lê a config.
+	Bloqueia bool `json:"bloqueia"`
 }
 
 func (p *Painel) UsoDaConta(ctx context.Context, userID string) (*Uso, error) {
@@ -541,15 +610,17 @@ func (p *Painel) DonoDaFaixa(ctx context.Context, id string) (donoID, titulo str
 // token de acesso na query, e não há por que o painel repeti-la), e de um envio
 // de arquivo fica a palavra `arquivo`.
 type Ingestao struct {
-	ID           string    `json:"id"`
-	Status       string    `json:"status"`
-	Tentativas   int       `json:"tentativas"`
-	Erro         string    `json:"erro,omitempty"`
-	Fonte        string    `json:"fonte"`
-	Titulo       string    `json:"titulo,omitempty"`
-	FaixaID      string    `json:"faixaId,omitempty"`
-	PedidoPor    string    `json:"pedidoPor"`
-	Destino      string    `json:"destino,omitempty"`
+	ID         string `json:"id"`
+	Status     string `json:"status"`
+	Tentativas int    `json:"tentativas"`
+	Erro       string `json:"erro,omitempty"`
+	Fonte      string `json:"fonte"`
+	Titulo     string `json:"titulo,omitempty"`
+	FaixaID    string `json:"faixaId,omitempty"`
+	PedidoPor  string `json:"pedidoPor"`
+	Destino    string `json:"destino,omitempty"`
+	// `pagina` enquanto o node ainda não baixou o link; `midia` depois.
+	Tipo         string    `json:"tipo"`
 	CriadaEm     time.Time `json:"criadaEm"`
 	AtualizadaEm time.Time `json:"atualizadaEm"`
 }
@@ -581,9 +652,10 @@ func (p *Painel) Ingestoes(ctx context.Context, status, userID string, limite in
 		limite = 100
 	}
 	linhas, err := p.pool.Query(ctx, `
-		SELECT j.id, j.status, j.attempts, coalesce(j.error, ''), j.source_url,
+		SELECT j.id, j.status, j.attempts, coalesce(j.error, ''),
+		       coalesce(j.pagina_url, j.source_url),
 		       coalesce(nullif(j.title, ''), j.fallback_title, ''), coalesce(j.track_id::text, ''),
-		       u.email, coalesce(d.email, ''), j.created_at, j.updated_at
+		       u.email, coalesce(d.email, ''), j.tipo, j.created_at, j.updated_at
 		  FROM ingest_jobs j
 		  JOIN users u ON u.id = j.user_id
 		  LEFT JOIN users d ON d.id = j.destino_id
@@ -601,7 +673,7 @@ func (p *Painel) Ingestoes(ctx context.Context, status, userID string, limite in
 		var i Ingestao
 		var fonte string
 		if err := linhas.Scan(&i.ID, &i.Status, &i.Tentativas, &i.Erro, &fonte, &i.Titulo, &i.FaixaID,
-			&i.PedidoPor, &i.Destino, &i.CriadaEm, &i.AtualizadaEm); err != nil {
+			&i.PedidoPor, &i.Destino, &i.Tipo, &i.CriadaEm, &i.AtualizadaEm); err != nil {
 			return nil, fmt.Errorf("admin: ingestões: scan: %w", err)
 		}
 		i.Fonte = resumirFonte(fonte)

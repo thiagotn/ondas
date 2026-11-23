@@ -136,6 +136,20 @@ certo), **1** (a API recusou ou não respondeu) e **2** (uso ou configuração).
 argumento — argumento aparece no `ps` e fica no histórico do shell. Sem `ADMIN_TOKEN_SHA256` na API,
 `/api/admin` responde 404, como rota que não existe.
 
+### Faixa por link
+
+Quem tem **envia** ligado traz faixa por link, sem passar pelo bot: um vídeo do YouTube, uma faixa
+do SoundCloud ou a URL de um arquivo de áudio. Três portas levam à mesma sugestão — o app nota o
+link copiado ao voltar para a frente (só onde a permissão de clipboard já foi dada), o `[+ link]`
+da biblioteca e o colar leem no gesto, e no Android o Ondas instalado aparece no menu Compartilhar.
+Nenhuma enfileira sozinha: nada sai do aparelho antes do `[adicionar ao acervo]`.
+
+URL de arquivo é baixada pelo worker do cluster, como sempre. **Link de página não**: quem o baixa é
+o node do Hermes (`ondas-fila`, no repo `homelab`), com as mesmas skills do bot, e o arquivo entra
+na conta de quem pediu. Uma faixa por link; até cinco pedidos em andamento por conta.
+
+O raciocínio está em [docs/engenharia/17-faixa-por-link.md](docs/engenharia/17-faixa-por-link.md).
+
 ### Painel de admin (`packages/admin`)
 
 A mesma administração, numa tela: `https://ondas-admin.thiagotn.com`. É **outra aplicação** — outro
@@ -158,8 +172,9 @@ Cadastro aberto, convites e "recebe do bot" moravam no ConfigMap (`SIGNUP_OPEN`,
 **uma vez**, na primeira subida, e daí em diante só o banco vale.
 
 **Cota.** Cada conta tem um plano (`planos.cota_bytes`) e um extra avulso (`cota_extra_bytes`); a
-cota é a soma. Por enquanto ela é só **medida** — aparece aqui e no `ondas whoami` de cada conta, e
-passar dela não bloqueia nada. As capas das faixas ingeridas antes da `0012` entram na conta depois
+cota é a soma. Desde a 1.12 ela **bloqueia**: conta acima do limite não recebe faixa nova (arquivo,
+link ou bot), e nada do que existe é apagado. A chave fica na tela **planos** — desligada, a cota
+volta a ser só medida. As capas das faixas ingeridas antes da `0012` entram na conta depois
 de `worker medir-capas --gravar` (uma vez).
 
 ```bash

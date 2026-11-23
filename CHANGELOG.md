@@ -7,6 +7,11 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.12.0 — 2026-11-23
+
+- quem tem envio liberado traz faixa por link: copie o endereço de um vídeo do YouTube, de uma faixa do SoundCloud ou de um arquivo de áudio, e o app oferece pôr no seu acervo. Na biblioteca há um `[+ link]` ao lado do `[+ arquivo]`; no Android instalado, o Ondas aparece no menu Compartilhar. O app só lê a área de transferência quando você já deu permissão ou num toque seu, e nada é enviado antes de você tocar em `[adicionar ao acervo]`. Uma faixa por link — playlist, canal e perfil ficam de fora
+- o limite do plano passa a valer: conta acima do limite não recebe faixa nova, por arquivo, por link ou pelo bot. Nada do que já está no acervo é apagado, e o `ondas whoami` diz quando o envio está bloqueado
+
 ## 1.11.0 — 2026-11-23
 
 - `ondas whoami` mostra quanto do seu acervo está ocupado e qual é o limite do seu plano, numa linha `acervo`. Por enquanto é só informação: passar do limite não bloqueia envio nem apaga nada

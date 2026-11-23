@@ -26,6 +26,7 @@ interface ContaFalsa {
 async function apiFalsa(page: Page) {
   let dentro = false;
   let cadastroAberto = false;
+  let cotaBloqueia = true;
   const pedidos: { metodo: string; caminho: string; corpo: unknown }[] = [];
   const contas: ContaFalsa[] = [
     {
@@ -112,10 +113,19 @@ async function apiFalsa(page: Page) {
       Object.assign(c, corpo);
       return json(200, completa(c));
     }
-    if (caminho === '/config' && metodo === 'GET') return json(200, { cadastroAberto });
+    if (caminho === '/config' && metodo === 'GET') return json(200, { cadastroAberto, cotaBloqueia });
     if (caminho === '/config' && metodo === 'PUT') {
-      cadastroAberto = corpo.cadastroAberto;
-      return json(200, { cadastroAberto });
+      // Como o servidor: só muda a chave que veio.
+      if (typeof corpo.cadastroAberto === 'boolean') cadastroAberto = corpo.cadastroAberto;
+      if (typeof corpo.cotaBloqueia === 'boolean') cotaBloqueia = corpo.cotaBloqueia;
+      return json(200, { cadastroAberto, cotaBloqueia });
+    }
+    if (caminho === '/planos' && metodo === 'GET') {
+      return json(200, {
+        planos: [
+          { id: 'padrao', nome: 'padrão', cotaBytes: 1024 ** 3, contas: 2, criadoEm: '2026-11-01T12:00:00Z' },
+        ],
+      });
     }
     if (caminho === '/convites' && metodo === 'GET') return json(200, { convites: [] });
     return json(404, { error: 'não encontrado' });
@@ -200,6 +210,18 @@ test('abrir o cadastro vale na tela e no servidor', async ({ page }) => {
   await page.getByRole('switch', { name: 'cadastro aberto' }).click();
   await expect(page.getByText(/aberto: qualquer pessoa pode pedir conta/)).toBeVisible();
   expect(pedidos).toContainEqual({ metodo: 'PUT', caminho: '/config', corpo: { cadastroAberto: true } });
+});
+
+test('desligar o bloqueio por cota manda só essa chave', async ({ page }) => {
+  const { pedidos } = await apiFalsa(page);
+  await entrar(page);
+  await page.getByRole('link', { name: 'planos', exact: true }).click();
+
+  await expect(page.getByText(/bloqueia: conta acima da cota não recebe faixa nova/)).toBeVisible();
+  await page.getByRole('switch', { name: 'a cota bloqueia envio' }).click();
+  await expect(page.getByText(/só mede: a cota aparece nas telas/)).toBeVisible();
+  // O cadastro não foi junto no pedido: mexer numa chave não mexe na outra.
+  expect(pedidos).toContainEqual({ metodo: 'PUT', caminho: '/config', corpo: { cotaBloqueia: false } });
 });
 
 test('sessão vencida no meio do uso volta para a entrada', async ({ page }) => {

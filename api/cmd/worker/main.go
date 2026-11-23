@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/thiagotn/ondas/api/internal/acervo"
+	"github.com/thiagotn/ondas/api/internal/admin"
 	"github.com/thiagotn/ondas/api/internal/config"
 	"github.com/thiagotn/ondas/api/internal/db"
 	"github.com/thiagotn/ondas/api/internal/ingest"
@@ -86,6 +87,24 @@ func main() {
 	}
 }
 
+// conferenciaDeCota adapta `admin.ConferirCota` para o worker, que não conhece
+// o pacote admin. Só a recusa de verdade vira erro: uma falha de LEITURA da
+// cota é logada e deixa a ingestão seguir, pela mesma razão do httpapi — a
+// cota é teto de crescimento, e o banco piscando não pode virar "sem espaço".
+func conferenciaDeCota(painel *admin.Painel) func(ctx context.Context, dono string, bytes int64) error {
+	return func(ctx context.Context, dono string, bytes int64) error {
+		err := painel.ConferirCota(ctx, dono, bytes)
+		var cheio *admin.ErrSemEspaco
+		if errors.As(err, &cheio) {
+			return &worker.ErrSemEspaco{Mensagem: admin.MensagemSemEspaco}
+		}
+		if err != nil {
+			slog.Error("conferir cota", "erro", err)
+		}
+		return nil
+	}
+}
+
 func run() error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -127,7 +146,7 @@ func run() error {
 		dirTrabalho,
 		prazo,
 		int64(cfg.IngestMaxMB)<<20,
-	)
+	).ComCota(conferenciaDeCota(admin.New(pool)))
 
 	srv := servidorDeSaude()
 	go func() {

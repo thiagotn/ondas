@@ -157,6 +157,9 @@ function semearCurtida(page: Page, id: string) {
 /** O acervo mutável da API falsa, por página — ver `semearCompartilhada`. */
 const acervoSemeado = new WeakMap<Page, Record<string, unknown>[]>();
 
+/** As URLs que chegaram ao `POST /api/acervo/ingest` de mentira. */
+const linksPedidos = new WeakMap<Page, string[]>();
+
 /** Põe no acervo desta página uma faixa que é de outra conta. */
 function semearCompartilhada(page: Page) {
   acervoSemeado.get(page)?.push({ ...COMPARTILHADA });
@@ -643,6 +646,40 @@ async function stubApi(page: Page) {
       premium: false,
     });
     return route.fulfill({ status: 202, json: { id: 'job-1', status: 'pending', url: 'upload:envio-1' } });
+  });
+
+  // Trazer faixa por LINK: a PWA manda a URL, e quem baixa é o servidor. O
+  // stub guarda o que chegou — é como um teste afirma "nada saiu do aparelho".
+  linksPedidos.set(page, []);
+  await page.route('**/api/acervo/ingest', async (route) => {
+    if (!logado) return route.fulfill({ status: 401, json: { error: 'sessão expirada' } });
+    const { url } = JSON.parse(route.request().postData() ?? '{}');
+    linksPedidos.get(page)!.push(String(url));
+    if (String(url).includes('conta-cheia')) {
+      return route.fulfill({
+        status: 413,
+        json: {
+          error: 'sem espaço no acervo: a conta chegou ao limite do plano',
+          code: 'cota_excedida',
+          params: { usado: 1, cota: 1 },
+        },
+      });
+    }
+    acervo.push({
+      id: 'acervo:22222222-2222-4222-8222-222222222222',
+      title: 'Veio do Link',
+      artist: 'acervo',
+      genre: 'acervo',
+      dur: 7,
+      art: '',
+      stream: '/api/acervo/22222222-2222-4222-8222-222222222222/audio',
+      peaks: PICOS_METADE,
+      premium: false,
+    });
+    return route.fulfill({
+      status: 202,
+      json: { id: 'job-1', status: 'pending', url, tipo: 'pagina' },
+    });
   });
 
   // 3) o acompanhamento, igual ao da ingestão por URL.
@@ -4196,3 +4233,223 @@ test('`ondas --about` leva às issues do projeto para reportar um bug', async ({
   // Abre em outra aba: reportar não pode custar a música que está tocando.
   await expect(link).toHaveAttribute('target', '_blank');
 });
+
+// ── trazer faixa por link ────────────────────────────────────────────────
+
+const LINK_YT = 'https://youtu.be/dQw4w9WgXcQ?si=rastreador';
+
+/**
+ * Um clipboard SÓ DESTA PÁGINA, no lugar do de verdade.
+ *
+ * O clipboard do Chromium é o do sistema: é um só para todos os testes que
+ * rodam em paralelo, e um teste lia o link que outro tinha acabado de copiar.
+ * (De quebra, a suíte parava de escrever na área de transferência de quem a
+ * roda.) O que se troca é a borda do navegador — `readText`, `writeText` e a
+ * pergunta de permissão; o caminho do app até elas é o de produção.
+ *
+ * `permitido` é a resposta de `permissions.query({ name: 'clipboard-read' })`:
+ * é ela que decide se o app lê sozinho ao voltar para a frente. As leituras
+ * são contadas, para um teste poder afirmar "o app não leu" — que é diferente
+ * de "o aviso não apareceu".
+ */
+async function clipboardDeMentira(page: Page, permitido: boolean) {
+  await page.addInitScript((granted) => {
+    const w = window as unknown as { __clip: string; __leituras: number };
+    w.__clip = '';
+    w.__leituras = 0;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        readText: async () => {
+          w.__leituras += 1;
+          return w.__clip;
+        },
+        writeText: async (t: string) => {
+          w.__clip = t;
+        },
+      },
+    });
+    const original = navigator.permissions.query.bind(navigator.permissions);
+    navigator.permissions.query = (d: PermissionDescriptor) =>
+      (d.name as string) === 'clipboard-read'
+        ? Promise.resolve({ state: granted ? 'granted' : 'prompt' } as PermissionStatus)
+        : original(d);
+  }, permitido);
+}
+
+const leituras = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __leituras: number }).__leituras);
+
+/** Põe o texto no clipboard e simula a volta para o app. */
+async function copiarEVoltar(page: Page, texto: string) {
+  await page.evaluate(async (t) => {
+    await navigator.clipboard.writeText(t);
+    window.dispatchEvent(new Event('focus'));
+  }, texto);
+}
+
+test('com permissão, o link copiado vira sugestão — e só sai do aparelho no toque', async ({
+  page,
+}) => {
+  await clipboardDeMentira(page, true);
+  await logar(page);
+
+  // O texto em volta do link é privado: o aviso mostra só o site e o id.
+  await copiarEVoltar(page, `segredo que não é da conta de ninguém ${LINK_YT}`);
+  const aviso = page.getByRole('status').filter({ hasText: 'link do YouTube copiado' });
+  await expect(aviso).toBeVisible();
+  await expect(aviso.getByText('youtube.com/dQw4w9WgXcQ')).toBeVisible();
+  await expect(page.getByText(/segredo que não é da conta/)).toBeHidden();
+  // Oferecer não é pedir: até aqui o servidor não soube de nada.
+  expect(linksPedidos.get(page)).toEqual([]);
+
+  await aviso.getByRole('button', { name: '[adicionar ao acervo]' }).click();
+  await expect(aviso).toBeHidden();
+  await expect(page.getByText(/na fila — acompanhe em ~\/biblioteca/)).toBeVisible();
+  // A URL vai como foi copiada: quem canoniza é o servidor.
+  await expect.poll(() => linksPedidos.get(page)).toEqual([LINK_YT]);
+
+  // Na biblioteca, o item do link concluiu e a faixa entrou no acervo.
+  await page.keyboard.press('3');
+  await expect(page.getByText('youtube.com/dQw4w9WgXcQ')).toBeVisible();
+  await expect(page.getByText('pronto', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Veio do Link/ })).toBeVisible();
+
+  // O mesmo link ainda está no clipboard, e voltar ao app NÃO o oferece de novo.
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await page.waitForTimeout(300);
+  await expect(page.getByRole('status').filter({ hasText: 'link do YouTube' })).toBeHidden();
+});
+
+test('ignorar dispensa o aviso, e nada é pedido ao servidor', async ({ page }) => {
+  await clipboardDeMentira(page, true);
+  await logar(page);
+  await copiarEVoltar(page, 'https://soundcloud.com/artista/faixa');
+
+  const aviso = page.getByRole('status').filter({ hasText: 'link do SoundCloud copiado' });
+  await expect(aviso).toBeVisible();
+  await aviso.getByRole('button', { name: '[ignorar]' }).click();
+  await expect(aviso).toBeHidden();
+  expect(linksPedidos.get(page)).toEqual([]);
+});
+
+test('sem permissão o app não lê o clipboard, nem pede para ler', async ({ page }) => {
+  await clipboardDeMentira(page, false);
+  await logar(page);
+  await copiarEVoltar(page, LINK_YT);
+  await page.waitForTimeout(300);
+
+  expect(await leituras(page)).toBe(0);
+  await expect(page.getByRole('status').filter({ hasText: /link d/ })).toBeHidden();
+});
+
+test('texto que não é link de música passa em silêncio', async ({ page }) => {
+  await clipboardDeMentira(page, true);
+  await logar(page);
+  for (const texto of [
+    'uma senha qualquer: hunter2',
+    'https://www.youtube.com/playlist?list=PLabcdefghijklmnop',
+    'https://exemplo.test/artigo',
+  ]) {
+    await copiarEVoltar(page, texto);
+    await page.waitForTimeout(200);
+    await expect(page.getByRole('status').filter({ hasText: /link d/ })).toBeHidden();
+  }
+});
+
+test('conta sem envio nunca vê a sugestão, e o app nem lê', async ({ page }) => {
+  await clipboardDeMentira(page, true);
+  contaFalsa(page).podeEnviar = false;
+  await logar(page, /^01 /);
+
+  await copiarEVoltar(page, LINK_YT);
+  await page.waitForTimeout(300);
+  expect(await leituras(page)).toBe(0);
+  await expect(page.getByRole('status').filter({ hasText: /link d/ })).toBeHidden();
+});
+
+test('[+ link] lê o clipboard no toque, e a recusa por cota aparece traduzida', async ({
+  page,
+}) => {
+  // SEM a permissão prévia: o toque no `[+ link]` é o gesto, e lê mesmo assim.
+  await clipboardDeMentira(page, false);
+  await logar(page);
+  await page.keyboard.press('3');
+  await page.evaluate(() => navigator.clipboard.writeText('https://cdn.exemplo.test/conta-cheia/a.mp3'));
+
+  await page.getByRole('button', { name: '[+ link]' }).click();
+  await expect(page.getByText('cdn.exemplo.test/a.mp3')).toBeVisible();
+  await expect(
+    page.getByText('sem espaço no acervo: a conta chegou ao limite do plano'),
+  ).toBeVisible();
+});
+
+test('[+ link] sem link no clipboard abre um campo para colar', async ({ page }) => {
+  await clipboardDeMentira(page, false);
+  await logar(page);
+  await page.keyboard.press('3');
+  await page.evaluate(() => navigator.clipboard.writeText('nada de link aqui'));
+
+  await page.getByRole('button', { name: '[+ link]' }).click();
+  const campo = page.getByRole('textbox', { name: 'cole o link aqui' });
+  await expect(campo).toBeVisible();
+
+  await campo.fill('isto não é um link');
+  await campo.press('Enter');
+  await expect(page.getByText('não achei um link de música no que foi copiado')).toBeVisible();
+  expect(linksPedidos.get(page)).toEqual([]);
+
+  await campo.fill(LINK_YT);
+  await campo.press('Enter');
+  await expect(campo).toBeHidden();
+  await expect.poll(() => linksPedidos.get(page)).toEqual([LINK_YT]);
+});
+
+test('colar fora de um campo oferece o link; dentro de um campo é só colar', async ({ page }) => {
+  await logar(page);
+  const colar = (seletor: string | null) =>
+    page.evaluate(
+      ([alvo, texto]) => {
+        const dados = new DataTransfer();
+        dados.setData('text/plain', texto!);
+        const evento = new ClipboardEvent('paste', { clipboardData: dados, bubbles: true });
+        (alvo ? document.querySelector(alvo)! : document.body).dispatchEvent(evento);
+      },
+      [seletor, LINK_YT] as const,
+    );
+
+  // Na busca, colar um link é procurar por ele — nenhuma sugestão.
+  await page.keyboard.press('2');
+  await colar('input');
+  await page.waitForTimeout(200);
+  await expect(page.getByRole('status').filter({ hasText: /link d/ })).toBeHidden();
+
+  await colar(null);
+  await expect(page.getByRole('status').filter({ hasText: 'link do YouTube copiado' })).toBeVisible();
+});
+
+test('compartilhar para o Ondas chega como sugestão e limpa o endereço', async ({ page }) => {
+  await logar(page);
+  // O Android entrega o link dentro de `text`, junto com o título do vídeo.
+  await page.goto('/share?title=Uma+M%C3%BAsica&text=' + encodeURIComponent(`Olha isso ${LINK_YT}`));
+
+  const aviso = page.getByRole('status').filter({ hasText: 'link recebido' });
+  await expect(aviso).toBeVisible();
+  await expect(aviso.getByText('youtube.com/dQw4w9WgXcQ')).toBeVisible();
+  await expect(page).toHaveURL(/\/library\/archive$/);
+  expect(linksPedidos.get(page)).toEqual([]);
+});
+
+test('os três manifests anunciam o destino de compartilhamento', async ({ request }) => {
+  for (const [arquivo, acao] of [
+    ['/manifest.webmanifest', '/share'],
+    ['/manifest-en.webmanifest', '/en/share'],
+    ['/manifest-es.webmanifest', '/es/share'],
+  ] as const) {
+    const manifest = (await (await request.get(arquivo)).json()) as {
+      share_target?: { action?: string; method?: string };
+    };
+    expect(manifest.share_target, arquivo).toMatchObject({ action: acao, method: 'GET' });
+  }
+});
+

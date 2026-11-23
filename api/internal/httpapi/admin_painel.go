@@ -222,35 +222,68 @@ func (s *Server) listarIngestoes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) lerConfigAdmin(w http.ResponseWriter, r *http.Request) {
-	aberto, err := s.painel.CadastroAberto(r.Context())
+	config, err := s.configAdmin(r)
 	if err != nil {
 		s.falhaDeLeitura(w, "config", err)
 		return
 	}
-	escreverJSON(w, http.StatusOK, map[string]any{"cadastroAberto": aberto})
+	escreverJSON(w, http.StatusOK, config)
+}
+
+func (s *Server) configAdmin(r *http.Request) (map[string]any, error) {
+	aberto, err := s.painel.CadastroAberto(r.Context())
+	if err != nil {
+		return nil, err
+	}
+	bloqueia, err := s.painel.CotaBloqueia(r.Context())
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"cadastroAberto": aberto, "cotaBloqueia": bloqueia}, nil
 }
 
 func (s *Server) gravarConfigAdmin(w http.ResponseWriter, r *http.Request) {
+	// Ponteiros: ausente é "não mexa". Um corpo sem chave nenhuma não pode
+	// fechar o cadastro nem desligar a cota.
 	var req struct {
 		CadastroAberto *bool `json:"cadastroAberto"`
+		CotaBloqueia   *bool `json:"cotaBloqueia"`
 	}
 	if !lerJSON(w, r, &req) {
 		return
 	}
-	if req.CadastroAberto == nil {
+	if req.CadastroAberto == nil && req.CotaBloqueia == nil {
 		escreverErro(w, http.StatusBadRequest, "requisição inválida")
 		return
 	}
-	if err := s.painel.DefinirCadastroAberto(r.Context(), *req.CadastroAberto); err != nil {
-		s.falhaDeEscrita(w, "config", err)
+	if req.CadastroAberto != nil {
+		if err := s.painel.DefinirCadastroAberto(r.Context(), *req.CadastroAberto); err != nil {
+			s.falhaDeEscrita(w, "config", err)
+			return
+		}
+		acao := "cadastro.fechado"
+		if *req.CadastroAberto {
+			acao = "cadastro.aberto"
+		}
+		s.registrar(r, admin.Evento{Acao: acao})
+	}
+	if req.CotaBloqueia != nil {
+		if err := s.painel.DefinirCotaBloqueia(r.Context(), *req.CotaBloqueia); err != nil {
+			s.falhaDeEscrita(w, "config", err)
+			return
+		}
+		acao := "cota.so_mede"
+		if *req.CotaBloqueia {
+			acao = "cota.bloqueia"
+		}
+		s.registrar(r, admin.Evento{Acao: acao})
+	}
+	config, err := s.configAdmin(r)
+	if err != nil {
+		s.falhaDeLeitura(w, "config", err)
 		return
 	}
-	acao := "cadastro.fechado"
-	if *req.CadastroAberto {
-		acao = "cadastro.aberto"
-	}
-	s.registrar(r, admin.Evento{Acao: acao})
-	escreverJSON(w, http.StatusOK, map[string]any{"cadastroAberto": *req.CadastroAberto})
+	escreverJSON(w, http.StatusOK, config)
 }
 
 func (s *Server) listarConvites(w http.ResponseWriter, r *http.Request) {

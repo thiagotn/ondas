@@ -53,11 +53,13 @@ export type ResultadoDoPedido = { status: 'pendente' } | { status: 'aprovada'; u
 /**
  * Quanto do acervo a conta ocupa, e quanto ela tem (plano + extra avulso).
  *
- * Nesta versão é só informação: passar da cota não bloqueia envio.
+ * `bloqueia` diz se passar da cota RECUSA faixa nova — é uma chave do admin.
+ * Ausente (servidor de antes da chave) vale `false`: lá a cota só era medida.
  */
 export interface UsoDaConta {
   usadoBytes: number;
   cotaBytes: number;
+  bloqueia?: boolean;
 }
 
 /** Autenticação. `LocalAuthService` implementa as regras do protótipo; OAuth/JWT entram aqui depois. */

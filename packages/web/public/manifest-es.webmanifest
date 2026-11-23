@@ -26,5 +26,14 @@
   "short_name": "Ondas",
   "description": "Reproductor de música con estética de terminal, con pistas offline.",
   "lang": "es",
-  "scope": "/es/"
+  "scope": "/es/",
+  "share_target": {
+    "action": "/es/share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }

@@ -59,7 +59,7 @@ export function VisaoGeral() {
             <Link className="cartao" to="/contas">
               <span className="rotulo">acima da cota</span>
               <span className={r.acimaDaCota ? 'numero aviso' : 'numero'}>{r.acimaDaCota}</span>
-              <span className="mudo">a cota hoje só é medida — nada é recusado</span>
+              <span className="mudo">o bloqueio liga e desliga em planos</span>
             </Link>
           </div>
         )}

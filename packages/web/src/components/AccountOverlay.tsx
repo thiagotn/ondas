@@ -119,7 +119,10 @@ export function AccountOverlay() {
                 <span className={s.panelValue}>
                   {acervoUsoLabel(acervo)}
                   {acimaDaCota(acervo) && (
-                    <span className={o.contaConfirma}> · {t('conta.acervoAcima')}</span>
+                    <span className={o.contaConfirma}>
+                      {' · '}
+                      {t(acervo.bloqueia ? 'conta.acervoBloqueado' : 'conta.acervoAcima')}
+                    </span>
                   )}
                 </span>
               </div>

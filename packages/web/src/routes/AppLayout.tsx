@@ -4,6 +4,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import * as controller from '../app/controller';
 import { useGuestMode } from '../app/guest';
 import * as historico from '../app/historico';
+import { iniciarDeteccaoDeLink } from '../app/linkSugerido';
 import { useSession, useUi } from '../app/stores';
 import { AboutOverlay } from '../components/AboutOverlay';
 import { AccountOverlay } from '../components/AccountOverlay';
@@ -54,6 +55,11 @@ export function AppLayout() {
   }, [faixaDaRota, user, guest, entrarComoVisitante]);
 
   useShortcuts(searchInputRef);
+
+  // O link de música no clipboard (ver `app/linkSugerido.ts`). Ligado aqui, e
+  // não no boot do app, porque só faz sentido com a casca na tela — login e
+  // cadastro não têm onde mostrar a sugestão.
+  useEffect(() => iniciarDeteccaoDeLink(), []);
 
   const tracks = data?.tracks;
   const temFaixaNaRota = !!faixaDaRota;

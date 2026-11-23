@@ -26,5 +26,14 @@
   "short_name": "Ondas",
   "description": "Music player with a terminal aesthetic, with offline tracks.",
   "lang": "en",
-  "scope": "/en/"
+  "scope": "/en/",
+  "share_target": {
+    "action": "/en/share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }

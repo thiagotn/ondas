@@ -97,17 +97,24 @@ A cota é **calculada**, não copiada: mudar a cota de um plano vale na hora par
 
 ### Medir antes de recusar
 
-Nesta versão nada é recusado. O número aparece no painel e no `ondas whoami` de cada conta, e só.
+Na 1.11 nada era recusado: o número aparecia no painel e no `ondas whoami` de cada conta, e só.
 Bloquear antes de ter visto os números reais seria escolher um limite no escuro.
+
+A recusa chegou na 1.12, junto com o motivo para ela existir — cada conta passou a trazer faixa
+sozinha, por link ([documento 17](17-faixa-por-link.md)). É uma chave do admin (`cota_bloqueia`, na
+tela de planos), e não regra fixa: se o número se mostrar errado, desliga-se sem deploy. Uma falha
+ao LER a cota não recusa ninguém — ela é teto de crescimento, e o banco piscando não pode virar
+"sem espaço" para quem tem.
 
 Para o número fechar com o que o bucket cobra, as capas passaram a contar (`tracks.art_bytes`). O
 worker sempre mediu a capa na hora de subir e jogava o resultado fora; as faixas antigas são
 preenchidas por `worker medir-capas`, que pergunta o tamanho ao R2 (HEAD) sem baixar nada.
 
-Os três pontos onde a recusa entraria estão anotados no código, sem ramo morto: o pedido de vaga e a
-finalização do upload (`httpapi/upload.go`), e o worker depois de baixar uma URL — único momento em
-que o tamanho de uma ingestão por URL é conhecido. Nos três, a conta que conta é a que vai ser
-**dona** da faixa, não quem pediu.
+A recusa mora em todo caminho de entrada: o pedido de vaga e a finalização do upload
+(`httpapi/upload.go`), o pedido de ingestão (conta já no limite nem enfileira), a vaga do arquivo
+que o node baixou (`httpapi/paginas.go`) e o worker depois de baixar uma URL — único momento em que
+o tamanho de uma ingestão por URL é conhecido, e ali a falha é definitiva: repetir o download não
+cria espaço. Em todos, a conta que conta é a que vai ser **dona** da faixa, não quem pediu.
 
 ## O que foi descartado
 
@@ -118,7 +125,7 @@ que o tamanho de uma ingestão por URL é conhecido. Nos três, a conta que cont
 | Token em `localStorage` | Ao alcance de script. O cookie `HttpOnly` custa uma rota |
 | `users.limite_bytes` direto, sem plano | Resolveria hoje e obrigaria a migrar no dia em que existir mais de um plano |
 | Copiar a cota do plano para a conta | Mudar o plano viraria um UPDATE em massa, e as duas cópias divergiriam |
-| Bloquear o envio já | Sem ter medido, o limite seria um chute |
+| Bloquear o envio na mesma versão que mediu | Sem ter medido, o limite seria um chute — o bloqueio veio uma versão depois |
 
 ## Custos assumidos
 

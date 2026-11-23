@@ -55,6 +55,8 @@ export interface Ingestao {
   faixaId?: string;
   pedidoPor: string;
   destino?: string;
+  /** `pagina` enquanto o node ainda não baixou o link; `midia` depois. */
+  tipo: 'midia' | 'pagina';
   criadaEm: string;
   atualizadaEm: string;
 }
@@ -68,6 +70,13 @@ export interface Resumo {
   convites: number;
   cadastroAberto: boolean;
   acimaDaCota: number;
+}
+
+/** As chaves globais que o admin liga e desliga. */
+export interface Config {
+  cadastroAberto: boolean;
+  /** Passar da cota recusa faixa nova? Desligada, a cota só é medida. */
+  cotaBloqueia: boolean;
 }
 
 export interface Convite {
@@ -187,9 +196,9 @@ export const api = {
   ingestoes: (status?: string) =>
     pedir<{ ingestoes: Ingestao[] }>('GET', '/ingestoes' + q({ status })).then((r) => r.ingestoes),
 
-  config: () => pedir<{ cadastroAberto: boolean }>('GET', '/config'),
-  definirCadastro: (cadastroAberto: boolean) =>
-    pedir<{ cadastroAberto: boolean }>('PUT', '/config', { cadastroAberto }),
+  config: () => pedir<Config>('GET', '/config'),
+  definirCadastro: (cadastroAberto: boolean) => pedir<Config>('PUT', '/config', { cadastroAberto }),
+  definirCotaBloqueia: (cotaBloqueia: boolean) => pedir<Config>('PUT', '/config', { cotaBloqueia }),
   convites: () => pedir<{ convites: Convite[] }>('GET', '/convites').then((r) => r.convites),
   convidar: (c: { email: string; podeEnviar: boolean; recebeDoBot: boolean; nota: string }) =>
     pedir<Convite>('POST', '/convites', c),

@@ -60,6 +60,7 @@ The test-to-production ratio in `core` is 0.91:1. In the two riskiest Go package
 | 14 | [Versioning and releases](14-versionamento-e-releases.en.md) | Why the release note is the source of every delivery, not its by-product |
 | 15 | [Sign-up and administration](15-cadastro-e-administracao.en.md) | How to open sign-up without opening the door: the request that is the account, the admin that is not a user and the CLI that goes through the API |
 | 16 | [Admin panel and quota](16-painel-de-admin-e-cota.en.md) | What is configuration and what is data: product decisions out of the ConfigMap, the panel that is not the PWA and the quota that measures before it refuses |
+| 17 | [Track by link](17-faixa-por-link.en.md) | How to offer "I copied a link" without reading anyone's clipboard for nothing, and how to serve a page link without teaching the cluster to resolve pages |
 
 ## Three ways to read this
 

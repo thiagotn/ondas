@@ -266,6 +266,24 @@ func (s *Server) Router() http.Handler {
 				r.With(s.exigirEnvio).Post("/upload/{id}/finalizar", s.finalizarUpload)
 			})
 
+			// O NODE atendendo link de página (migração 0013): só o token de
+			// máquina, nunca sessão.
+			//
+			// A PWA enfileira o link (`POST /ingest`, acima), e quem o baixa é
+			// o node do Hermes, onde yt-dlp e scdl existem. Estas quatro rotas
+			// são o lado dele da fila. O alcance novo do token é estreito, e é
+			// a consulta que o garante, não um `if`: ele só enxerga job de
+			// PÁGINA em andamento, e o arquivo vai para a área de espera de
+			// quem PEDIU aquele job — nunca para uma conta que o pedido nomeie.
+			// `TestRotasDoNodeSoAbremComOTokenDeMaquina` trava a divisão.
+			r.Group(func(r chi.Router) {
+				r.Use(s.exigirToken)
+				r.Post("/paginas/reivindicar", s.reivindicarPagina)
+				r.Post("/paginas/{id}/vaga", s.vagaDaPagina)
+				r.Post("/paginas/{id}/pronto", s.paginaPronta)
+				r.Post("/paginas/{id}/falha", s.paginaFalhou)
+			})
+
 			// Mexer no acervo que já existe: só sessão, nunca token.
 			//
 			// É aqui que um token vazado viraria exfiltração (listar, baixar)
@@ -450,13 +468,18 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 
 // usoDaConta diz quanto a conta ocupa e quanto ela tem (plano + extra).
 //
-// Nesta versão é só informação: nada recusa envio por causa da cota.
+// `bloqueia` diz se passar da cota recusa faixa nova (chave do admin).
 func (s *Server) usoDaConta(w http.ResponseWriter, r *http.Request) {
 	uso, err := s.painel.UsoDaConta(r.Context(), usuarioDe(r.Context()).ID)
 	if err != nil {
 		slog.Error("uso da conta", "erro", err)
 		escreverErro(w, http.StatusInternalServerError, "não foi possível ler o uso da conta")
 		return
+	}
+	// Falha ao ler a chave não derruba a resposta: os dois números são o que
+	// importa, e `false` é o lado que não assusta ninguém à toa.
+	if uso.Bloqueia, err = s.painel.CotaBloqueia(r.Context()); err != nil {
+		slog.Error("uso da conta: cota bloqueia", "erro", err)
 	}
 	escreverJSON(w, http.StatusOK, uso)
 }

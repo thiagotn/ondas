@@ -68,9 +68,28 @@ type Job struct {
 	// (`storage.KeyUploadStage`) e que deixa o bot ler o status do próprio job.
 	DestinoID    string
 	Visibilidade string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	// QUEM atende o job (migração 0013): `midia` é do worker do cluster,
+	// `pagina` é do node do Hermes — que baixa o link e devolve o job como
+	// `midia`, com a fonte trocada por um arquivo enviado.
+	Tipo string
+	// O link de página como a pessoa mandou, já canonizado. Sobrevive à troca
+	// de `SourceURL`, para o status continuar mostrando o que ela reconhece.
+	PaginaURL string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
+
+const (
+	TipoMidia  = "midia"
+	TipoPagina = "pagina"
+)
+
+// Quantos pedidos uma conta pode ter em andamento pela PWA. A rota de
+// ingestão não tem outro freio, e cada job de página é um download no node.
+//
+// Cinco e não três: a mesma URL publicada para "só eu", duas pessoas e "todos"
+// são quatro pedidos legítimos de uma vez (ver o índice de dedupe da 0007).
+const MaxAtivosPorConta = 5
 
 // Destino é para onde a faixa vai quando o job terminar.
 //
@@ -91,6 +110,7 @@ func NewJobs(pool *pgxpool.Pool) *Jobs { return &Jobs{pool: pool} }
 const colunasJob = `id, user_id, source_url, coalesce(title, ''), coalesce(artist, ''),
 	coalesce(fallback_title, ''), status, attempts, coalesce(error, ''),
 	coalesce(track_id::text, ''), coalesce(destino_id::text, ''), visibilidade,
+	tipo, coalesce(pagina_url, ''),
 	created_at, updated_at`
 
 func scanJob(row pgx.Row) (*Job, error) {
@@ -98,6 +118,7 @@ func scanJob(row pgx.Row) (*Job, error) {
 	err := row.Scan(&j.ID, &j.UserID, &j.SourceURL, &j.Title, &j.Artist,
 		&j.TituloReserva, &j.Status, &j.Attempts, &j.Error, &j.TrackID,
 		&j.DestinoID, &j.Visibilidade,
+		&j.Tipo, &j.PaginaURL,
 		&j.CreatedAt, &j.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrJobNaoEncontrado
@@ -114,7 +135,16 @@ func scanJob(row pgx.Row) (*Job, error) {
 // pedido repetido é esperado: o bot reenvia quando o usuário toca no botão de
 // novo ou quando o Telegram repete a entrega.
 func (r *Jobs) Enfileirar(ctx context.Context, userID, url, title, artist string, d Destino) (job *Job, novo bool, err error) {
-	return r.enfileirar(ctx, userID, url, title, artist, "", d)
+	return r.enfileirar(ctx, userID, url, title, artist, "", TipoMidia, d)
+}
+
+// EnfileirarPagina cria o job de um link de PÁGINA (YouTube, SoundCloud), que
+// quem atende é o node. `url` já vem canonizada (`ingest.ClassificarLink`), e é
+// por isso que o mesmo vídeo colado de dois jeitos cai no mesmo job.
+//
+// Sem destino: pela PWA a faixa é sempre de quem pediu.
+func (r *Jobs) EnfileirarPagina(ctx context.Context, userID, url string) (job *Job, novo bool, err error) {
+	return r.enfileirar(ctx, userID, url, "", "", "", TipoPagina, Destino{})
 }
 
 // EnfileirarEnvio é o Enfileirar de um envio de arquivo: além do título escolhido,
@@ -122,10 +152,10 @@ func (r *Jobs) Enfileirar(ctx context.Context, userID, url, title, artist string
 // arquivo não tiver tag nenhuma. Método irmão em vez de um parâmetro a mais
 // porque o caminho do bot não tem nome de arquivo para informar.
 func (r *Jobs) EnfileirarEnvio(ctx context.Context, userID, fonte, title, artist, reserva string, d Destino) (job *Job, novo bool, err error) {
-	return r.enfileirar(ctx, userID, fonte, title, artist, reserva, d)
+	return r.enfileirar(ctx, userID, fonte, title, artist, reserva, TipoMidia, d)
 }
 
-func (r *Jobs) enfileirar(ctx context.Context, userID, url, title, artist, reserva string, d Destino) (job *Job, novo bool, err error) {
+func (r *Jobs) enfileirar(ctx context.Context, userID, url, title, artist, reserva, tipo string, d Destino) (job *Job, novo bool, err error) {
 	var t, a *string
 	if title != "" {
 		t = &title
@@ -152,12 +182,12 @@ func (r *Jobs) enfileirar(ctx context.Context, userID, url, title, artist, reser
 	// duas pessoas diferentes são dois pedidos legítimos.
 	j, err := scanJob(r.pool.QueryRow(ctx, `
 		INSERT INTO ingest_jobs (user_id, source_url, title, artist, fallback_title,
-		                         destino_id, visibilidade)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		                         destino_id, visibilidade, tipo, pagina_url)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $8 = 'pagina' THEN $2 END)
 		ON CONFLICT (user_id, source_url, coalesce(destino_id, user_id), visibilidade)
 		WHERE status IN ('pending', 'processing')
 		DO NOTHING
-		RETURNING `+colunasJob, userID, url, t, a, reserva, destino, vis))
+		RETURNING `+colunasJob, userID, url, t, a, reserva, destino, vis, tipo))
 	if err == nil {
 		return j, true, nil
 	}
@@ -190,8 +220,20 @@ func (r *Jobs) PorID(ctx context.Context, userID, id string) (*Job, error) {
 		`SELECT `+colunasJob+` FROM ingest_jobs WHERE id = $1 AND user_id = $2`, id, userID))
 }
 
+// Ativos conta os pedidos da conta que ainda não terminaram.
+func (r *Jobs) Ativos(ctx context.Context, userID string) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx, `
+		SELECT count(*) FROM ingest_jobs
+		 WHERE user_id = $1 AND status IN ('pending', 'processing')`, userID).Scan(&n)
+	return n, err
+}
+
 // Reivindicar pega o próximo job da fila, marcando-o como `processing` no mesmo
 // comando.
+//
+// Só os de `tipo = 'midia'`: job de página é do node (`ReivindicarPagina`), e o
+// worker do cluster, que só sabe baixar arquivo, receberia HTML.
 //
 // `FOR UPDATE SKIP LOCKED` é o padrão de fila do rachão: dois workers nunca
 // pegam o mesmo job, e nenhum deles fica esperando o outro. Também resgata o
@@ -202,9 +244,10 @@ func (r *Jobs) Reivindicar(ctx context.Context) (*Job, error) {
 		SET status = 'processing', attempts = attempts + 1, updated_at = now()
 		WHERE id = (
 			SELECT id FROM ingest_jobs
-			WHERE (status = 'pending' AND attempts < $1)
-			   OR (status = 'processing' AND updated_at < now() - $2::interval
-			       AND attempts < $1)
+			WHERE tipo = 'midia'
+			  AND ((status = 'pending' AND attempts < $1)
+			    OR (status = 'processing' AND updated_at < now() - $2::interval
+			        AND attempts < $1))
 			ORDER BY created_at
 			FOR UPDATE SKIP LOCKED
 			LIMIT 1
@@ -214,6 +257,70 @@ func (r *Jobs) Reivindicar(ctx context.Context) (*Job, error) {
 		return nil, ErrFilaVazia
 	}
 	return j, err
+}
+
+// ReivindicarPagina é o `Reivindicar` do node: o próximo link de página, com a
+// mesma fila (`SKIP LOCKED`), as mesmas tentativas e o mesmo resgate do que
+// ficou preso.
+func (r *Jobs) ReivindicarPagina(ctx context.Context) (*Job, error) {
+	j, err := scanJob(r.pool.QueryRow(ctx, `
+		UPDATE ingest_jobs
+		SET status = 'processing', attempts = attempts + 1, updated_at = now()
+		WHERE id = (
+			SELECT id FROM ingest_jobs
+			WHERE tipo = 'pagina'
+			  AND ((status = 'pending' AND attempts < $1)
+			    OR (status = 'processing' AND updated_at < now() - $2::interval
+			        AND attempts < $1))
+			ORDER BY created_at
+			FOR UPDATE SKIP LOCKED
+			LIMIT 1
+		)
+		RETURNING `+colunasJob, MaxTentativas, PrazoTravado.String()))
+	if errors.Is(err, ErrJobNaoEncontrado) {
+		return nil, ErrFilaVazia
+	}
+	return j, err
+}
+
+// PaginaEmCurso devolve o job de página que o node está atendendo. É o que as
+// rotas do node usam para saber DE QUEM é o arquivo — e a consulta já recorta
+// por tipo e por estado: um id de job de mídia, ou de um job que ninguém
+// reivindicou, não é encontrado.
+func (r *Jobs) PaginaEmCurso(ctx context.Context, id string) (*Job, error) {
+	return scanJob(r.pool.QueryRow(ctx, `
+		SELECT `+colunasJob+` FROM ingest_jobs
+		 WHERE id = $1 AND tipo = 'pagina' AND status = 'processing'`, id))
+}
+
+// EntregarPagina é o node dizendo "baixei, o arquivo está na área de espera".
+//
+// O job VIRA um job de mídia, com a fonte trocada pelo arquivo enviado e as
+// tentativas zeradas — as do download não devem gastar as da ingestão. O id é
+// o mesmo, então quem pediu acompanha uma coisa só do começo ao fim.
+//
+// Título e artista só entram onde o pedido não trouxe: o que o node manda é o
+// que o site diz do vídeo, e isso perde do que a pessoa escolheu.
+func (r *Jobs) EntregarPagina(ctx context.Context, id, uploadID, title, artist, reserva string) (*Job, error) {
+	return scanJob(r.pool.QueryRow(ctx, `
+		UPDATE ingest_jobs
+		SET source_url = $2, tipo = 'midia', status = 'pending', attempts = 0,
+		    title = coalesce(nullif(title, ''), nullif($3, '')),
+		    artist = coalesce(nullif(artist, ''), nullif($4, '')),
+		    fallback_title = nullif($5, ''),
+		    error = NULL, updated_at = now()
+		WHERE id = $1 AND tipo = 'pagina' AND status = 'processing'
+		RETURNING `+colunasJob, id, FonteUpload(uploadID), title, artist, reserva))
+}
+
+// Desistir encerra o job como `error` SEM gastar as tentativas que sobraram.
+// É para a falha que repetir não conserta: conta sem espaço, vídeo que não
+// existe, faixa longa demais.
+func (r *Jobs) Desistir(ctx context.Context, jobID, motivo string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE ingest_jobs SET status = 'error', error = $2, updated_at = now()
+		WHERE id = $1`, jobID, motivo)
+	return err
 }
 
 func (r *Jobs) Concluir(ctx context.Context, jobID, trackID string) error {

@@ -97,6 +97,8 @@ const ROTULO_ACAO: Record<string, string> = {
   'faixa.apagada': 'apagou a faixa',
   'cadastro.aberto': 'abriu o cadastro',
   'cadastro.fechado': 'fechou o cadastro',
+  'cota.bloqueia': 'ligou o bloqueio por cota',
+  'cota.so_mede': 'desligou o bloqueio por cota',
   'convite.criado': 'convidou',
   'convite.removido': 'removeu o convite de',
   'plano.criado': 'criou o plano',

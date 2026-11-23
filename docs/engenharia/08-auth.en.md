@@ -267,6 +267,7 @@ The answer is in the router's shape, not in a permission field.
 | Session only | touching what already exists | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}`, `PATCH {id}/compartilhamento` |
 | Session only | touching one's own account | `GET /auth/me`, `PATCH /auth/prefs`, `PATCH /auth/conta`, `POST /auth/senha`, `POST /auth/conta/apagar` |
 | Session only | seeing one's own usage | `GET /auth/uso` |
+| Machine **token** only (never a session) | the node serving a page link — only a page job in progress, and the file goes to whoever asked | `POST /acervo/paginas/reivindicar`, `POST /acervo/paginas/{id}/vaga`, `…/pronto`, `…/falha` — see [document 17](17-faixa-por-link.en.md) |
 | **Admin** credential only (token in the header, or the panel's cookie) | deciding who gets in, what each account may do and how much it has | everything under `/admin/…`: accounts, tracks, ingestions, config, invites, plans, events — see [document 16](16-painel-de-admin-e-cota.en.md) |
 | Public, **only** to trade the token for the cookie | signing in and out of the panel | `POST /admin/sessao`, `DELETE /admin/sessao` |
 | Session only | touching one's own taste | `GET /likes`, `PATCH /likes` |

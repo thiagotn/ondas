@@ -99,18 +99,26 @@ account on it.
 
 ### Measure before refusing
 
-In this version nothing is refused. The number shows up in the panel and in each account's
-`ondas whoami`, and that is all. Blocking before seeing the real numbers would be picking a limit
+In 1.11 nothing was refused: the number showed up in the panel and in each account's
+`ondas whoami`, and that was all. Blocking before seeing the real numbers would be picking a limit
 in the dark.
+
+Refusal arrived in 1.12, together with the reason for it to exist — every account became able to
+bring in tracks by itself, by link ([document 17](17-faixa-por-link.en.md)). It is an admin switch
+(`cota_bloqueia`, on the plans screen), not a fixed rule: if the number turns out wrong, it is
+turned off without a deploy. A failure to READ the quota refuses nobody — it is a ceiling on
+growth, and a flickering database must not become "no space" for someone who has some.
 
 For the number to match what the bucket charges for, cover art now counts (`tracks.art_bytes`). The
 worker always measured the cover when uploading it and threw the result away; older tracks are
 filled in by `worker medir-capas`, which asks R2 for the size (HEAD) without downloading anything.
 
-The three places where a refusal would go are marked in the code, with no dead branch: the upload
-slot request and the upload finalisation (`httpapi/upload.go`), and the worker after downloading a
-URL — the only moment the size of a URL ingestion is known. In all three, the account that counts
-is the one that will **own** the track, not the one that asked.
+The refusal sits on every way in: the upload slot request and the upload finalisation
+(`httpapi/upload.go`), the ingestion request (an account already at its limit is not even queued),
+the slot for the file the node downloaded (`httpapi/paginas.go`) and the worker after downloading a
+URL — the only moment the size of a URL ingestion is known, and there the failure is final:
+repeating the download creates no space. In all of them, the account that counts is the one that
+will **own** the track, not the one that asked.
 
 ## What was discarded
 
@@ -121,7 +129,7 @@ is the one that will **own** the track, not the one that asked.
 | Token in `localStorage` | Within reach of scripts. The `HttpOnly` cookie costs one route |
 | `users.limite_bytes` directly, no plan | It would work today and force a migration the day a second plan exists |
 | Copying the plan's quota onto the account | Changing a plan would become a mass UPDATE, and the two copies would drift |
-| Blocking uploads now | Without having measured, the limit would be a guess |
+| Blocking uploads in the same version that measured | Without having measured, the limit would be a guess — blocking came one version later |
 
 ## Costs accepted
 

@@ -1,5 +1,7 @@
 package httpapi
 
+import "strings"
+
 // O vocabulário de erro da API, num lugar só.
 //
 // A API mandava só a frase, em pt-BR, porque a PWA a exibia crua — está escrito
@@ -92,7 +94,45 @@ const (
 	CodIngestSemAudio      = "ingest_sem_audio"
 	CodIngestDemorou       = "ingest_demorou"
 	CodIngestFalhou        = "ingest_falhou"
+	CodIngestGrandeDemais  = "ingest_grande_demais"
+	CodIngestFormato       = "ingest_formato"
+
+	// Trazer faixa por link, pela PWA (migração 0013).
+	CodCotaExcedida       = "cota_excedida"
+	CodLinkNaoSuportado   = "link_nao_suportado"
+	CodMuitosPedidos      = "muitos_pedidos"
+	CodPaginaIndisponivel = "pagina_indisponivel"
+	CodPaginaLongaDemais  = "pagina_longa_demais"
+	CodPaginaFalhou       = "pagina_falhou"
 )
+
+// As frases que o NODE pode gravar num job de página, pelo código que ele
+// manda. Lista fechada de propósito: o node informa O QUE aconteceu, e a frase
+// que vai para o banco é sempre uma destas — texto livre vindo de fora viraria
+// conteúdo na tela de quem pediu.
+var mensagemDaPagina = map[string]string{
+	CodPaginaIndisponivel: "o link não está disponível",
+	CodPaginaLongaDemais:  "a faixa deste link é longa demais",
+	CodPaginaFalhou:       "não foi possível baixar este link",
+}
+
+// codigoDoJob acha o código do erro de um job pela frase gravada. A tabela
+// resolve as frases fixas; as duas que carregam número ou nome de codec
+// (`ErrGrandeDemais`, `ErrFormatoNaoToca`, no pacote ingest) são reconhecidas
+// pelo começo — sem isto elas saíam sem código, e a PWA mostrava a frase crua
+// em pt-BR para quem lê em inglês.
+func codigoDoJob(frase string) string {
+	if cod, ok := codigoPorMensagem[frase]; ok {
+		return cod
+	}
+	switch {
+	case strings.HasPrefix(frase, "arquivo maior que o limite"):
+		return CodIngestGrandeDemais
+	case strings.HasPrefix(frase, "formato que o navegador não toca"):
+		return CodIngestFormato
+	}
+	return ""
+}
 
 // codigoPorMensagem mapeia cada frase que a API devolve ao seu código estável.
 //
@@ -168,4 +208,11 @@ var codigoPorMensagem = map[string]string{
 	"o arquivo não tem faixa de áudio":                           CodIngestSemAudio,
 	"a origem demorou demais":                                    CodIngestDemorou,
 	"não foi possível ingerir esta mídia":                        CodIngestFalhou,
+
+	"sem espaço no acervo: a conta chegou ao limite do plano": CodCotaExcedida,
+	"este link não é de uma faixa":                            CodLinkNaoSuportado,
+	"muitos pedidos em andamento — espere um terminar":        CodMuitosPedidos,
+	"o link não está disponível":                              CodPaginaIndisponivel,
+	"a faixa deste link é longa demais":                       CodPaginaLongaDemais,
+	"não foi possível baixar este link":                       CodPaginaFalhou,
 }

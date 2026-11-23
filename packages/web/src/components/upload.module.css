@@ -13,6 +13,27 @@
   color: var(--color-neutral-300);
 }
 
+/* O campo de colar o link, quando o navegador não deixou ler o clipboard.
+   16px no celular: abaixo disso o Safari dá zoom na página ao focar. */
+.campoLink {
+  flex: 1 1 18ch;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--color-neutral-700);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 16px;
+  caret-color: var(--color-accent);
+}
+
+@media (min-width: 860px) {
+  .campoLink {
+    font-size: inherit;
+  }
+}
+
 .estado {
   flex: 1;
   min-width: 0;

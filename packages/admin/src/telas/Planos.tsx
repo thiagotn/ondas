@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { api, type Plano } from '../api';
 import { escreverTamanho, fmtBytes, lerTamanho } from '../formato';
-import { Estado, useAcao, useDados } from '../ui';
+import { Estado, Marca, useAcao, useDados } from '../ui';
 
 /**
  * Planos: quanto de armazenamento uma conta tem.
@@ -12,7 +12,9 @@ import { Estado, useAcao, useDados } from '../ui';
  */
 export function Planos() {
   const { dados, erro, carregando, recarregar } = useDados(() => api.planos(), []);
+  const config = useDados(() => api.config(), []);
   const acao = useAcao();
+  const bloqueia = config.dados?.cotaBloqueia ?? false;
   const [id, setId] = useState('');
   const [nome, setNome] = useState('');
   const [cota, setCota] = useState('');
@@ -32,15 +34,32 @@ export function Planos() {
   return (
     <section>
       <h1>planos</h1>
-      <p className="mudo">
-        cota da conta = cota do plano + extra avulso da conta. hoje a cota só é medida: passar dela
-        não bloqueia envio.
-      </p>
+      <p className="mudo">cota da conta = cota do plano + extra avulso da conta.</p>
       {acao.falha && (
         <p className="erro" role="alert">
           {acao.falha}
         </p>
       )}
+      <Estado carregando={config.carregando} erro={config.erro} tem={!!config.dados}>
+        <div className="painel">
+          <div className="linha">
+            <span className="rotulo">limite</span>
+            <Marca
+              ligado={bloqueia}
+              rotulo="a cota bloqueia envio"
+              desabilitado={acao.ocupado}
+              aoMudar={(v) =>
+                void acao.rodar(() => api.definirCotaBloqueia(v)).then(() => config.recarregar())
+              }
+            />
+            <span className={bloqueia ? 'aviso' : 'mudo'}>
+              {bloqueia
+                ? 'bloqueia: conta acima da cota não recebe faixa nova (arquivo, link ou bot). nada é apagado'
+                : 'só mede: a cota aparece nas telas, e nada é recusado'}
+            </span>
+          </div>
+        </div>
+      </Estado>
       <Estado carregando={carregando} erro={erro} tem={!!dados}>
         <div className="rolagem">
           <table>

@@ -220,3 +220,81 @@ describe('AcervoUploader', () => {
     ).rejects.toThrow('403');
   });
 });
+
+describe('AcervoUploader.ingerirLink', () => {
+  const novo = (impl: typeof fetch) =>
+    new AcervoUploader({ enviarBytes: vi.fn(), fetchImpl: impl, esperar: semEspera });
+
+  it('manda a URL como veio e acompanha o mesmo job até a faixa', async () => {
+    const { impl, chamadas } = fetchFalso({
+      ingest: [
+        resposta(202, { id: 'job-7', status: 'pending', tipo: 'pagina' }),
+        resposta(200, { id: 'job-7', status: 'processing', tipo: 'pagina' }),
+        // O node entregou: o job virou mídia, com o MESMO id.
+        resposta(200, { id: 'job-7', status: 'pending', tipo: 'midia' }),
+        resposta(200, { id: 'job-7', status: 'ready', tipo: 'midia', trackId: 'acervo:7' }),
+      ],
+    });
+    const estados: string[] = [];
+    const trackId = await novo(impl).ingerirLink('https://youtu.be/dQw4w9WgXcQ?si=x', {
+      aoMudar: (p) => estados.push(p.estado),
+    });
+
+    expect(trackId).toBe('acervo:7');
+    expect(chamadas[0]).toEqual({
+      url: '/api/acervo/ingest',
+      corpo: { url: 'https://youtu.be/dQw4w9WgXcQ?si=x' },
+    });
+    expect(chamadas.slice(1).every((c) => c.url === '/api/acervo/ingest/job-7')).toBe(true);
+    // `baixando` enquanto é página; `processando` quando o arquivo já é nosso.
+    expect(estados).toEqual(['preparando', 'baixando', 'baixando', 'processando', 'pronto']);
+  });
+
+  it('URL direta de mídia nunca passa por `baixando`', async () => {
+    const { impl } = fetchFalso({
+      ingest: [
+        resposta(202, { id: 'job-8', status: 'pending', tipo: 'midia' }),
+        resposta(200, { id: 'job-8', status: 'ready', tipo: 'midia', trackId: 'acervo:8' }),
+      ],
+    });
+    const estados: string[] = [];
+    await novo(impl).ingerirLink('https://cdn.exemplo.test/a.mp3', {
+      aoMudar: (p) => estados.push(p.estado),
+    });
+    expect(estados).toEqual(['preparando', 'processando', 'pronto']);
+  });
+
+  it('a recusa da entrada chega com o código — cota, link que não serve', async () => {
+    for (const [status, code] of [
+      [413, 'cota_excedida'],
+      [400, 'link_nao_suportado'],
+      [429, 'muitos_pedidos'],
+    ] as const) {
+      const { impl } = fetchFalso({ ingest: [resposta(status, { error: 'x', code })] });
+      const erro = await novo(impl)
+        .ingerirLink('https://youtu.be/dQw4w9WgXcQ')
+        .catch((e: unknown) => e);
+      expect(erro).toBeInstanceOf(AcervoError);
+      expect((erro as AcervoError).codigo).toBe(code);
+    }
+  });
+
+  it('a falha do job chega com o código que o servidor deu a ela', async () => {
+    const { impl } = fetchFalso({
+      ingest: [
+        resposta(202, { id: 'job-9', status: 'pending', tipo: 'pagina' }),
+        resposta(200, {
+          id: 'job-9',
+          status: 'error',
+          error: 'o link não está disponível',
+          code: 'pagina_indisponivel',
+        }),
+      ],
+    });
+    const erro = await novo(impl)
+      .ingerirLink('https://youtu.be/dQw4w9WgXcQ')
+      .catch((e: unknown) => e);
+    expect((erro as AcervoError).codigo).toBe('pagina_indisponivel');
+  });
+});
+

@@ -810,3 +810,37 @@ func TestSemDestinoAFaixaNasceDeQuemPediuEPrivada(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, dela)
 }
+
+// Sem espaço é falha DEFINITIVA: o worker não baixa de novo para ouvir o mesmo
+// "não", e nada sobe para o bucket.
+func TestContaSemEspacoDesisteNaPrimeiraTentativa(t *testing.T) {
+	exigirFFmpeg(t)
+	bx := &baixadorDeArquivo{caminho: mp3DeTeste(t, "Cheia", "Banda", false)}
+	w, jobs, tracks, s3, dono := montar(t, bx)
+	ctx := context.Background()
+
+	var conferido string
+	w.ComCota(func(_ context.Context, quem string, bytes int64) error {
+		conferido = quem
+		require.Positive(t, bytes, "a conferência recebe o tamanho baixado")
+		return &worker.ErrSemEspaco{Mensagem: "sem espaço no acervo: a conta chegou ao limite do plano"}
+	})
+
+	job, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/cheia.mp3", "", "", acervo.Destino{})
+	require.NoError(t, err)
+
+	_, err = w.Rodar(ctx)
+	require.NoError(t, err)
+	require.Equal(t, dono, conferido, "a conta conferida é a que seria dona da faixa")
+	require.Equal(t, 1, bx.chamou, "uma tentativa só")
+
+	depois, err := jobs.PorID(ctx, dono, job.ID)
+	require.NoError(t, err)
+	require.Equal(t, "error", depois.Status)
+	require.Equal(t, "sem espaço no acervo: a conta chegou ao limite do plano", depois.Error)
+
+	faixas, err := tracks.Listar(ctx, dono)
+	require.NoError(t, err)
+	require.Empty(t, faixas)
+	require.Empty(t, s3.chaves(), "nada foi para o bucket")
+}

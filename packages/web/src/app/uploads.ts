@@ -1,4 +1,12 @@
-import { AcervoError, canUpload, tErro, tituloDoArquivo, type EstadoEnvio } from '@ondas/core';
+import {
+  AcervoError,
+  canUpload,
+  rotuloDoLink,
+  tErro,
+  tituloDoArquivo,
+  type EstadoEnvio,
+  type LinkAchado,
+} from '@ondas/core';
 import { create } from 'zustand';
 import { CATALOG_LOGADO_KEY } from '../query/catalog';
 import { queryClient } from '../query/client';
@@ -20,6 +28,8 @@ export interface ItemEnvio {
 interface Uploads {
   itens: ItemEnvio[];
   enviar(arquivos: File[]): Promise<void>;
+  /** Traz uma faixa por link (URL de mídia, YouTube ou SoundCloud). */
+  adicionarLink(link: LinkAchado): Promise<void>;
   remover(id: string): void;
   limparConcluidos(): void;
 }
@@ -92,6 +102,42 @@ export const useUploads = create<Uploads>((set) => ({
           set((st) => ({ itens: st.itens.filter((it) => !resto.has(it.id)) }));
           break;
         }
+      }
+    }
+  },
+
+  async adicionarLink(link) {
+    if (!canUpload(sessionStore.getState().user)) return;
+
+    const item: ItemEnvio = {
+      id: `env-${++sequencia}`,
+      nome: rotuloDoLink(link),
+      estado: 'preparando',
+      fracao: 0,
+    };
+    set((st) => ({ itens: [item, ...st.itens] }));
+    const mudar = (mudanca: Partial<ItemEnvio>) =>
+      set((st) => ({ itens: st.itens.map((i) => (i.id === item.id ? { ...i, ...mudanca } : i)) }));
+
+    // Sem fila aqui, ao contrário dos arquivos: não há upload do aparelho para
+    // disputar banda — quem baixa é o servidor —, e o teto de pedidos em
+    // andamento é dele (`muitos_pedidos`).
+    try {
+      await acervoUploader.ingerirLink(link.url, {
+        aoMudar: (p) => mudar({ estado: p.estado, fracao: p.fracao }),
+      });
+      await queryClient.invalidateQueries({ queryKey: CATALOG_LOGADO_KEY });
+    } catch (err) {
+      const acervo = err instanceof AcervoError ? err : null;
+      mudar({
+        estado: 'erro',
+        erro: tErro(acervo?.codigo) ?? (err instanceof Error ? err.message : 'falhou'),
+        ...(acervo?.semSessao ? { semSessao: true } : {}),
+      });
+      // A mesma régua do envio de arquivo: o admin tirou o envio com a tela
+      // aberta, e reler a sessão é o que tira o painel dela.
+      if (acervo?.codigo === 'envio_nao_permitido') {
+        sessionStore.getState().setUser(await auth.restore());
       }
     }
   },

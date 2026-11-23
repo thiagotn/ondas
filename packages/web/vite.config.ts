@@ -45,6 +45,16 @@ export default defineConfig({
         orientation: 'portrait',
         background_color: DEFAULT_BG,
         theme_color: DEFAULT_BG,
+        // "Compartilhar para o Ondas" (Android): o link de música compartilhado
+        // de outro app chega em `/share` como sugestão de ingestão. GET de
+        // propósito — é só um link, e assim o service worker não precisa
+        // interceptar POST. O mesmo bloco está nos manifests de en e es
+        // (`public/manifest-*.webmanifest`), com o prefixo do idioma.
+        share_target: {
+          action: '/share',
+          method: 'GET',
+          params: { title: 'title', text: 'text', url: 'url' },
+        },
         // `?v=2` é a versão da marca: ver o comentário no index.html.
         icons: [
           { src: 'icons/icon-192.png?v=2', sizes: '192x192', type: 'image/png', purpose: 'any' },

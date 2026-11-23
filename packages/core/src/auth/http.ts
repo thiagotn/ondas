@@ -232,11 +232,19 @@ export class HttpAuthService implements AuthService {
     try {
       const res = await this.pedir(ROTAS.uso);
       if (!res.ok) return null;
-      const corpo = (await res.json()) as { usadoBytes?: unknown; cotaBytes?: unknown };
+      const corpo = (await res.json()) as {
+        usadoBytes?: unknown;
+        cotaBytes?: unknown;
+        bloqueia?: unknown;
+      };
       // Os DOIS números ou nada: meia resposta desenharia "312 MB de NaN".
       const valido = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0;
       if (!valido(corpo.usadoBytes) || !valido(corpo.cotaBytes)) return null;
-      return { usadoBytes: corpo.usadoBytes, cotaBytes: corpo.cotaBytes };
+      return {
+        usadoBytes: corpo.usadoBytes,
+        cotaBytes: corpo.cotaBytes,
+        ...(corpo.bloqueia === true ? { bloqueia: true } : {}),
+      };
     } catch {
       return null;
     }

@@ -12,6 +12,7 @@ import { ThemePicker } from './components/ThemePicker';
 import { Wallpaper } from './components/Wallpaper';
 import { AppLayout } from './routes/AppLayout';
 import { ChangelogRoute } from './routes/ChangelogRoute';
+import { ShareRoute } from './routes/ShareRoute';
 import { HomeRoute } from './routes/HomeRoute';
 import { LibraryRoute } from './routes/LibraryRoute';
 import { LoginRoute } from './routes/LoginRoute';
@@ -74,6 +75,9 @@ export function App() {
               direto cai no app inteiro, com abas e rodapé, e não numa página
               solta sem saída. */}
           <Route path={PATHS.changelog} element={<ChangelogRoute />} />
+          {/* "Compartilhar para o Ondas" (o `share_target` do manifest): não
+              desenha nada, vira sugestão e vai para a biblioteca. */}
+          <Route path={PATHS.share} element={<ShareRoute />} />
           {/* Normaliza em vez de mentir: antes `/qualquer-coisa` desenhava a
               home com o endereço errado na barra — e os paths em português
               ficaram todos aqui. */}

@@ -58,6 +58,23 @@ type Worker struct {
 	trabalho string
 	prazo    time.Duration
 	maxBytes int64
+	// Confere a cota da conta que vai ser dona da faixa. `nil` = não confere
+	// (os testes do worker que não são sobre cota, e os comandos de operador).
+	cota func(ctx context.Context, dono string, bytes int64) error
+}
+
+// ErrSemEspaco é a recusa por cota, vista do worker. Ele não importa o pacote
+// `admin`: recebe a conferência como função (`ComCota`) e só precisa saber
+// reconhecer a resposta e a frase que grava no job.
+type ErrSemEspaco struct{ Mensagem string }
+
+func (e *ErrSemEspaco) Error() string { return e.Mensagem }
+
+// ComCota liga a conferência de cota. Fora do `New` para não mudar a assinatura
+// que os testes e os comandos de operador já usam.
+func (w *Worker) ComCota(confere func(ctx context.Context, dono string, bytes int64) error) *Worker {
+	w.cota = confere
+	return w
 }
 
 func New(jobs *acervo.Jobs, tracks *acervo.Tracks, r2 *storage.R2,
@@ -105,6 +122,16 @@ func (w *Worker) processar(ctx context.Context, job *acervo.Job) {
 		// A mensagem vai para o banco e o bot a lê: tem de dizer o que
 		// aconteceu sem vazar o que não interessa.
 		log.Error("ingestão falhou", "erro", err)
+		// Sem espaço é falha DEFINITIVA: baixar de novo não cria cota, e as
+		// duas tentativas seguintes só gastariam banda para ouvir o mesmo não.
+		var cheio *ErrSemEspaco
+		if errors.As(err, &cheio) {
+			if erroMarcar := w.jobs.Desistir(ctx, job.ID, cheio.Mensagem); erroMarcar != nil {
+				log.Error("não deu para marcar a falha", "erro", erroMarcar)
+			}
+			w.descartarEnvio(ctx, job, log)
+			return
+		}
 		if erroMarcar := w.jobs.Falhar(ctx, job.ID, mensagemDeErro(err)); erroMarcar != nil {
 			log.Error("não deu para marcar a falha", "erro", erroMarcar)
 		}
@@ -195,10 +222,16 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 	// mentir.
 	audioKey := fmt.Sprintf("u/%s/a/%s.%s", dono, trackID, midia.Ext)
 
-	// COTA: é AQUI que entraria a recusa por falta de espaço numa ingestão por
-	// URL — o tamanho só é conhecido agora, depois de baixar, e a conta que
-	// conta é `dono`, não quem pediu. Hoje a cota só é medida e mostrada
-	// (`admin.UsoDaConta`); os outros dois pontos estão em `httpapi/upload.go`.
+	// COTA: para a ingestão por URL o tamanho só é conhecido agora, depois de
+	// baixar — e a conta que conta é `dono`, não quem pediu. É a última
+	// conferência antes de o arquivo ocupar espaço no bucket; os envios de
+	// arquivo já passaram pela deles (`httpapi/upload.go`, `paginas.go`), e
+	// repetir aqui pega quem encheu a conta entre o envio e a ingestão.
+	if w.cota != nil {
+		if err := w.cota(ctx, dono, tamanho); err != nil {
+			return nil, err
+		}
+	}
 
 	if err := w.enviarArquivo(ctx, bruto, audioKey, midia.ContentType, tamanho); err != nil {
 		return nil, err

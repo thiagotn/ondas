@@ -85,11 +85,14 @@ func (s *Server) pedirVagaDeUpload(w http.ResponseWriter, r *http.Request) {
 			"arquivo grande demais: o limite é "+megabytes(max), map[string]any{"limite": max})
 		return
 	}
-	// COTA: o primeiro dos três pontos onde entraria a recusa por falta de
-	// espaço — aqui com o tamanho DECLARADO, pelo mesmo motivo do teto acima.
-	// Hoje a cota só é medida e mostrada (`admin.UsoDaConta`).
-
 	user := usuarioDe(r.Context())
+	// COTA, com o tamanho DECLARADO e pelo mesmo motivo do teto acima: recusar
+	// antes de a pessoa subir o arquivo. Aqui ainda não se sabe o destino (ele
+	// vem no finalizar), então a conta conferida é a de quem pede — o caso de
+	// quem envia para si. O destino é conferido no finalizar, com o tamanho real.
+	if !s.cabeNaCota(w, r, user.ID, req.Bytes) {
+		return
+	}
 	id := uuid.NewString()
 	url, err := s.r2.URLAssinadaPUT(r.Context(), storage.KeyUploadStage(user.ID, id), validadeUploadPUT)
 	if err != nil {
@@ -163,9 +166,17 @@ func (s *Server) finalizarUpload(w http.ResponseWriter, r *http.Request) {
 			"arquivo grande demais: o limite é "+megabytes(max), map[string]any{"limite": max})
 		return
 	}
-	// COTA: o segundo ponto, e o que valeria — tamanho REAL, e contra a conta
-	// que vai ser dona da faixa (`destino`, resolvido acima), não quem enviou.
-	// O terceiro é o worker, para a ingestão por URL (`worker.processar`).
+	// COTA, e é esta que vale: tamanho REAL, contra a conta que vai ser DONA
+	// da faixa (`destino`, resolvido acima), não contra quem enviou. O objeto
+	// recusado sai do bucket na hora, como o que estourou o teto.
+	dono := user.ID
+	if destino.UserID != "" {
+		dono = destino.UserID
+	}
+	if !s.cabeNaCota(w, r, dono, tamanho) {
+		s.descartarUpload(r, key)
+		return
+	}
 
 	titulo := cortar(req.Title, maxNomeArquivo)
 	artista := cortar(req.Artist, maxNomeArquivo)

@@ -264,6 +264,7 @@ A resposta está na forma do roteador, e não num campo de permissão.
 | Só sessão | mexer no que já existe | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}`, `PATCH {id}/compartilhamento` |
 | Só sessão | mexer na própria conta | `GET /auth/me`, `PATCH /auth/prefs`, `PATCH /auth/conta`, `POST /auth/senha`, `POST /auth/conta/apagar` |
 | Só sessão | ver a própria ocupação | `GET /auth/uso` |
+| Só **token** de máquina (nunca sessão) | o node atendendo link de página — só job de página em andamento, e o arquivo vai para quem pediu | `POST /acervo/paginas/reivindicar`, `POST /acervo/paginas/{id}/vaga`, `…/pronto`, `…/falha` — ver o [documento 17](17-faixa-por-link.md) |
 | Só credencial de **admin** (token no cabeçalho, ou o cookie do painel) | decidir quem entra, o que cada conta pode e quanto ela tem | tudo em `/admin/…`: contas, faixas, ingestões, config, convites, planos, eventos — ver o [documento 16](16-painel-de-admin-e-cota.md) |
 | Pública, **só** para trocar o token pelo cookie | entrar e sair do painel | `POST /admin/sessao`, `DELETE /admin/sessao` |
 | Só sessão | mexer no próprio gosto | `GET /likes`, `PATCH /likes` |

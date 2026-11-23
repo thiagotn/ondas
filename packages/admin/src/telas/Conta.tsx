@@ -93,7 +93,11 @@ export function TabelaDeIngestoes({ lista }: { lista: Ingestao[] }) {
             <tr key={i.id}>
               <td className="mudo">{fmtQuando(i.criadaEm)}</td>
               <td className={`job-${i.status}`}>
-                {rotuloStatus(i.status)}
+                {/* Link de página ainda na fila do node: "na fila" sozinho
+                    esconderia que quem está devendo é o download, não o worker. */}
+                {i.tipo === 'pagina' && i.status !== 'error' && i.status !== 'ready'
+                  ? 'esperando o node baixar'
+                  : rotuloStatus(i.status)}
                 {/* O erro é a frase que o worker gravou — texto, nunca HTML. */}
                 {i.erro && <div className="erro">{i.erro}</div>}
               </td>

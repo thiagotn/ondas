@@ -23,6 +23,11 @@ export const PATHS = {
    * `/t/...`, e nenhuma aba acende.
    */
   changelog: '/changelog',
+  /**
+   * Onde o Android entrega o que foi compartilhado para o app (`share_target`
+   * nos três manifests — o endereço tem de ser o mesmo lá).
+   */
+  share: '/share',
 } as const;
 
 export const TAB_PATHS: Record<TabId, string> = {

@@ -1,5 +1,6 @@
-import { barraDeProgresso, dlPct, t } from '@ondas/core';
-import { useRef } from 'react';
+import { acharLink, barraDeProgresso, dlPct, t } from '@ondas/core';
+import { useRef, useState } from 'react';
+import { lerNoGesto } from '../app/linkSugerido';
 import { useUploads, type ItemEnvio } from '../app/uploads';
 import { useWide } from '../hooks/useWide';
 import s from './shell.module.css';
@@ -17,7 +18,31 @@ export function UploadPanel() {
   const itens = useUploads((st) => st.itens);
   const enviar = useUploads((st) => st.enviar);
   const limpar = useUploads((st) => st.limparConcluidos);
+  const adicionarLink = useUploads((st) => st.adicionarLink);
   const input = useRef<HTMLInputElement>(null);
+  // O campo de colar só abre quando o navegador não deixou ler o clipboard, ou
+  // quando o que estava lá não era link de música.
+  const [colando, setColando] = useState(false);
+  const [texto, setTexto] = useState('');
+  const [semLink, setSemLink] = useState(false);
+
+  const tentar = (bruto: string | null): boolean => {
+    const link = acharLink(bruto, location.host);
+    if (!link) return false;
+    setColando(false);
+    setTexto('');
+    setSemLink(false);
+    void adicionarLink(link);
+    return true;
+  };
+
+  // O toque no `[+ link]` é o gesto que deixa ler o clipboard — inclusive no
+  // iPhone, e é ele que concede a permissão que a leitura automática usa
+  // depois (ver `app/linkSugerido.ts`).
+  const aoPedirLink = async () => {
+    if (tentar(await lerNoGesto())) return;
+    setColando(true);
+  };
   const wide = useWide();
   const concluidos = itens.some((i) => i.estado === 'pronto' || i.estado === 'erro');
 
@@ -27,6 +52,9 @@ export function UploadPanel() {
         <span className={s.panelLabel}>{t('upload.enviar')}</span>
         <button type="button" className={s.link} onClick={() => input.current?.click()}>
           {t('upload.adicionarArquivo')}
+        </button>
+        <button type="button" className={s.link} onClick={() => void aoPedirLink()}>
+          {t('upload.adicionarLink')}
         </button>
         <span className={`${s.panelFormatos} ${s.panelMuted} ${wide ? '' : s.panelFormatosSolo}`}>
           mp3 · flac · opus · m4a
@@ -51,6 +79,47 @@ export function UploadPanel() {
           }}
         />
       </div>
+
+      {colando && (
+        <form
+          className={s.panelRow}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!tentar(texto)) setSemLink(true);
+          }}
+        >
+          <input
+            className={u.campoLink}
+            value={texto}
+            onChange={(e) => {
+              setTexto(e.target.value);
+              setSemLink(false);
+            }}
+            placeholder={t('upload.colarLink')}
+            aria-label={t('upload.colarLink')}
+            inputMode="url"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            autoFocus
+          />
+          <button type="submit" className={s.link} disabled={!texto.trim()}>
+            {t('upload.adicionar')}
+          </button>
+          <button
+            type="button"
+            className={s.link}
+            onClick={() => {
+              setColando(false);
+              setTexto('');
+              setSemLink(false);
+            }}
+          >
+            {t('upload.cancelar')}
+          </button>
+          {semLink && <span className={u.erro}>{t('upload.semLink')}</span>}
+        </form>
+      )}
 
       {itens.map((item) => (
         <Linha key={item.id} item={item} />
@@ -101,6 +170,9 @@ function Estado({ item }: { item: ItemEnvio }) {
           {barraDeProgresso(item.fracao)} {dlPct(item.fracao)}
         </span>
       );
+    case 'baixando':
+      // Link de página: o arquivo ainda está sendo trazido do site.
+      return <span className={u.processando}>{t('upload.baixando')}</span>;
     case 'processando':
       // O arquivo já está no bucket; agora é o worker examinando e subindo.
       return <span className={u.processando}>{t('upload.processando')}</span>;

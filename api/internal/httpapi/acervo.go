@@ -11,7 +11,9 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/thiagotn/ondas/api/internal/acervo"
+	"github.com/thiagotn/ondas/api/internal/admin"
 	"github.com/thiagotn/ondas/api/internal/auth"
+	"github.com/thiagotn/ondas/api/internal/ingest"
 )
 
 // trackJSON sai no formato do `Track` do core, de propósito: assim a fase 3
@@ -95,6 +97,9 @@ type jobJSON struct {
 	Code string `json:"code,omitempty"`
 	// Preenchido quando o status é `ready`.
 	TrackID string `json:"trackId,omitempty"`
+	// `pagina` enquanto o link ainda espera o node baixar; `midia` no resto do
+	// tempo. A PWA usa para dizer "baixando do site" em vez de "processando".
+	Tipo string `json:"tipo,omitempty"`
 }
 
 func paraJobJSON(j *acervo.Job) jobJSON {
@@ -103,7 +108,13 @@ func paraJobJSON(j *acervo.Job) jobJSON {
 		Status: j.Status,
 		URL:    j.SourceURL,
 		Error:  j.Error,
-		Code:   codigoPorMensagem[j.Error],
+		Code:   codigoDoJob(j.Error),
+		Tipo:   j.Tipo,
+	}
+	// O link de página continua sendo o que a pessoa vê, mesmo depois que a
+	// fonte do job virou `upload:<id>`.
+	if j.PaginaURL != "" {
+		saida.URL = j.PaginaURL
 	}
 	if j.TrackID != "" {
 		saida.TrackID = prefixoID + j.TrackID
@@ -153,6 +164,19 @@ func (s *Server) exigirSessaoOuToken(next http.Handler) http.Handler {
 		}
 		// `comToken` é o que diz ao handler de ingestão que este pedido é do
 		// robô: é dessa marca que depende o teto de `INGEST_DESTINOS`.
+		next.ServeHTTP(w, r.WithContext(comToken(comUsuario(r.Context(), user))))
+	})
+}
+
+// exigirToken só deixa passar o token de máquina. É o inverso de
+// `exigirSessao`: aqui o cookie nem é olhado, e uma sessão válida recebe 401.
+func (s *Server) exigirToken(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, err := s.usuarioDoToken(r.Context(), r.Header.Get("X-Ondas-Token"))
+		if err != nil {
+			escreverErro(w, http.StatusUnauthorized, "token inválido")
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(comToken(comUsuario(r.Context(), user))))
 	})
 }
@@ -345,12 +369,67 @@ func (s *Server) ingerir(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := usuarioDe(r.Context())
+	ctx := r.Context()
+
+	// Pela PWA (sessão), o link é classificado: página do YouTube/SoundCloud é
+	// job do node; o resto é mídia, como sempre. Pelo TOKEN nada muda — o bot
+	// faz o próprio download e só chega aqui com URL de mídia.
+	tipo := ingest.LinkMidia
+	if !porTokenDe(ctx) {
+		canonica, t, err := ingest.ClassificarLink(req.URL)
+		if err != nil {
+			escreverErro(w, http.StatusBadRequest, "este link não é de uma faixa")
+			return
+		}
+		req.URL, tipo = canonica, t
+		// Página é sempre para a própria conta: publicar para outra pessoa o
+		// que se baixou de um site é o caminho do bot, com a conversa dele.
+		if tipo == ingest.LinkPagina && strings.TrimSpace(req.Para) != "" {
+			escreverErro(w, http.StatusBadRequest, "requisição inválida")
+			return
+		}
+	}
+
 	destino, ok := s.resolverDestino(w, r, req.Para)
 	if !ok {
 		return
 	}
-	job, novo, err := s.jobs.Enfileirar(r.Context(), user.ID, req.URL,
-		strings.TrimSpace(req.Title), strings.TrimSpace(req.Artist), destino)
+	// COTA: conta que já está no limite nem enfileira. O tamanho ainda não é
+	// conhecido — é uma URL —, então aqui a pergunta é "cabe um byte?"; o
+	// tamanho de verdade é conferido depois do download (worker) ou no envio
+	// do node (`vagaDaPagina`). Vale para o bot também: publicar para uma conta
+	// cheia é recusado como qualquer outro caminho.
+	dono := user.ID
+	if destino.UserID != "" {
+		dono = destino.UserID
+	}
+	if !s.cabeNaCota(w, r, dono, 1) {
+		return
+	}
+
+	var (
+		job  *acervo.Job
+		novo bool
+		err  error
+	)
+	if tipo == ingest.LinkPagina {
+		job, novo, err = s.jobs.EnfileirarPagina(ctx, user.ID, req.URL)
+	} else {
+		job, novo, err = s.jobs.Enfileirar(ctx, user.ID, req.URL,
+			strings.TrimSpace(req.Title), strings.TrimSpace(req.Artist), destino)
+	}
+	// O teto de pedidos em andamento é da PWA. Conferido DEPOIS de enfileirar e
+	// só para job novo: repetir um pedido que já existe devolve o mesmo job, e
+	// isso não pode virar 429.
+	if err == nil && novo && !porTokenDe(ctx) {
+		if ativos, errAtivos := s.jobs.Ativos(ctx, user.ID); errAtivos == nil && ativos > acervo.MaxAtivosPorConta {
+			if errDes := s.jobs.Desistir(ctx, job.ID, "muitos pedidos em andamento — espere um terminar"); errDes != nil {
+				slog.Error("desistir do pedido excedente", "erro", errDes)
+			}
+			escreverErro(w, http.StatusTooManyRequests, "muitos pedidos em andamento — espere um terminar")
+			return
+		}
+	}
 	if err != nil {
 		slog.Error("enfileirar ingestão", "erro", err)
 		escreverErro(w, http.StatusInternalServerError, "não foi possível enfileirar")
@@ -362,6 +441,24 @@ func (s *Server) ingerir(w http.ResponseWriter, r *http.Request) {
 		status = http.StatusOK
 	}
 	escreverJSON(w, status, paraJobJSON(job))
+}
+
+// cabeNaCota confere a cota e, quando não cabe, já escreve a recusa. Erro de
+// leitura NÃO recusa: a cota é um teto de crescimento, e uma falha do banco
+// aqui não deve virar "sem espaço" para quem tem espaço — o envio segue, e a
+// conferência seguinte pega.
+func (s *Server) cabeNaCota(w http.ResponseWriter, r *http.Request, dono string, bytes int64) bool {
+	err := s.painel.ConferirCota(r.Context(), dono, bytes)
+	var cheio *admin.ErrSemEspaco
+	if errors.As(err, &cheio) {
+		escreverErroCod(w, http.StatusRequestEntityTooLarge, CodCotaExcedida, admin.MensagemSemEspaco,
+			map[string]any{"usado": cheio.UsadoBytes, "cota": cheio.CotaBytes})
+		return false
+	}
+	if err != nil {
+		slog.Error("conferir cota", "erro", err)
+	}
+	return true
 }
 
 func (s *Server) statusIngestao(w http.ResponseWriter, r *http.Request) {

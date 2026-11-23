@@ -1,5 +1,21 @@
 [
   {
+    "versao": "1.12.0",
+    "data": "2026-11-23",
+    "itens": [
+      {
+        "pt-BR": "quem tem envio liberado traz faixa por link: copie o endereço de um vídeo do YouTube, de uma faixa do SoundCloud ou de um arquivo de áudio, e o app oferece pôr no seu acervo. Na biblioteca há um `[+ link]` ao lado do `[+ arquivo]`; no Android instalado, o Ondas aparece no menu Compartilhar. O app só lê a área de transferência quando você já deu permissão ou num toque seu, e nada é enviado antes de você tocar em `[adicionar ao acervo]`. Uma faixa por link — playlist, canal e perfil ficam de fora",
+        "en": "accounts with uploads enabled can bring in a track by link: copy the address of a YouTube video, a SoundCloud track or an audio file, and the app offers to add it to your archive. The library has a `[+ link]` next to `[+ file]`; on Android, once installed, Ondas shows up in the Share menu. The app only reads the clipboard when you have already granted permission or on a tap of yours, and nothing is sent before you tap `[add to archive]`. One track per link — playlists, channels and profiles are left out",
+        "es": "quien tiene las subidas habilitadas trae una pista por enlace: copia la dirección de un vídeo de YouTube, de una pista de SoundCloud o de un archivo de audio, y la app ofrece añadirla a tu archivo. En la biblioteca hay un `[+ enlace]` junto a `[+ archivo]`; en Android, ya instalada, Ondas aparece en el menú Compartir. La app solo lee el portapapeles cuando ya diste permiso o con un toque tuyo, y nada se envía antes de que toques `[añadir al archivo]`. Una pista por enlace — listas, canales y perfiles quedan fuera"
+      },
+      {
+        "pt-BR": "o limite do plano passa a valer: conta acima do limite não recebe faixa nova, por arquivo, por link ou pelo bot. Nada do que já está no acervo é apagado, e o `ondas whoami` diz quando o envio está bloqueado",
+        "en": "the plan limit is now enforced: an account over its limit receives no new tracks, whether by file, by link or through the bot. Nothing already in the archive is deleted, and `ondas whoami` says when uploads are blocked",
+        "es": "el límite del plan empieza a valer: una cuenta por encima del límite no recibe pistas nuevas, ni por archivo, ni por enlace, ni por el bot. Nada de lo que ya está en el archivo se borra, y `ondas whoami` avisa cuando la subida está bloqueada"
+      }
+    ]
+  },
+  {
     "versao": "1.11.0",
     "data": "2026-11-23",
     "itens": [
