@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { api, ErroDaApi } from '../api';
+import { t } from '../i18n';
+import { Preferencias } from '../ui';
 
 /**
  * A entrada: o token de admin, uma vez.
@@ -24,10 +26,10 @@ export function Entrada({ aoEntrar }: { aoEntrar: () => void }) {
       setToken('');
       aoEntrar();
     } catch (err) {
-      if (err instanceof ErroDaApi && err.status === 401) setErro('token inválido');
+      if (err instanceof ErroDaApi && err.status === 401) setErro(t('entrada.tokenInvalido'));
       else if (err instanceof ErroDaApi && err.status === 429)
-        setErro('muitas tentativas — espere alguns minutos');
-      else setErro(err instanceof Error ? err.message : 'não foi possível entrar');
+        setErro(t('entrada.muitasTentativas'));
+      else setErro(err instanceof Error ? err.message : t('entrada.naoDeu'));
     } finally {
       setOcupado(false);
     }
@@ -35,12 +37,17 @@ export function Entrada({ aoEntrar }: { aoEntrar: () => void }) {
 
   return (
     <form className="entrada" onSubmit={(e) => void enviar(e)}>
+      {/* Antes de entrar também: quem não lê português precisa trocar o idioma
+          justamente aqui. */}
+      <div className="entrada-prefs">
+        <Preferencias />
+      </div>
       <h1>
         <span className="destaque">ondas</span> admin
       </h1>
-      <p className="mudo">cole o token de admin. ele não fica guardado neste navegador.</p>
+      <p className="mudo">{t('entrada.explica')}</p>
       <label className="campo">
-        <span className="rotulo">token</span>
+        <span className="rotulo">{t('entrada.token')}</span>
         <input
           type="password"
           value={token}
@@ -49,7 +56,7 @@ export function Entrada({ aoEntrar }: { aoEntrar: () => void }) {
           autoCapitalize="off"
           spellCheck={false}
           autoFocus
-          aria-label="Token de admin"
+          aria-label={t('entrada.tokenRotulo')}
         />
       </label>
       {erro && (
@@ -58,7 +65,7 @@ export function Entrada({ aoEntrar }: { aoEntrar: () => void }) {
         </p>
       )}
       <button type="submit" className="primario" disabled={!token.trim() || ocupado}>
-        {ocupado ? '⠋ entrando…' : '[entrar]'}
+        {ocupado ? t('entrada.entrando') : t('entrada.entrar')}
       </button>
     </form>
   );

@@ -1,5 +1,21 @@
 [
   {
+    "versao": "1.13.0",
+    "data": "2026-11-23",
+    "itens": [
+      {
+        "pt-BR": "no painel de administração, toda lista ganhou um campo de filtro e colunas que ordenam ao clique — contas, faixas, ingestões, convites, planos e histórico. O filtro ignora acento e maiúsculas, e o recorte fica no endereço: recarregar a página não o desfaz",
+        "en": "in the admin panel, every list gained a filter field and columns that sort on click — accounts, tracks, ingestions, invites, plans and history. The filter ignores accents and capitals, and the view stays in the address: reloading the page does not undo it",
+        "es": "en el panel de administración, cada lista ganó un campo de filtro y columnas que ordenan al hacer clic — cuentas, pistas, ingestas, invitaciones, planes e historial. El filtro ignora acentos y mayúsculas, y la vista queda en la dirección: recargar la página no la deshace"
+      },
+      {
+        "pt-BR": "o painel de administração passa a ter os nove temas do app e os três idiomas (português, inglês e espanhol), trocados na barra do topo e guardados no navegador",
+        "en": "the admin panel now has the app's nine themes and three languages (Portuguese, English and Spanish), switched from the top bar and remembered in the browser",
+        "es": "el panel de administración ahora tiene los nueve temas de la app y los tres idiomas (portugués, inglés y español), que se cambian en la barra superior y quedan guardados en el navegador"
+      }
+    ]
+  },
+  {
     "versao": "1.12.0",
     "data": "2026-11-23",
     "itens": [

@@ -10,6 +10,8 @@
  * ele passa pela memória do formulário de entrada e some.
  */
 
+import { t, tErroDaApi } from './i18n';
+
 export interface Conta {
   id: string;
   email: string;
@@ -145,16 +147,16 @@ async function pedir<T>(metodo: string, caminho: string, corpo?: unknown): Promi
       ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }),
     });
   } catch {
-    throw new ErroDaApi('sem resposta do servidor', 0);
+    throw new ErroDaApi(t('comum.semResposta'), 0);
   }
   if (res.ok) return (await res.json()) as T;
 
-  let msg = `o servidor respondeu ${res.status}`;
+  let msg = t('comum.respondeu', { status: String(res.status) });
   let codigo: string | undefined;
   try {
     const erro = (await res.json()) as { error?: unknown; code?: unknown };
-    if (typeof erro.error === 'string' && erro.error) msg = erro.error;
     if (typeof erro.code === 'string') codigo = erro.code;
+    if (typeof erro.error === 'string' && erro.error) msg = tErroDaApi(codigo, erro.error);
   } catch {
     // Resposta sem JSON (um 502 do proxy, por exemplo): fica a frase genérica.
   }

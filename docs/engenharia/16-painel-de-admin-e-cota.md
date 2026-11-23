@@ -80,6 +80,27 @@ um pedido por vez. Um painel abre uma tela com três pedidos em paralelo, e perg
 sem credencial nenhuma toda vez que é aberto deslogado. Agora ele conta só a **credencial errada**:
 token recusado ou cookie forjado. Pedido válido e pedido sem credencial não gastam nada.
 
+### Filtro, ordem, tema e idioma: tudo no navegador
+
+As listas filtram por texto e ordenam por coluna **no cliente**, sobre as linhas que a API já
+mandou (`packages/admin/src/lista.tsx`). É a escolha certa para o tamanho que o painel tem — dezenas
+de contas, até 200 faixas por pedido — e evita uma segunda linguagem de consulta no servidor. O
+limite é dito na tela: numa lista que o servidor corta, filtrar e ordenar não alcançam o que ficou
+de fora do corte. Os filtros que **mudam o que a API manda** (status de conta, status de ingestão,
+"maiores"/"mais novas" nas faixas) continuam sendo pedidos novos, e ficam separados da busca de
+propósito. O recorte mora no endereço (`?q=…&ord=-usado`): recarregar e voltar o preservam.
+
+Tema e idioma são os da PWA — os temas vêm de `THEMES`/`themeCssVars` e o motor de frases é o do
+core —, mas o **catálogo de frases é do pacote do painel**: o core vai para o bundle de todo
+visitante, e frase de administração não deve chegar lá. As duas preferências ficam no
+`localStorage` deste host (`prefs.ts`). Não há de quem herdar: o token de admin não tem identidade,
+e o `localStorage` da PWA é de outra origem. Trocar de idioma recarrega a página, pelo mesmo motivo
+da PWA (idioma de módulo, fixado no boot).
+
+O que **não** é traduzido: o que o servidor escreveu como dado — a frase de erro de uma ingestão, o
+detalhe de um evento do histórico, o nome de um plano. Erro de pedido à API é traduzido pelo
+código quando o catálogo do app o conhece; sem isso, aparece a frase em português do servidor.
+
 ## Cota: o modelo antes da cobrança
 
 O envio custa armazenamento, e o "formato comercial" disso continua indefinido. O que dá para

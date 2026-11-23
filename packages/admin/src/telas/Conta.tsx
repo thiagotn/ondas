@@ -10,109 +10,188 @@ import {
   lerTamanho,
   rotuloStatus,
 } from '../formato';
+import { t } from '../i18n';
+import { Busca, NadaCasa, ThOrd, useLista, type Config, type Lista } from '../lista';
 import { Confirmar, Estado, Marca, Uso, useAcao, useDados } from '../ui';
 
+/** Colunas e busca das faixas — as mesmas na tela de faixas e na da conta. */
+export const LISTA_DE_FAIXAS: Config<Faixa> = {
+  colunas: {
+    faixa: (f) => f.titulo,
+    dono: (f) => f.donoEmail,
+    duracao: (f) => f.duracaoS,
+    audio: (f) => f.audioBytes,
+    capas: (f) => f.capaBytes,
+    visivel: (f) => f.visibilidade,
+    desde: (f) => f.criadaEm,
+  },
+  texto: (f) => `${f.titulo} ${f.artista} ${f.donoEmail} ${f.donoNome}`,
+  descPrimeiro: ['duracao', 'audio', 'capas', 'desde'],
+};
+
 export function TabelaDeFaixas({
-  faixas,
+  lista,
   comDono,
   aoApagar,
   ocupado,
 }: {
-  faixas: Faixa[];
+  lista: Lista<Faixa>;
   comDono: boolean;
   aoApagar: (f: Faixa) => void;
   ocupado: boolean;
 }) {
   return (
-    <div className="rolagem">
-      <table>
-        <thead>
-          <tr>
-            <th>faixa</th>
-            {comDono && <th>dono</th>}
-            <th className="num">duração</th>
-            <th className="num">áudio</th>
-            <th className="num">capas</th>
-            <th>visível para</th>
-            <th>desde</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {faixas.map((f) => (
-            <tr key={f.id}>
-              <td>
-                {f.titulo}
-                <div className="mudo">{f.artista}</div>
-              </td>
+    <>
+      <div className="rolagem">
+        <table>
+          <thead>
+            <tr>
+              <ThOrd lista={lista} chave="faixa">
+                {t('col.faixa')}
+              </ThOrd>
               {comDono && (
-                <td>
-                  <Link to={`/contas/${f.donoId}`}>{f.donoEmail}</Link>
-                </td>
+                <ThOrd lista={lista} chave="dono">
+                  {t('col.dono')}
+                </ThOrd>
               )}
-              <td className="num">{fmtDuracao(f.duracaoS)}</td>
-              <td className="num">{fmtBytes(f.audioBytes)}</td>
-              <td className="num mudo">{f.capaBytes ? fmtBytes(f.capaBytes) : '—'}</td>
-              <td className={f.visibilidade === 'todos' ? 'aviso' : 'mudo'}>
-                {f.visibilidade === 'todos' ? 'todos' : 'só o dono'}
-              </td>
-              <td className="mudo">{fmtDia(f.criadaEm)}</td>
-              <td className="acoes">
-                <Confirmar
-                  rotulo="[apagar]"
-                  pergunta="sai do acervo e do bucket, sem volta. apagar?"
-                  desabilitado={ocupado}
-                  aoConfirmar={() => aoApagar(f)}
-                />
-              </td>
+              <ThOrd lista={lista} chave="duracao" className="num">
+                {t('col.duracao')}
+              </ThOrd>
+              <ThOrd lista={lista} chave="audio" className="num">
+                {t('col.audio')}
+              </ThOrd>
+              <ThOrd lista={lista} chave="capas" className="num">
+                {t('col.capas')}
+              </ThOrd>
+              <ThOrd lista={lista} chave="visivel">
+                {t('col.visivel')}
+              </ThOrd>
+              <ThOrd lista={lista} chave="desde">
+                {t('col.desde')}
+              </ThOrd>
+              <th />
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {lista.visiveis.map((f) => (
+              <tr key={f.id}>
+                <td>
+                  {f.titulo}
+                  <div className="mudo">{f.artista}</div>
+                </td>
+                {comDono && (
+                  <td>
+                    <Link to={`/contas/${f.donoId}`}>{f.donoEmail}</Link>
+                  </td>
+                )}
+                <td className="num">{fmtDuracao(f.duracaoS)}</td>
+                <td className="num">{fmtBytes(f.audioBytes)}</td>
+                <td className="num mudo">{f.capaBytes ? fmtBytes(f.capaBytes) : '—'}</td>
+                <td className={f.visibilidade === 'todos' ? 'aviso' : 'mudo'}>
+                  {f.visibilidade === 'todos' ? t('faixas.visTodos') : t('faixas.visDono')}
+                </td>
+                <td className="mudo">{fmtDia(f.criadaEm)}</td>
+                <td className="acoes">
+                  <Confirmar
+                    rotulo={t('faixas.apagar')}
+                    pergunta={t('faixas.apagarPergunta')}
+                    desabilitado={ocupado}
+                    aoConfirmar={() => aoApagar(f)}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <NadaCasa lista={lista} />
+    </>
   );
 }
 
-export function TabelaDeIngestoes({ lista }: { lista: Ingestao[] }) {
+/**
+ * Link de página ainda na fila do node: "na fila" sozinho esconderia que quem
+ * está devendo é o download, não o worker.
+ */
+function statusDaIngestao(i: Ingestao): string {
+  return i.tipo === 'pagina' && i.status !== 'error' && i.status !== 'ready'
+    ? t('status.esperandoNode')
+    : rotuloStatus(i.status);
+}
+
+export const LISTA_DE_INGESTOES: Config<Ingestao> = {
+  colunas: {
+    quando: (i) => i.criadaEm,
+    status: (i) => i.status,
+    origem: (i) => i.fonte,
+    titulo: (i) => i.titulo,
+    pedidoPor: (i) => i.pedidoPor,
+    para: (i) => i.destino,
+    tentativas: (i) => i.tentativas,
+  },
+  // O erro entra na busca: é por ele que se acha "todas as que falharam por X".
+  texto: (i) =>
+    `${i.fonte} ${i.titulo ?? ''} ${i.pedidoPor} ${i.destino ?? ''} ${statusDaIngestao(i)} ${i.erro ?? ''}`,
+  descPrimeiro: ['quando', 'tentativas'],
+};
+
+export function TabelaDeIngestoes({ lista }: { lista: Lista<Ingestao> }) {
   return (
-    <div className="rolagem">
-      <table>
-        <thead>
-          <tr>
-            <th>quando</th>
-            <th>status</th>
-            <th>origem</th>
-            <th>título</th>
-            <th>pedido por</th>
-            <th>para</th>
-            <th className="num">tentativas</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lista.map((i) => (
-            <tr key={i.id}>
-              <td className="mudo">{fmtQuando(i.criadaEm)}</td>
-              <td className={`job-${i.status}`}>
-                {/* Link de página ainda na fila do node: "na fila" sozinho
-                    esconderia que quem está devendo é o download, não o worker. */}
-                {i.tipo === 'pagina' && i.status !== 'error' && i.status !== 'ready'
-                  ? 'esperando o node baixar'
-                  : rotuloStatus(i.status)}
-                {/* O erro é a frase que o worker gravou — texto, nunca HTML. */}
-                {i.erro && <div className="erro">{i.erro}</div>}
-              </td>
-              <td>{i.fonte}</td>
-              <td>{i.titulo || <span className="mudo">—</span>}</td>
-              <td className="mudo">{i.pedidoPor}</td>
-              <td className="mudo">{i.destino || '—'}</td>
-              <td className="num">{i.tentativas}</td>
+    <>
+      <div className="rolagem">
+        <table>
+          <thead>
+            <tr>
+              <ThOrd lista={lista} chave="quando">
+                {t('col.quando')}
+              </ThOrd>
+              <ThOrd lista={lista} chave="status">
+                {t('col.status')}
+              </ThOrd>
+              <ThOrd lista={lista} chave="origem">
+                {t('col.origem')}
+              </ThOrd>
+              <ThOrd lista={lista} chave="titulo">
+                {t('col.titulo')}
+              </ThOrd>
+              <ThOrd lista={lista} chave="pedidoPor">
+                {t('col.pedidoPor')}
+              </ThOrd>
+              <ThOrd lista={lista} chave="para">
+                {t('col.para')}
+              </ThOrd>
+              <ThOrd lista={lista} chave="tentativas" className="num">
+                {t('col.tentativas')}
+              </ThOrd>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {lista.visiveis.map((i) => (
+              <tr key={i.id}>
+                <td className="mudo">{fmtQuando(i.criadaEm)}</td>
+                <td className={`job-${i.status}`}>
+                  {statusDaIngestao(i)}
+                  {/* O erro é a frase que o worker gravou — texto, nunca HTML. */}
+                  {i.erro && <div className="erro">{i.erro}</div>}
+                </td>
+                <td>{i.fonte}</td>
+                <td>{i.titulo || <span className="mudo">—</span>}</td>
+                <td className="mudo">{i.pedidoPor}</td>
+                <td className="mudo">{i.destino || '—'}</td>
+                <td className="num">{i.tentativas}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <NadaCasa lista={lista} />
+    </>
   );
 }
+
+// Duas tabelas na mesma tela: cada uma com o seu par de chaves no endereço.
+const FAIXAS_DA_CONTA: Config<Faixa> = { ...LISTA_DE_FAIXAS, prefixo: 'f' };
+const INGESTOES_DA_CONTA: Config<Ingestao> = { ...LISTA_DE_INGESTOES, prefixo: 'i' };
 
 export function ContaDetalhe() {
   const { id = '' } = useParams();
@@ -124,6 +203,8 @@ export function ContaDetalhe() {
   const [confirmaEmail, setConfirmaEmail] = useState('');
 
   const conta = dados?.conta;
+  const faixas = useLista(dados?.faixas, FAIXAS_DA_CONTA);
+  const ingestoes = useLista(dados?.ingestoes, INGESTOES_DA_CONTA);
   useEffect(() => {
     if (conta) setExtra(escreverTamanho(conta.cotaExtraBytes));
   }, [conta?.id, conta?.cotaExtraBytes]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -135,7 +216,7 @@ export function ContaDetalhe() {
   return (
     <section>
       <p>
-        <Link to="/contas">← contas</Link>
+        <Link to="/contas">{t('conta.voltar')}</Link>
       </p>
       <Estado carregando={carregando} erro={erro} tem={!!conta}>
         {conta && dados && (
@@ -149,11 +230,11 @@ export function ContaDetalhe() {
 
             <div className="painel">
               <div className="linha">
-                <span className="rotulo">nome</span>
+                <span className="rotulo">{t('conta.nome')}</span>
                 <span>{conta.name}</span>
               </div>
               <div className="linha">
-                <span className="rotulo">status</span>
+                <span className="rotulo">{t('conta.status')}</span>
                 <span className={`status-${conta.status}`}>{rotuloStatus(conta.status)}</span>
                 <span className="acoes">
                   {conta.status !== 'aprovada' && (
@@ -163,13 +244,13 @@ export function ContaDetalhe() {
                       disabled={acao.ocupado}
                       onClick={() => fazer(() => api.aprovar(conta.id))}
                     >
-                      [aprovar]
+                      {t('comum.aprovar')}
                     </button>
                   )}
                   {conta.status !== 'negada' && (
                     <Confirmar
-                      rotulo={conta.status === 'aprovada' ? '[suspender]' : '[negar]'}
-                      pergunta="a conta deixa de entrar. confirmar?"
+                      rotulo={conta.status === 'aprovada' ? t('comum.suspender') : t('comum.negar')}
+                      pergunta={t('conta.deixaDeEntrar')}
                       desabilitado={acao.ocupado}
                       aoConfirmar={() => fazer(() => api.negar(conta.id))}
                     />
@@ -178,36 +259,36 @@ export function ContaDetalhe() {
               </div>
               {conta.mensagem && (
                 <div className="linha">
-                  <span className="rotulo">pedido</span>
+                  <span className="rotulo">{t('conta.pedido')}</span>
                   <span className="citacao">“{conta.mensagem}”</span>
                 </div>
               )}
               <div className="linha">
-                <span className="rotulo">envio</span>
+                <span className="rotulo">{t('conta.envio')}</span>
                 <Marca
                   ligado={conta.podeEnviar}
-                  rotulo="pode enviar arquivo"
+                  rotulo={t('conta.podeEnviarRotulo')}
                   desabilitado={acao.ocupado}
                   aoMudar={(v) => fazer(() => api.ajustar(conta.id, { podeEnviar: v }))}
                 />
-                <span className="mudo">pode enviar arquivo e pedir ingestão de URL</span>
+                <span className="mudo">{t('conta.podeEnviarExplica')}</span>
               </div>
               <div className="linha">
-                <span className="rotulo">bot</span>
+                <span className="rotulo">{t('conta.bot')}</span>
                 <Marca
                   ligado={conta.recebeDoBot}
-                  rotulo="recebe do bot"
+                  rotulo={t('conta.recebeDoBotRotulo')}
                   desabilitado={acao.ocupado}
                   aoMudar={(v) => fazer(() => api.ajustar(conta.id, { recebeDoBot: v }))}
                 />
-                <span className="mudo">o bot do Telegram pode publicar faixa para esta conta</span>
+                <span className="mudo">{t('conta.recebeDoBotExplica')}</span>
               </div>
               <div className="linha">
-                <span className="rotulo">plano</span>
+                <span className="rotulo">{t('conta.plano')}</span>
                 <select
                   value={conta.planoId}
                   disabled={acao.ocupado || !planos.dados}
-                  aria-label="Plano da conta"
+                  aria-label={t('conta.planoRotulo')}
                   onChange={(e) => fazer(() => api.ajustar(conta.id, { planoId: e.target.value }))}
                 >
                   {(planos.dados ?? [{ id: conta.planoId, nome: conta.planoNome, cotaBytes: 0 }]).map(
@@ -229,11 +310,11 @@ export function ContaDetalhe() {
                   }
                 }}
               >
-                <span className="rotulo">extra</span>
+                <span className="rotulo">{t('conta.extra')}</span>
                 <input
                   value={extra}
                   onChange={(e) => setExtra(e.target.value)}
-                  aria-label="Cota extra avulsa"
+                  aria-label={t('conta.extraRotulo')}
                   placeholder="0, 500 MB, 2 GB"
                   size={12}
                 />
@@ -242,57 +323,65 @@ export function ContaDetalhe() {
                   className="link"
                   disabled={acao.ocupado || extraLido === null || extraLido === conta.cotaExtraBytes}
                 >
-                  [salvar]
+                  {t('comum.salvar')}
                 </button>
                 <span className={extraLido === null ? 'erro' : 'mudo'}>
-                  {extraLido === null
-                    ? 'não entendi o tamanho'
-                    : 'espaço avulso, somado ao do plano'}
+                  {extraLido === null ? t('comum.naoEntendiTamanho') : t('conta.extraExplica')}
                 </span>
               </form>
               <div className="linha">
-                <span className="rotulo">ocupação</span>
+                <span className="rotulo">{t('conta.ocupacao')}</span>
                 <Uso usado={conta.usadoBytes} cota={conta.cotaBytes} />
-                <span className="mudo">{conta.faixas} faixa(s)</span>
+                <span className="mudo">{t('conta.nFaixas', { n: conta.faixas })}</span>
               </div>
               <div className="linha">
-                <span className="rotulo">atividade</span>
+                <span className="rotulo">{t('conta.atividade')}</span>
                 <span className="mudo">
-                  conta de {fmtDia(conta.criadaEm)} · último login {fmtQuando(conta.ultimoLoginEm)} ·
-                  última escuta {fmtQuando(conta.ultimaEscutaEm)}
+                  {t('conta.atividadeResumo', {
+                    criada: fmtDia(conta.criadaEm),
+                    login: fmtQuando(conta.ultimoLoginEm),
+                    escuta: fmtQuando(conta.ultimaEscutaEm),
+                  })}
                 </span>
               </div>
             </div>
 
-            <h2>faixas</h2>
+            <h2>{t('conta.faixas')}</h2>
             {dados.faixas.length === 0 ? (
-              <p className="mudo">esta conta não tem faixa no acervo.</p>
+              <p className="mudo">{t('conta.semFaixas')}</p>
             ) : (
-              <TabelaDeFaixas
-                faixas={dados.faixas}
-                comDono={false}
-                ocupado={acao.ocupado}
-                aoApagar={(f) => fazer(() => api.apagarFaixa(f.id))}
-              />
+              <>
+                <div className="filtros">
+                  <Busca lista={faixas} rotulo={t('conta.buscaFaixas')} />
+                </div>
+                <TabelaDeFaixas
+                  lista={faixas}
+                  comDono={false}
+                  ocupado={acao.ocupado}
+                  aoApagar={(f) => fazer(() => api.apagarFaixa(f.id))}
+                />
+              </>
             )}
 
-            <h2>ingestões recentes</h2>
+            <h2>{t('conta.ingestoes')}</h2>
             {dados.ingestoes.length === 0 ? (
-              <p className="mudo">nenhuma ingestão desta conta.</p>
+              <p className="mudo">{t('conta.semIngestoes')}</p>
             ) : (
-              <TabelaDeIngestoes lista={dados.ingestoes} />
+              <>
+                <div className="filtros">
+                  <Busca lista={ingestoes} rotulo={t('conta.buscaIngestoes')} />
+                </div>
+                <TabelaDeIngestoes lista={ingestoes} />
+              </>
             )}
 
-            <h2 className="erro">apagar a conta</h2>
-            <p className="mudo">
-              apaga a conta, as {conta.faixas} faixa(s) dela e os arquivos no bucket. não tem volta.
-              para confirmar, digite o e-mail da conta.
-            </p>
+            <h2 className="erro">{t('conta.apagar')}</h2>
+            <p className="mudo">{t('conta.apagarExplica', { n: conta.faixas })}</p>
             <div className="linha solta">
               <input
                 value={confirmaEmail}
                 onChange={(e) => setConfirmaEmail(e.target.value)}
-                aria-label="E-mail da conta, para confirmar"
+                aria-label={t('conta.confirmaEmail')}
                 placeholder={conta.email}
                 autoComplete="off"
                 size={28}
@@ -307,7 +396,7 @@ export function ContaDetalhe() {
                   })
                 }
               >
-                [apagar de vez]
+                {t('conta.apagarDeVez')}
               </button>
             </div>
           </>

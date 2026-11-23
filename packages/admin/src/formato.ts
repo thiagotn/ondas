@@ -1,35 +1,49 @@
-import { fmtBytes } from '@ondas/core';
+import { fmtBytes, idioma } from '@ondas/core';
+import { t, tSe } from './i18n';
 
 export { fmtBytes };
 
-const DATA = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-const SO_DATA = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
+/**
+ * Os formatadores de data seguem o idioma do painel, e por isso nascem na
+ * primeira chamada: no topo do módulo o idioma ainda não foi decidido.
+ */
+let formatos: { locale: string; data: Intl.DateTimeFormat; dia: Intl.DateTimeFormat } | null = null;
+function fmt() {
+  if (formatos?.locale !== idioma()) {
+    formatos = {
+      locale: idioma(),
+      data: new Intl.DateTimeFormat(idioma(), { dateStyle: 'short', timeStyle: 'short' }),
+      dia: new Intl.DateTimeFormat(idioma(), { dateStyle: 'short' }),
+    };
+  }
+  return formatos;
+}
 
 export function fmtQuando(iso: string | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '—' : DATA.format(d);
+  return Number.isNaN(d.getTime()) ? '—' : fmt().data.format(d);
 }
 
 export function fmtDia(iso: string | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '—' : SO_DATA.format(d);
+  return Number.isNaN(d.getTime()) ? '—' : fmt().dia.format(d);
 }
 
 /** "há 3 dias" — para a coluna de atividade, onde a data exata importa menos. */
 export function fmtHa(iso: string | undefined, agora = Date.now()): string {
-  if (!iso) return 'nunca';
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return 'nunca';
-  const min = Math.max(0, Math.round((agora - t) / 60_000));
-  if (min < 1) return 'agora';
-  if (min < 60) return `há ${min} min`;
+  if (!iso) return t('quando.nunca');
+  const quando = new Date(iso).getTime();
+  if (Number.isNaN(quando)) return t('quando.nunca');
+  const min = Math.max(0, Math.round((agora - quando) / 60_000));
+  if (min < 1) return t('quando.agora');
+  if (min < 60) return t('quando.min', { n: min });
   const h = Math.round(min / 60);
-  if (h < 24) return `há ${h} h`;
+  if (h < 24) return t('quando.h', { n: h });
   const d = Math.round(h / 24);
-  if (d < 60) return `há ${d} d`;
-  return `há ${Math.round(d / 30)} meses`;
+  if (d < 60) return t('quando.d', { n: d });
+  return t('quando.meses', { n: Math.round(d / 30) });
 }
 
 export function fmtDuracao(s: number): string {
@@ -69,40 +83,17 @@ export function escreverTamanho(bytes: number): string {
   ] as const) {
     if (bytes >= fator) {
       const v = bytes / fator;
-      return `${Number.isInteger(v) ? v : v.toFixed(2).replace('.', ',')} ${nome}`;
+      // O decimal do idioma — e `lerTamanho` entende os dois, então o que este
+      // campo mostra sempre pode ser salvo de volta.
+      const decimal = idioma() === 'en' ? '.' : ',';
+      return `${Number.isInteger(v) ? v : v.toFixed(2).replace('.', decimal)} ${nome}`;
     }
   }
   return `${bytes} B`;
 }
 
-const ROTULO_STATUS: Record<string, string> = {
-  pendente: 'em análise',
-  aprovada: 'aprovada',
-  negada: 'negada',
-  pending: 'na fila',
-  processing: 'processando',
-  ready: 'pronta',
-  error: 'erro',
-};
+/** Status de conta ou de job → a palavra da tela. Valor desconhecido sai cru. */
+export const rotuloStatus = (s: string): string => tSe('status.' + s) ?? s;
 
-export const rotuloStatus = (s: string): string => ROTULO_STATUS[s] ?? s;
-
-const ROTULO_ACAO: Record<string, string> = {
-  'sessao.aberta': 'entrou no painel',
-  'conta.aprovada': 'aprovou a conta',
-  'conta.negada': 'negou a conta',
-  'conta.pendente': 'devolveu a conta para análise',
-  'conta.ajustada': 'ajustou a conta',
-  'conta.apagada': 'apagou a conta',
-  'faixa.apagada': 'apagou a faixa',
-  'cadastro.aberto': 'abriu o cadastro',
-  'cadastro.fechado': 'fechou o cadastro',
-  'cota.bloqueia': 'ligou o bloqueio por cota',
-  'cota.so_mede': 'desligou o bloqueio por cota',
-  'convite.criado': 'convidou',
-  'convite.removido': 'removeu o convite de',
-  'plano.criado': 'criou o plano',
-  'plano.alterado': 'alterou o plano',
-};
-
-export const rotuloAcao = (a: string): string => ROTULO_ACAO[a] ?? a;
+/** Ação do histórico → a frase. Ação que esta tela não conhece sai crua. */
+export const rotuloAcao = (a: string): string => tSe('acao.' + a) ?? a;

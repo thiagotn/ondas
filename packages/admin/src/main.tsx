@@ -1,4 +1,3 @@
-import { DEFAULT_THEME_ID, findTheme, themeCssVars } from '@ondas/core';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
@@ -6,15 +5,12 @@ import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/700.css';
 import { App } from './App';
 import './estilo.css';
+import { iniciarPrefs } from './prefs';
 
-// Os mesmos tokens da PWA, do mesmo lugar (`themeCssVars`, no core): o painel
-// tem a cara do app sem copiar uma paleta. Um tema só — aqui não há o que
-// personalizar.
-const raiz = document.documentElement;
-for (const [chave, valor] of Object.entries(themeCssVars(findTheme(DEFAULT_THEME_ID)))) {
-  raiz.style.setProperty(chave, valor);
-}
-raiz.style.colorScheme = 'dark';
+// Tema e idioma ANTES do primeiro render: os tokens vêm do mesmo lugar que os
+// da PWA (`themeCssVars`, no core), e o idioma é de módulo — fixado aqui, uma
+// vez, ele não muda enquanto a página viver (ver `prefs.ts`).
+iniciarPrefs();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

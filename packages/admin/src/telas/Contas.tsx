@@ -1,13 +1,15 @@
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, type Conta } from '../api';
 import { fmtDia, fmtHa, rotuloStatus } from '../formato';
+import { t } from '../i18n';
+import { Busca, NadaCasa, ThOrd, useLista, type Config } from '../lista';
 import { Confirmar, Estado, Marca, Segmentos, Uso, useAcao, useDados } from '../ui';
 
 const FILTROS = [
-  { valor: '', rotulo: 'todas' },
-  { valor: 'pendente', rotulo: 'em análise' },
-  { valor: 'aprovada', rotulo: 'aprovadas' },
-  { valor: 'negada', rotulo: 'negadas' },
+  { valor: '', chave: 'contas.todas' },
+  { valor: 'pendente', chave: 'contas.emAnalise' },
+  { valor: 'aprovada', chave: 'contas.aprovadas' },
+  { valor: 'negada', chave: 'contas.negadas' },
 ] as const;
 
 type Filtro = (typeof FILTROS)[number]['valor'];
@@ -18,6 +20,24 @@ export function ultimaAtividade(c: Conta): string | undefined {
   return datas.sort().at(-1);
 }
 
+const LISTA: Config<Conta> = {
+  colunas: {
+    conta: (c) => c.email,
+    status: (c) => c.status,
+    envia: (c) => c.podeEnviar,
+    bot: (c) => c.recebeDoBot,
+    faixas: (c) => c.faixas,
+    // Pelos bytes, não pela fração da cota: "quem ocupa mais" é a pergunta
+    // desta coluna; quem estourou tem o cartão da visão geral.
+    usado: (c) => c.usadoBytes,
+    atividade: (c) => ultimaAtividade(c),
+    desde: (c) => c.criadaEm,
+  },
+  // A mensagem do pedido entra na busca: é por ela que se reconhece quem pediu.
+  texto: (c) => `${c.email} ${c.name} ${rotuloStatus(c.status)} ${c.planoNome} ${c.mensagem ?? ''}`,
+  descPrimeiro: ['envia', 'bot', 'faixas', 'usado', 'atividade', 'desde'],
+};
+
 export function Contas() {
   const [params, setParams] = useSearchParams();
   const navegar = useNavigate();
@@ -27,19 +47,31 @@ export function Contas() {
     () => api.contas(filtro || undefined),
     [filtro],
   );
+  const lista = useLista(dados, LISTA);
   const acao = useAcao();
 
   const fazer = (fn: () => Promise<unknown>) => void acao.rodar(fn).then(() => recarregar());
 
   return (
     <section>
-      <h1>contas</h1>
-      <Segmentos
-        rotulo="Filtrar por status"
-        opcoes={FILTROS}
-        valor={filtro}
-        aoMudar={(v) => setParams(v ? { status: v } : {})}
-      />
+      <h1>{t('aba.contas')}</h1>
+      <div className="filtros">
+        <Segmentos
+          rotulo={t('contas.filtroStatus')}
+          opcoes={FILTROS.map((f) => ({ valor: f.valor, rotulo: t(f.chave) }))}
+          valor={filtro}
+          aoMudar={(v) =>
+            // Só o status muda: a busca e a ordem continuam valendo no recorte novo.
+            setParams((antes) => {
+              const novo = new URLSearchParams(antes);
+              if (v) novo.set('status', v);
+              else novo.delete('status');
+              return novo;
+            })
+          }
+        />
+        <Busca lista={lista} rotulo={t('contas.busca')} />
+      </div>
       {acao.falha && (
         <p className="erro" role="alert">
           {acao.falha}
@@ -49,25 +81,41 @@ export function Contas() {
         carregando={carregando}
         erro={erro}
         tem={!!dados}
-        vazio={dados?.length === 0 && 'nenhuma conta neste recorte.'}
+        vazio={dados?.length === 0 && t('contas.vazio')}
       >
         <div className="rolagem">
           <table>
             <thead>
               <tr>
-                <th>conta</th>
-                <th>status</th>
-                <th title="pode enviar arquivo e pedir ingestão">envia</th>
-                <th title="o bot pode publicar faixa para esta conta">bot</th>
-                <th className="num">faixas</th>
-                <th>ocupação</th>
-                <th>atividade</th>
-                <th>desde</th>
+                <ThOrd lista={lista} chave="conta">
+                  {t('col.conta')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="status">
+                  {t('col.status')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="envia" title={t('col.enviaDica')}>
+                  {t('col.envia')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="bot" title={t('col.botDica')}>
+                  {t('col.bot')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="faixas" className="num">
+                  {t('col.faixas')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="usado">
+                  {t('col.ocupacao')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="atividade">
+                  {t('col.atividade')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="desde">
+                  {t('col.desde')}
+                </ThOrd>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {dados?.map((c) => (
+              {lista.visiveis.map((c) => (
                 <tr key={c.id} className="clicavel" onClick={() => navegar(`/contas/${c.id}`)}>
                   <td>
                     <Link to={`/contas/${c.id}`} onClick={(e) => e.stopPropagation()}>
@@ -84,7 +132,7 @@ export function Contas() {
                   <td>
                     <Marca
                       ligado={c.podeEnviar}
-                      rotulo={`${c.email} pode enviar`}
+                      rotulo={t('contas.podeEnviar', { email: c.email })}
                       desabilitado={acao.ocupado}
                       aoMudar={(v) => fazer(() => api.ajustar(c.id, { podeEnviar: v }))}
                     />
@@ -92,7 +140,7 @@ export function Contas() {
                   <td>
                     <Marca
                       ligado={c.recebeDoBot}
-                      rotulo={`${c.email} recebe do bot`}
+                      rotulo={t('contas.recebeDoBot', { email: c.email })}
                       desabilitado={acao.ocupado}
                       aoMudar={(v) => fazer(() => api.ajustar(c.id, { recebeDoBot: v }))}
                     />
@@ -114,7 +162,7 @@ export function Contas() {
                           fazer(() => api.aprovar(c.id));
                         }}
                       >
-                        [aprovar]
+                        {t('comum.aprovar')}
                       </button>
                     )}
                     {c.status === 'pendente' && (
@@ -127,13 +175,13 @@ export function Contas() {
                           fazer(() => api.negar(c.id));
                         }}
                       >
-                        [negar]
+                        {t('comum.negar')}
                       </button>
                     )}
                     {c.status === 'aprovada' && (
                       <Confirmar
-                        rotulo="[suspender]"
-                        pergunta="a conta para de entrar agora. suspender?"
+                        rotulo={t('comum.suspender')}
+                        pergunta={t('contas.suspenderPergunta')}
                         desabilitado={acao.ocupado}
                         aoConfirmar={() => fazer(() => api.negar(c.id))}
                       />
@@ -144,6 +192,7 @@ export function Contas() {
             </tbody>
           </table>
         </div>
+        <NadaCasa lista={lista} />
       </Estado>
     </section>
   );

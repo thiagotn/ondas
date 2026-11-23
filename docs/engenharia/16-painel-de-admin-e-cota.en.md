@@ -81,6 +81,27 @@ with no credential at all every time it is opened signed out. It now counts only
 credential**: a rejected token or a forged cookie. A valid request and a request with no credential
 cost nothing.
 
+### Filter, sort, theme and language: all in the browser
+
+Lists filter by text and sort by column **on the client**, over the rows the API already sent
+(`packages/admin/src/lista.tsx`). That is the right call for the size the panel has — dozens of
+accounts, up to 200 tracks per request — and it avoids a second query language on the server. The
+limit is stated on screen: on a list the server truncates, filtering and sorting do not reach what
+was left out. Filters that **change what the API sends** (account status, ingestion status,
+"largest"/"newest" for tracks) are still new requests, and are kept apart from the search on
+purpose. The view lives in the address (`?q=…&ord=-usado`): reloading and going back preserve it.
+
+Theme and language are the PWA's — themes come from `THEMES`/`themeCssVars` and the phrase engine is
+the core's — but the **phrase catalogue belongs to the panel package**: the core ships in every
+visitor's bundle, and administration phrases should not get there. Both preferences live in this
+host's `localStorage` (`prefs.ts`). There is nobody to inherit from: the admin token has no
+identity, and the PWA's `localStorage` belongs to another origin. Switching language reloads the
+page, for the same reason as in the PWA (module-level language, fixed at boot).
+
+What is **not** translated: whatever the server wrote as data — the error phrase of an ingestion,
+the detail of a history event, a plan's name. An API request error is translated by its code when
+the app catalogue knows it; otherwise the server's Portuguese phrase is shown.
+
 ## Quota: the model before the billing
 
 Uploads cost storage, and the "commercial format" of that is still undecided. What can be decided

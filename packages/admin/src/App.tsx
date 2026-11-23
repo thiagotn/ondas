@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { api, ErroDaApi, ouvirSessaoPerdida } from './api';
+import { t } from './i18n';
 import { Cadastro } from './telas/Cadastro';
 import { ContaDetalhe } from './telas/Conta';
 import { Contas } from './telas/Contas';
@@ -10,17 +11,19 @@ import { Historico } from './telas/Historico';
 import { Ingestoes } from './telas/Ingestoes';
 import { Planos } from './telas/Planos';
 import { VisaoGeral } from './telas/VisaoGeral';
+import { Preferencias } from './ui';
 
 type Sessao = 'verificando' | 'fora' | 'dentro' | 'desligado';
 
+// Chave, e não a frase: este módulo é avaliado antes de o idioma ser decidido.
 const ABAS = [
-  { para: '/', rotulo: 'visão geral', fim: true },
-  { para: '/contas', rotulo: 'contas', fim: false },
-  { para: '/faixas', rotulo: 'faixas', fim: false },
-  { para: '/ingestoes', rotulo: 'ingestões', fim: false },
-  { para: '/cadastro', rotulo: 'cadastro', fim: false },
-  { para: '/planos', rotulo: 'planos', fim: false },
-  { para: '/historico', rotulo: 'histórico', fim: false },
+  { para: '/', chave: 'aba.visaoGeral', fim: true },
+  { para: '/contas', chave: 'aba.contas', fim: false },
+  { para: '/faixas', chave: 'aba.faixas', fim: false },
+  { para: '/ingestoes', chave: 'aba.ingestoes', fim: false },
+  { para: '/cadastro', chave: 'aba.cadastro', fim: false },
+  { para: '/planos', chave: 'aba.planos', fim: false },
+  { para: '/historico', chave: 'aba.historico', fim: false },
 ] as const;
 
 export function App() {
@@ -38,13 +41,9 @@ export function App() {
       });
   }, []);
 
-  if (sessao === 'verificando') return <p className="centro mudo">⠋ ondas admin…</p>;
+  if (sessao === 'verificando') return <p className="centro mudo">{t('app.carregando')}</p>;
   if (sessao === 'desligado') {
-    return (
-      <p className="centro erro">
-        a administração está desligada no servidor (sem `ADMIN_TOKEN_SHA256`).
-      </p>
-    );
+    return <p className="centro erro">{t('app.desligado')}</p>;
   }
   if (sessao === 'fora') return <Entrada aoEntrar={() => setSessao('dentro')} />;
 
@@ -54,7 +53,7 @@ export function App() {
         <span className="marca-app">
           <span className="destaque">ondas</span> admin
         </span>
-        <nav className="abas" aria-label="Seções">
+        <nav className="abas" aria-label={t('app.secoes')}>
           {ABAS.map((a) => (
             <NavLink
               key={a.para}
@@ -62,10 +61,11 @@ export function App() {
               end={a.fim}
               className={({ isActive }) => (isActive ? 'aba ativa' : 'aba')}
             >
-              {a.rotulo}
+              {t(a.chave)}
             </NavLink>
           ))}
         </nav>
+        <Preferencias />
         <button
           type="button"
           className="link sair"
@@ -76,7 +76,7 @@ export function App() {
             void api.sair().catch(() => {});
           }}
         >
-          [sair]
+          {t('app.sair')}
         </button>
       </header>
       <main className="conteudo">

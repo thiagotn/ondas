@@ -11,6 +11,10 @@ export {
   idioma,
   LOCALES,
   NOMES_DE_IDIOMA,
+  // `resolver` e `Frase` saem para o painel de admin, que tem catálogo próprio
+  // (as frases dele não entram no bundle da PWA) mas o mesmo motor.
+  resolver,
+  type Frase,
   type Locale,
   type Params,
 } from './motor.js';

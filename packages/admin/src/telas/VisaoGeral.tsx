@@ -1,7 +1,20 @@
 import { Link } from 'react-router-dom';
-import { api } from '../api';
+import { api, type Conta } from '../api';
 import { fmtBytes } from '../formato';
+import { t } from '../i18n';
+import { ThOrd, useLista, type Config } from '../lista';
 import { Estado, Uso, useDados } from '../ui';
+
+const LISTA: Config<Conta> = {
+  colunas: {
+    conta: (c) => c.email,
+    faixas: (c) => c.faixas,
+    usado: (c) => c.usadoBytes,
+    plano: (c) => c.planoNome,
+  },
+  texto: (c) => c.email,
+  descPrimeiro: ['faixas', 'usado'],
+};
 
 /** A primeira tela: o tamanho de tudo, e o que está esperando por você. */
 export function VisaoGeral() {
@@ -10,80 +23,98 @@ export function VisaoGeral() {
   const r = resumo.dados;
 
   // Quem mais ocupa. A lista de contas já traz o uso de cada uma, então a
-  // ordenação é daqui — não vale uma rota só para isso.
+  // ordenação é daqui — não vale uma rota só para isso. As colunas reordenam
+  // estas oito, não escolhem outras: o recorte é sempre o dos maiores.
   const maiores = [...(contas.dados ?? [])]
     .filter((c) => c.usadoBytes > 0)
     .sort((a, b) => b.usadoBytes - a.usadoBytes)
     .slice(0, 8);
+  const lista = useLista(maiores, LISTA);
 
   return (
     <section>
-      <h1>visão geral</h1>
+      <h1>{t('aba.visaoGeral')}</h1>
       <Estado carregando={resumo.carregando} erro={resumo.erro} tem={!!r}>
         {r && (
           <div className="cartoes">
             <Link className="cartao" to="/contas?status=pendente">
-              <span className="rotulo">pedidos em análise</span>
+              <span className="rotulo">{t('geral.pedidos')}</span>
               <span className={r.contas['pendente'] ? 'numero aviso' : 'numero'}>
                 {r.contas['pendente'] ?? 0}
               </span>
               <span className="mudo">
-                {r.contas['aprovada'] ?? 0} aprovadas · {r.contas['negada'] ?? 0} negadas
+                {t('geral.pedidosResumo', {
+                  aprovadas: r.contas['aprovada'] ?? 0,
+                  negadas: r.contas['negada'] ?? 0,
+                })}
               </span>
             </Link>
             <Link className="cartao" to="/faixas">
-              <span className="rotulo">armazenamento</span>
+              <span className="rotulo">{t('geral.armazenamento')}</span>
               <span className="numero">{fmtBytes(r.audioBytes + r.capaBytes)}</span>
               <span className="mudo">
-                {r.faixas} faixas · {fmtBytes(r.audioBytes)} de áudio · {fmtBytes(r.capaBytes)} de
-                capas
+                {t('geral.armazenamentoResumo', {
+                  faixas: r.faixas,
+                  audio: fmtBytes(r.audioBytes),
+                  capas: fmtBytes(r.capaBytes),
+                })}
               </span>
             </Link>
             <Link className="cartao" to="/ingestoes?status=error">
-              <span className="rotulo">ingestões</span>
+              <span className="rotulo">{t('geral.ingestoes')}</span>
               <span className={r.ingestoes['error'] ? 'numero erro' : 'numero'}>
-                {r.ingestoes['error'] ?? 0} com erro
+                {t('geral.comErro', { n: r.ingestoes['error'] ?? 0 })}
               </span>
               <span className="mudo">
-                {(r.ingestoes['pending'] ?? 0) + (r.ingestoes['processing'] ?? 0)} na fila ·{' '}
-                {r.ingestoes['ready'] ?? 0} prontas
+                {t('geral.ingestoesResumo', {
+                  fila: (r.ingestoes['pending'] ?? 0) + (r.ingestoes['processing'] ?? 0),
+                  prontas: r.ingestoes['ready'] ?? 0,
+                })}
               </span>
             </Link>
             <Link className="cartao" to="/cadastro">
-              <span className="rotulo">cadastro</span>
+              <span className="rotulo">{t('geral.cadastro')}</span>
               <span className={r.cadastroAberto ? 'numero ok' : 'numero'}>
-                {r.cadastroAberto ? 'aberto' : 'fechado'}
+                {r.cadastroAberto ? t('geral.aberto') : t('geral.fechado')}
               </span>
-              <span className="mudo">{r.convites} convite(s) esperando</span>
+              <span className="mudo">{t('geral.convites', { n: r.convites })}</span>
             </Link>
-            <Link className="cartao" to="/contas">
-              <span className="rotulo">acima da cota</span>
+            <Link className="cartao" to="/contas?ord=-usado">
+              <span className="rotulo">{t('geral.acimaDaCota')}</span>
               <span className={r.acimaDaCota ? 'numero aviso' : 'numero'}>{r.acimaDaCota}</span>
-              <span className="mudo">o bloqueio liga e desliga em planos</span>
+              <span className="mudo">{t('geral.bloqueioEmPlanos')}</span>
             </Link>
           </div>
         )}
       </Estado>
 
-      <h2>quem mais ocupa</h2>
+      <h2>{t('geral.quemMaisOcupa')}</h2>
       <Estado
         carregando={contas.carregando}
         erro={contas.erro}
         tem={!!contas.dados}
-        vazio={maiores.length === 0 && 'nenhuma conta tem faixa no acervo ainda.'}
+        vazio={maiores.length === 0 && t('geral.ninguemOcupa')}
       >
         <div className="rolagem">
           <table>
             <thead>
               <tr>
-                <th>conta</th>
-                <th className="num">faixas</th>
-                <th>ocupação</th>
-                <th>plano</th>
+                <ThOrd lista={lista} chave="conta">
+                  {t('col.conta')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="faixas" className="num">
+                  {t('col.faixas')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="usado">
+                  {t('col.ocupacao')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="plano">
+                  {t('col.plano')}
+                </ThOrd>
               </tr>
             </thead>
             <tbody>
-              {maiores.map((c) => (
+              {lista.visiveis.map((c) => (
                 <tr key={c.id}>
                   <td>
                     <Link to={`/contas/${c.id}`}>{c.email}</Link>

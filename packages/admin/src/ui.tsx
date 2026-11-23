@@ -1,6 +1,17 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  BANDEIRAS,
+  idioma,
+  LOCALES,
+  NOMES_DE_IDIOMA,
+  THEMES,
+  type Locale,
+  type ThemeId,
+} from '@ondas/core';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ErroDaApi } from './api';
 import { fmtBytes } from './formato';
+import { t } from './i18n';
+import { temaAtual, trocarIdioma, trocarTema } from './prefs';
 
 /**
  * Carrega um dado da API e sabe recarregar. Sem biblioteca de cache de
@@ -28,7 +39,7 @@ export function useDados<T>(buscar: () => Promise<T>, deps: readonly unknown[]) 
       setErro(null);
     } catch (e) {
       if (meu !== pedido.current) return;
-      setErro(e instanceof Error ? e.message : 'falha ao carregar');
+      setErro(e instanceof Error ? e.message : t('comum.falhaCarregar'));
     } finally {
       if (meu === pedido.current) setCarregando(false);
     }
@@ -55,7 +66,7 @@ export function useAcao() {
     } catch (e) {
       // 401 já mandou a tela para a entrada; não há o que mostrar aqui.
       if (!(e instanceof ErroDaApi && e.status === 401)) {
-        setFalha(e instanceof Error ? e.message : 'falhou');
+        setFalha(e instanceof Error ? e.message : t('comum.falhou'));
       }
       return false;
     } finally {
@@ -83,8 +94,8 @@ export function Estado({
   vazio?: string | false;
   children: ReactNode;
 }) {
-  if (erro) return <p className="erro">erro: {erro}</p>;
-  if (!tem) return <p className="mudo">{carregando ? '⠋ carregando…' : 'nada aqui.'}</p>;
+  if (erro) return <p className="erro">{t('comum.erro', { msg: erro })}</p>;
+  if (!tem) return <p className="mudo">{carregando ? t('comum.carregando') : t('comum.nadaAqui')}</p>;
   if (vazio) return <p className="mudo">{vazio}</p>;
   return <>{children}</>;
 }
@@ -163,10 +174,10 @@ export function Confirmar({
           aoConfirmar();
         }}
       >
-        [sim]
+        {t('comum.sim')}
       </button>
       <button type="button" className="link" onClick={() => setAberto(false)}>
-        [não]
+        {t('comum.nao')}
       </button>
     </span>
   );
@@ -179,7 +190,7 @@ export function Uso({ usado, cota }: { usado: number; cota: number }) {
   const cheios = Math.min(LARGURA, Math.round(fracao * LARGURA));
   const acima = usado > cota;
   return (
-    <span className="uso" title={`${Math.round(fracao * 100)}% da cota`}>
+    <span className="uso" title={t('uso.porcento', { p: Math.round(fracao * 100) })}>
       <span className={acima ? 'erro' : 'destaque'} aria-hidden="true">
         {'█'.repeat(cheios)}
       </span>
@@ -187,7 +198,7 @@ export function Uso({ usado, cota }: { usado: number; cota: number }) {
         {'░'.repeat(LARGURA - cheios)}
       </span>{' '}
       <span className={acima ? 'erro' : undefined}>
-        {fmtBytes(usado)} de {fmtBytes(cota)}
+        {t('uso.de', { usado: fmtBytes(usado), cota: fmtBytes(cota) })}
       </span>
     </span>
   );
@@ -217,6 +228,165 @@ export function Segmentos<T extends string>({
           {o.rotulo}
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Um botão que abre uma lista de escolha única — o seletor de tema e o de
+ * idioma. Sem `<select>` nativo: a lista dele é desenhada pelo sistema, fora
+ * do tema, e era a única coisa do painel que não pareceria o produto.
+ *
+ * `curto` é o que o botão mostra em tela estreita, onde a barra do topo já
+ * disputa espaço com as abas; o nome completo continua no `aria-label`.
+ */
+export function Menu<T extends string>({
+  rotulo,
+  curto,
+  texto,
+  opcoes,
+  valor,
+  aoEscolher,
+}: {
+  rotulo: string;
+  curto: ReactNode;
+  texto: string;
+  opcoes: readonly { valor: T; rotulo: ReactNode; lang?: string }[];
+  valor: T;
+  aoEscolher: (v: T) => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const caixa = useRef<HTMLDivElement>(null);
+  const botao = useRef<HTMLButtonElement>(null);
+  const id = useId();
+
+  useEffect(() => {
+    if (!aberto) return;
+    // Abre com o foco na opção marcada: seta para cima e para baixo já andam
+    // a partir de onde a pessoa está.
+    caixa.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+    const fora = (e: PointerEvent) => {
+      if (!caixa.current?.contains(e.target as Node)) setAberto(false);
+    };
+    document.addEventListener('pointerdown', fora);
+    return () => document.removeEventListener('pointerdown', fora);
+  }, [aberto]);
+
+  const fechar = () => {
+    setAberto(false);
+    botao.current?.focus();
+  };
+
+  return (
+    <div
+      className="menu"
+      ref={caixa}
+      onKeyDown={(e) => {
+        if (!aberto) return;
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          fechar();
+          return;
+        }
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        e.preventDefault();
+        const itens = [...(caixa.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? [])];
+        const atual = itens.indexOf(document.activeElement as HTMLElement);
+        const passo = e.key === 'ArrowDown' ? 1 : -1;
+        itens[(atual + passo + itens.length) % itens.length]?.focus();
+      }}
+    >
+      <button
+        type="button"
+        ref={botao}
+        className="link menu-botao"
+        aria-haspopup="menu"
+        aria-expanded={aberto}
+        aria-controls={aberto ? id : undefined}
+        aria-label={`${rotulo}: ${texto}`}
+        title={rotulo}
+        onClick={() => setAberto((a) => !a)}
+      >
+        <span aria-hidden="true">{curto}</span>
+        <span className="menu-texto" aria-hidden="true">
+          {texto}
+        </span>
+      </button>
+      {aberto && (
+        <div className="menu-lista" role="menu" id={id} aria-label={rotulo}>
+          {opcoes.map((o) => (
+            <button
+              key={o.valor}
+              type="button"
+              role="menuitemradio"
+              aria-checked={o.valor === valor}
+              lang={o.lang}
+              className={o.valor === valor ? 'menu-item ativo' : 'menu-item'}
+              onClick={() => {
+                fechar();
+                if (o.valor !== valor) aoEscolher(o.valor);
+              }}
+            >
+              {o.rotulo}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Tema e idioma, lado a lado — na barra do topo e na tela de entrada.
+ *
+ * O tema vive em estado aqui só para o botão mostrar o nome certo: quem
+ * pinta a tela é `trocarTema`, que escreve os tokens em `:root`. O idioma não
+ * precisa de estado, porque trocá-lo recarrega a página.
+ */
+export function Preferencias() {
+  const [tema, setTema] = useState<ThemeId>(temaAtual);
+  const atual = THEMES.find((x) => x.id === tema) ?? THEMES[0]!;
+  return (
+    <div className="prefs">
+      <Menu<ThemeId>
+        rotulo={t('prefs.tema')}
+        curto="◐"
+        texto={atual.name.toLowerCase()}
+        valor={tema}
+        aoEscolher={(v) => {
+          trocarTema(v);
+          setTema(v);
+        }}
+        opcoes={THEMES.map((x) => ({
+          valor: x.id,
+          rotulo: (
+            <>
+              {/* As cores DO tema da linha, e não as do tema atual: é a
+                  amostra do que a pessoa vai receber. */}
+              <span className="amostra" aria-hidden="true" style={{ background: x.bg }}>
+                <span style={{ color: x.accent }}>●</span>
+                <span style={{ color: x.ansi[2] }}>●</span>
+                <span style={{ color: x.ansi[1] }}>●</span>
+              </span>
+              {x.name.toLowerCase()}
+            </>
+          ),
+        }))}
+      />
+      <Menu<Locale>
+        rotulo={t('prefs.idioma')}
+        curto={BANDEIRAS[idioma()]}
+        texto={idioma()}
+        valor={idioma()}
+        aoEscolher={trocarIdioma}
+        // Cada idioma no próprio idioma, com o `lang` dele: é o que o leitor
+        // de tela usa para pronunciar certo.
+        opcoes={LOCALES.map((l) => ({
+          valor: l,
+          lang: l,
+          rotulo: `${BANDEIRAS[l]} ${NOMES_DE_IDIOMA[l]}`,
+        }))}
+      />
     </div>
   );
 }

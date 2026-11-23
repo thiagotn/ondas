@@ -7,6 +7,11 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.13.0 — 2026-11-23
+
+- no painel de administração, toda lista ganhou um campo de filtro e colunas que ordenam ao clique — contas, faixas, ingestões, convites, planos e histórico. O filtro ignora acento e maiúsculas, e o recorte fica no endereço: recarregar a página não o desfaz
+- o painel de administração passa a ter os nove temas do app e os três idiomas (português, inglês e espanhol), trocados na barra do topo e guardados no navegador
+
 ## 1.12.0 — 2026-11-23
 
 - quem tem envio liberado traz faixa por link: copie o endereço de um vídeo do YouTube, de uma faixa do SoundCloud ou de um arquivo de áudio, e o app oferece pôr no seu acervo. Na biblioteca há um `[+ link]` ao lado do `[+ arquivo]`; no Android instalado, o Ondas aparece no menu Compartilhar. O app só lê a área de transferência quando você já deu permissão ou num toque seu, e nada é enviado antes de você tocar em `[adicionar ao acervo]`. Uma faixa por link — playlist, canal e perfil ficam de fora

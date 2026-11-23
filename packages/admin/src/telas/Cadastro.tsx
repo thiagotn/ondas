@@ -1,7 +1,23 @@
 import { useState, type FormEvent } from 'react';
-import { api } from '../api';
+import { api, type Convite } from '../api';
 import { fmtDia } from '../formato';
+import { t } from '../i18n';
+import { Busca, NadaCasa, ThOrd, useLista, type Config } from '../lista';
 import { Confirmar, Estado, Marca, useAcao, useDados } from '../ui';
+
+const LISTA: Config<Convite> = {
+  colunas: {
+    email: (c) => c.email,
+    envia: (c) => c.podeEnviar,
+    bot: (c) => c.recebeDoBot,
+    nota: (c) => c.nota,
+    desde: (c) => c.criadoEm,
+  },
+  texto: (c) => `${c.email} ${c.nota ?? ''}`,
+  descPrimeiro: ['envia', 'bot', 'desde'],
+  // A tela tem outras coisas além da lista: as chaves dizem de quem são.
+  prefixo: 'c',
+};
 
 /**
  * Quem pode pedir conta, e quem já entra aprovado.
@@ -12,6 +28,7 @@ import { Confirmar, Estado, Marca, useAcao, useDados } from '../ui';
 export function Cadastro() {
   const config = useDados(() => api.config(), []);
   const convites = useDados(() => api.convites(), []);
+  const lista = useLista(convites.dados, LISTA);
   const acao = useAcao();
 
   const [email, setEmail] = useState('');
@@ -34,7 +51,7 @@ export function Cadastro() {
 
   return (
     <section>
-      <h1>cadastro</h1>
+      <h1>{t('aba.cadastro')}</h1>
       {acao.falha && (
         <p className="erro" role="alert">
           {acao.falha}
@@ -44,62 +61,57 @@ export function Cadastro() {
       <Estado carregando={config.carregando} erro={config.erro} tem={!!config.dados}>
         <div className="painel">
           <div className="linha">
-            <span className="rotulo">pedidos</span>
+            <span className="rotulo">{t('cadastro.pedidos')}</span>
             <Marca
               ligado={aberto}
-              rotulo="cadastro aberto"
+              rotulo={t('cadastro.abertoRotulo')}
               desabilitado={acao.ocupado}
               aoMudar={(v) =>
                 void acao.rodar(() => api.definirCadastro(v)).then(() => config.recarregar())
               }
             />
             <span className={aberto ? 'ok' : 'mudo'}>
-              {aberto
-                ? 'aberto: qualquer pessoa pode pedir conta, e o pedido espera a sua análise'
-                : 'fechado: só entra quem tem convite'}
+              {aberto ? t('cadastro.abertoExplica') : t('cadastro.fechadoExplica')}
             </span>
           </div>
         </div>
       </Estado>
 
-      <h2>convites</h2>
-      <p className="mudo">
-        o e-mail convidado nasce aprovado ao se cadastrar, com o que você marcar aqui — e o convite
-        some da lista quando é usado.
-      </p>
+      <h2>{t('cadastro.convites')}</h2>
+      <p className="mudo">{t('cadastro.convitesExplica')}</p>
       <form className="painel" onSubmit={(e) => void convidar(e)}>
         <div className="linha">
-          <span className="rotulo">e-mail</span>
+          <span className="rotulo">{t('cadastro.email')}</span>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            aria-label="E-mail a convidar"
-            placeholder="pessoa@exemplo.com"
+            aria-label={t('cadastro.emailRotulo')}
+            placeholder={t('cadastro.emailExemplo')}
             autoComplete="off"
             required
             size={28}
           />
         </div>
         <div className="linha">
-          <span className="rotulo">nasce com</span>
-          <Marca ligado={podeEnviar} rotulo="convite: pode enviar" aoMudar={setPodeEnviar} />
-          <span className="mudo">pode enviar</span>
-          <Marca ligado={recebeDoBot} rotulo="convite: recebe do bot" aoMudar={setRecebeDoBot} />
-          <span className="mudo">recebe do bot</span>
+          <span className="rotulo">{t('cadastro.nasceCom')}</span>
+          <Marca ligado={podeEnviar} rotulo={t('cadastro.convitePodeEnviar')} aoMudar={setPodeEnviar} />
+          <span className="mudo">{t('cadastro.podeEnviar')}</span>
+          <Marca ligado={recebeDoBot} rotulo={t('cadastro.conviteRecebeDoBot')} aoMudar={setRecebeDoBot} />
+          <span className="mudo">{t('cadastro.recebeDoBot')}</span>
         </div>
         <div className="linha">
-          <span className="rotulo">nota</span>
+          <span className="rotulo">{t('cadastro.nota')}</span>
           <input
             value={nota}
             onChange={(e) => setNota(e.target.value)}
-            aria-label="Nota do convite"
-            placeholder="opcional — de onde vem a pessoa"
+            aria-label={t('cadastro.notaRotulo')}
+            placeholder={t('cadastro.notaExemplo')}
             maxLength={200}
             size={36}
           />
           <button type="submit" className="primario" disabled={acao.ocupado || !email.trim()}>
-            [convidar]
+            {t('cadastro.convidar')}
           </button>
         </div>
       </form>
@@ -108,22 +120,35 @@ export function Cadastro() {
         carregando={convites.carregando}
         erro={convites.erro}
         tem={!!convites.dados}
-        vazio={convites.dados?.length === 0 && 'nenhum convite esperando.'}
+        vazio={convites.dados?.length === 0 && t('cadastro.semConvites')}
       >
+        <div className="filtros">
+          <Busca lista={lista} rotulo={t('cadastro.busca')} />
+        </div>
         <div className="rolagem">
           <table>
             <thead>
               <tr>
-                <th>e-mail</th>
-                <th>envia</th>
-                <th>bot</th>
-                <th>nota</th>
-                <th>desde</th>
+                <ThOrd lista={lista} chave="email">
+                  {t('col.email')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="envia">
+                  {t('col.envia')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="bot">
+                  {t('col.bot')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="nota">
+                  {t('col.nota')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="desde">
+                  {t('col.desde')}
+                </ThOrd>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {convites.dados?.map((c) => (
+              {lista.visiveis.map((c) => (
                 <tr key={c.email}>
                   <td>{c.email}</td>
                   <td className={c.podeEnviar ? 'ok' : 'mudo'}>{c.podeEnviar ? '[x]' : '[ ]'}</td>
@@ -132,8 +157,8 @@ export function Cadastro() {
                   <td className="mudo">{fmtDia(c.criadoEm)}</td>
                   <td className="acoes">
                     <Confirmar
-                      rotulo="[remover]"
-                      pergunta="remover o convite?"
+                      rotulo={t('cadastro.remover')}
+                      pergunta={t('cadastro.removerPergunta')}
                       desabilitado={acao.ocupado}
                       aoConfirmar={() =>
                         void acao
@@ -147,6 +172,7 @@ export function Cadastro() {
             </tbody>
           </table>
         </div>
+        <NadaCasa lista={lista} />
       </Estado>
     </section>
   );

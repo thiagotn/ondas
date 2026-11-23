@@ -1,7 +1,22 @@
 import { useState, type FormEvent } from 'react';
 import { api, type Plano } from '../api';
 import { escreverTamanho, fmtBytes, lerTamanho } from '../formato';
+import { t } from '../i18n';
+import { ThOrd, useLista, type Config } from '../lista';
 import { Estado, Marca, useAcao, useDados } from '../ui';
+
+// Sem busca: plano se conta nos dedos. A ordem por coluna responde a única
+// pergunta que a lista tem — qual é o maior, e qual tem mais gente.
+const LISTA: Config<Plano> = {
+  colunas: {
+    id: (p) => p.id,
+    nome: (p) => p.nome,
+    cota: (p) => p.cotaBytes,
+    contas: (p) => p.contas,
+  },
+  texto: (p) => `${p.id} ${p.nome}`,
+  descPrimeiro: ['cota', 'contas'],
+};
 
 /**
  * Planos: quanto de armazenamento uma conta tem.
@@ -13,6 +28,7 @@ import { Estado, Marca, useAcao, useDados } from '../ui';
 export function Planos() {
   const { dados, erro, carregando, recarregar } = useDados(() => api.planos(), []);
   const config = useDados(() => api.config(), []);
+  const lista = useLista(dados, LISTA);
   const acao = useAcao();
   const bloqueia = config.dados?.cotaBloqueia ?? false;
   const [id, setId] = useState('');
@@ -33,8 +49,8 @@ export function Planos() {
 
   return (
     <section>
-      <h1>planos</h1>
-      <p className="mudo">cota da conta = cota do plano + extra avulso da conta.</p>
+      <h1>{t('aba.planos')}</h1>
+      <p className="mudo">{t('planos.formula')}</p>
       {acao.falha && (
         <p className="erro" role="alert">
           {acao.falha}
@@ -43,19 +59,17 @@ export function Planos() {
       <Estado carregando={config.carregando} erro={config.erro} tem={!!config.dados}>
         <div className="painel">
           <div className="linha">
-            <span className="rotulo">limite</span>
+            <span className="rotulo">{t('planos.limite')}</span>
             <Marca
               ligado={bloqueia}
-              rotulo="a cota bloqueia envio"
+              rotulo={t('planos.bloqueiaRotulo')}
               desabilitado={acao.ocupado}
               aoMudar={(v) =>
                 void acao.rodar(() => api.definirCotaBloqueia(v)).then(() => config.recarregar())
               }
             />
             <span className={bloqueia ? 'aviso' : 'mudo'}>
-              {bloqueia
-                ? 'bloqueia: conta acima da cota não recebe faixa nova (arquivo, link ou bot). nada é apagado'
-                : 'só mede: a cota aparece nas telas, e nada é recusado'}
+              {bloqueia ? t('planos.bloqueiaExplica') : t('planos.soMedeExplica')}
             </span>
           </div>
         </div>
@@ -65,14 +79,22 @@ export function Planos() {
           <table>
             <thead>
               <tr>
-                <th>id</th>
-                <th>nome</th>
-                <th>cota</th>
-                <th className="num">contas</th>
+                <ThOrd lista={lista} chave="id">
+                  {t('col.id')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="nome">
+                  {t('col.nome')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="cota">
+                  {t('col.cota')}
+                </ThOrd>
+                <ThOrd lista={lista} chave="contas" className="num">
+                  {t('col.contas')}
+                </ThOrd>
               </tr>
             </thead>
             <tbody>
-              {dados?.map((p) => (
+              {lista.visiveis.map((p) => (
                 <LinhaDoPlano
                   key={p.id}
                   plano={p}
@@ -87,40 +109,40 @@ export function Planos() {
         </div>
       </Estado>
 
-      <h2>novo plano</h2>
+      <h2>{t('planos.novo')}</h2>
       <form className="painel" onSubmit={(e) => void criar(e)}>
         <div className="linha">
-          <span className="rotulo">id</span>
+          <span className="rotulo">{t('col.id')}</span>
           <input
             value={id}
             onChange={(e) => setId(e.target.value.toLowerCase())}
-            aria-label="Id do plano"
-            placeholder="ex.: plus"
+            aria-label={t('planos.idRotulo')}
+            placeholder={t('planos.idExemplo')}
             pattern="[a-z0-9-]{1,32}"
             required
             size={14}
           />
-          <span className="mudo">minúsculas, números e hífen — não muda depois</span>
+          <span className="mudo">{t('planos.idExplica')}</span>
         </div>
         <div className="linha">
-          <span className="rotulo">nome</span>
+          <span className="rotulo">{t('col.nome')}</span>
           <input
             value={nome}
             onChange={(e) => setNome(e.target.value)}
-            aria-label="Nome do plano"
-            placeholder="ex.: Plus"
+            aria-label={t('planos.nomeRotulo')}
+            placeholder={t('planos.nomeExemplo')}
             maxLength={40}
             required
             size={20}
           />
         </div>
         <div className="linha">
-          <span className="rotulo">cota</span>
+          <span className="rotulo">{t('col.cota')}</span>
           <input
             value={cota}
             onChange={(e) => setCota(e.target.value)}
-            aria-label="Cota do plano"
-            placeholder="ex.: 5 GB"
+            aria-label={t('planos.cotaRotulo')}
+            placeholder={t('planos.cotaExemplo')}
             required
             size={12}
           />
@@ -129,9 +151,9 @@ export function Planos() {
             className="primario"
             disabled={acao.ocupado || !id || !nome.trim() || cotaLida === null}
           >
-            [criar]
+            {t('planos.criar')}
           </button>
-          {cota && cotaLida === null && <span className="erro">não entendi o tamanho</span>}
+          {cota && cotaLida === null && <span className="erro">{t('comum.naoEntendiTamanho')}</span>}
         </div>
       </form>
     </section>
@@ -159,7 +181,7 @@ function LinhaDoPlano({
         <input
           value={nome}
           onChange={(e) => setNome(e.target.value)}
-          aria-label={`Nome do plano ${plano.id}`}
+          aria-label={t('planos.nomeDoPlano', { id: plano.id })}
           maxLength={40}
           size={16}
         />
@@ -168,7 +190,7 @@ function LinhaDoPlano({
         <input
           value={cota}
           onChange={(e) => setCota(e.target.value)}
-          aria-label={`Cota do plano ${plano.id}`}
+          aria-label={t('planos.cotaDoPlano', { id: plano.id })}
           size={10}
         />{' '}
         <button
@@ -182,10 +204,10 @@ function LinhaDoPlano({
             })
           }
         >
-          [salvar]
+          {t('comum.salvar')}
         </button>{' '}
         <span className={cotaLida === null ? 'erro' : 'mudo'}>
-          {cotaLida === null ? 'não entendi' : fmtBytes(cotaLida)}
+          {cotaLida === null ? t('comum.naoEntendi') : fmtBytes(cotaLida)}
         </span>
       </td>
       <td className="num">{plano.contas}</td>

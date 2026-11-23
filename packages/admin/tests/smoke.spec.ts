@@ -245,3 +245,99 @@ test('no celular a página não rola de lado: quem rola é a tabela', async ({ p
   );
   expect(sobra).toBeLessThanOrEqual(0);
 });
+
+test('a lista de contas filtra pelo texto e ordena pela coluna, e o recorte fica no endereço', async ({
+  page,
+}) => {
+  await apiFalsa(page);
+  await entrar(page);
+  await page.getByRole('link', { name: 'contas', exact: true }).click();
+  const linhas = page.locator('tbody tr');
+  await expect(linhas).toHaveCount(2);
+  // A ordem do servidor: a dona primeiro.
+  await expect(linhas.first()).toContainText('dona@exemplo.test');
+
+  // Dois cliques na coluna: A→Z e depois Z→A.
+  const coluna = page.getByRole('columnheader', { name: 'conta' });
+  await coluna.getByRole('button').click();
+  await expect(coluna).toHaveAttribute('aria-sort', 'ascending');
+  await coluna.getByRole('button').click();
+  await expect(coluna).toHaveAttribute('aria-sort', 'descending');
+  await expect(linhas.first()).toContainText('nova@exemplo.test');
+  await expect(page).toHaveURL(/ord=-conta/);
+
+  // Coluna de número começa pelo maior: é a pergunta que se faz a ela.
+  await page.getByRole('columnheader', { name: 'ocupação' }).getByRole('button').click();
+  await expect(linhas.first()).toContainText('dona@exemplo.test');
+  await expect(page).toHaveURL(/ord=-usado/);
+
+  // O filtro ignora acento e caixa, e procura também no status.
+  await page.getByLabel('Filtrar contas').fill('ANALISE');
+  await expect(linhas).toHaveCount(1);
+  await expect(linhas.first()).toContainText('nova@exemplo.test');
+  await expect(page.getByText('1 de 2')).toBeVisible();
+
+  await page.getByLabel('Filtrar contas').fill('ninguém com esse nome');
+  await expect(linhas).toHaveCount(0);
+  await expect(page.getByText('nada casa com o filtro.')).toBeVisible();
+
+  // O recorte sobrevive a recarregar a página.
+  await page.getByLabel('Filtrar contas').fill('dona');
+  await page.reload();
+  await expect(page.getByLabel('Filtrar contas')).toHaveValue('dona');
+  await expect(linhas).toHaveCount(1);
+  await expect(page.getByRole('columnheader', { name: 'ocupação' })).toHaveAttribute(
+    'aria-sort',
+    'descending',
+  );
+});
+
+test('o tema troca na hora e continua depois de recarregar', async ({ page }) => {
+  await apiFalsa(page);
+  await entrar(page);
+  const fundo = () =>
+    page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-bg').trim());
+  expect(await fundo()).toBe('#1e1e2e');
+
+  await page.getByRole('button', { name: /^Tema:/ }).click();
+  await page.getByRole('menuitemradio', { name: /github light/ }).click();
+  expect(await fundo()).toBe('#ffffff');
+  expect(await page.evaluate(() => document.documentElement.style.colorScheme)).toBe('light');
+
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'visão geral' })).toBeVisible();
+  expect(await fundo()).toBe('#ffffff');
+  await expect(page.getByRole('button', { name: 'Tema: github light' })).toBeVisible();
+});
+
+test('o idioma troca o painel inteiro e continua depois de recarregar', async ({ page }) => {
+  await apiFalsa(page);
+  await entrar(page);
+
+  await page.getByRole('button', { name: /^Idioma:/ }).click();
+  await page.getByRole('menuitemradio', { name: /english/ }).click();
+  // Trocar de idioma recarrega; a sessão (cookie) continua valendo.
+  await expect(page.getByRole('heading', { name: 'overview' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.getByRole('link', { name: 'accounts', exact: true })).toBeVisible();
+  // Número e data acompanham: ponto decimal, e não vírgula.
+  await expect(page.getByText('300.0 MB', { exact: false }).first()).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'overview' })).toBeVisible();
+
+  // E volta: o seletor mostra cada idioma na língua dele.
+  await page.getByRole('button', { name: /^Language:/ }).click();
+  await page.getByRole('menuitemradio', { name: /português/ }).click();
+  await expect(page.getByRole('heading', { name: 'visão geral' })).toBeVisible();
+});
+
+test('na tela de entrada já dá para trocar o idioma', async ({ page }) => {
+  await apiFalsa(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: /^Idioma:/ }).click();
+  await page.getByRole('menuitemradio', { name: /español/ }).click();
+  await expect(page.getByLabel('Token de admin')).toBeVisible();
+  await expect(page.getByRole('button', { name: '[entrar]' })).toBeVisible();
+  await expect(page.getByText('pega el token de admin', { exact: false })).toBeVisible();
+});
