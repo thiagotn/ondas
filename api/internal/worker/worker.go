@@ -195,11 +195,16 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 	// mentir.
 	audioKey := fmt.Sprintf("u/%s/a/%s.%s", dono, trackID, midia.Ext)
 
+	// COTA: é AQUI que entraria a recusa por falta de espaço numa ingestão por
+	// URL — o tamanho só é conhecido agora, depois de baixar, e a conta que
+	// conta é `dono`, não quem pediu. Hoje a cota só é medida e mostrada
+	// (`admin.UsoDaConta`); os outros dois pontos estão em `httpapi/upload.go`.
+
 	if err := w.enviarArquivo(ctx, bruto, audioKey, midia.ContentType, tamanho); err != nil {
 		return nil, err
 	}
 
-	artKey, thumbKey := w.capas(ctx, dir, bruto, dono, trackID, midia, log)
+	artKey, thumbKey, capaBytes := w.capas(ctx, dir, bruto, dono, trackID, midia, log)
 
 	// Best-effort, como as capas: faixa sem forma de onda desenha barra lisa,
 	// e isso não é motivo para reprovar uma ingestão que já subiu o áudio.
@@ -224,6 +229,7 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 		SizeBytes:   tamanho,
 		ArtKey:      artKey,
 		ArtThumbKey: thumbKey,
+		ArtBytes:    capaBytes,
 		Peaks:       picos,
 		// Vazia vira `privada` no SQL — faixa nunca nasce publicada por um
 		// campo esquecido no caminho.
@@ -319,9 +325,9 @@ func (w *Worker) descartarEnvio(ctx context.Context, job *acervo.Job, log *slog.
 // capas é best-effort: faixa sem arte embutida é normal e não deve reprovar a
 // ingestão — a PWA já sabe mostrar linha sem capa.
 func (w *Worker) capas(ctx context.Context, dir, origem, userID, trackID string,
-	midia *ingest.Midia, log *slog.Logger) (artKey, thumbKey string) {
+	midia *ingest.Midia, log *slog.Logger) (artKey, thumbKey string, bytes int64) {
 	if !midia.TemCapa {
-		return "", ""
+		return "", "", 0
 	}
 	for _, c := range []struct {
 		lado    int
@@ -348,8 +354,11 @@ func (w *Worker) capas(ctx context.Context, dir, origem, userID, trackID string,
 			continue
 		}
 		*c.destino = key
+		// Só conta a capa que SUBIU: é o que o bucket guarda, e é contra isso
+		// que a ocupação da conta é medida.
+		bytes += info.Size()
 	}
-	return artKey, thumbKey
+	return artKey, thumbKey, bytes
 }
 
 func (w *Worker) enviarArquivo(ctx context.Context, caminho, key, contentType string, tamanho int64) error {

@@ -593,6 +593,19 @@ export function storageLabel(uso: { bytes: number; quota?: number } | null): str
   return traduzir('espaco.livres', { livres: fmtBytes(livres), total: fmtBytes(uso.quota) });
 }
 
+/** A linha `acervo` do `ondas whoami`: quanto a conta ocupa e quanto ela tem. */
+export function acervoUsoLabel(uso: { usadoBytes: number; cotaBytes: number }): string {
+  return traduzir('conta.acervoUso', {
+    usado: fmtBytes(uso.usadoBytes),
+    total: fmtBytes(uso.cotaBytes),
+  });
+}
+
+/** A conta já ocupa mais do que a cota dela? */
+export function acimaDaCota(uso: { usadoBytes: number; cotaBytes: number }): boolean {
+  return uso.usadoBytes > uso.cotaBytes;
+}
+
 /** `buf:` da status line. */
 export function bufferShortLabel(cached: boolean, ahead: number): string {
   return cached

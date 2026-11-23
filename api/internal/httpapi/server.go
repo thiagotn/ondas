@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/thiagotn/ondas/api/internal/acervo"
+	"github.com/thiagotn/ondas/api/internal/admin"
 	"github.com/thiagotn/ondas/api/internal/audius"
 	"github.com/thiagotn/ondas/api/internal/auth"
 	"github.com/thiagotn/ondas/api/internal/config"
@@ -34,9 +35,13 @@ type Server struct {
 	cadastroLimiter *auth.Limiter
 	senhaLimiter    *auth.Limiter
 	adminLimiter    *auth.Limiter
-	tracks          *acervo.Tracks
-	jobs            *acervo.Jobs
-	likes           *likes.Likes
+	// O que o admin decide (cadastro aberto, convites, planos) e as leituras
+	// do painel. Desde a migração 0012 é daqui, e não do env, que o cadastro
+	// e o destino do bot tiram a resposta.
+	painel *admin.Painel
+	tracks *acervo.Tracks
+	jobs   *acervo.Jobs
+	likes  *likes.Likes
 	// As playlists da conta. Como as curtidas, não dependem de R2 nenhum.
 	playlists *playlists.Playlists
 	// O marcador (onde a conta parou) e o histórico do que ela ouviu.
@@ -63,6 +68,7 @@ func New(cfg *config.Config, pool *pgxpool.Pool) *Server {
 		cadastroLimiter: auth.NewLimiter(10, time.Hour),
 		senhaLimiter:    auth.NewLimiter(cfg.LoginAttempts, time.Duration(cfg.LoginWindowS)*time.Second),
 		adminLimiter:    auth.NewLimiter(cfg.LoginAttempts, time.Duration(cfg.LoginWindowS)*time.Second),
+		painel:          admin.New(pool),
 		tracks:          acervo.NewTracks(pool),
 		jobs:            acervo.NewJobs(pool),
 		likes:           likes.NewLikes(pool),
@@ -124,6 +130,11 @@ func (s *Server) Router() http.Handler {
 			r.With(s.exigirSessao).Patch("/conta", s.renomearConta)
 			r.With(s.exigirSessao).Post("/senha", s.trocarSenha)
 			r.With(s.exigirSessao).Post("/conta/apagar", s.apagarConta)
+
+			// Quanto a conta ocupa e quanto ela tem. Fora do `/me` de
+			// propósito: `/me` roda em todo boot, e isto é uma soma sobre as
+			// faixas que só interessa a quem abriu o painel da conta.
+			r.With(s.exigirSessao).Get("/uso", s.usoDaConta)
 		})
 
 		// Administração: quem entra na plataforma e quem pode enviar arquivo.
@@ -133,11 +144,40 @@ func (s *Server) Router() http.Handler {
 		// abra esta porta, e a PWA não tem tela para isto. Quem consome é a
 		// `ondasctl` (cmd/ondasctl).
 		r.Route("/admin", func(r chi.Router) {
-			r.Use(s.exigirAdmin)
-			r.Get("/contas", s.listarContas)
-			r.Post("/contas/{id}/aprovar", s.aprovarConta)
-			r.Post("/contas/{id}/negar", s.negarConta)
-			r.Patch("/contas/{id}/envio", s.definirEnvio)
+			// Entrar e sair ficam FORA de `exigirAdmin`: uma é como se ganha a
+			// credencial, e a outra tem de funcionar com a credencial vencida.
+			r.Post("/sessao", s.abrirSessaoAdmin)
+			r.Delete("/sessao", s.fecharSessaoAdmin)
+
+			r.Group(func(r chi.Router) {
+				r.Use(s.exigirAdmin)
+				r.Get("/sessao", s.sessaoAdmin)
+				r.Get("/resumo", s.resumoAdmin)
+
+				r.Get("/contas", s.listarContas)
+				r.Get("/contas/{id}", s.detalharConta)
+				r.Patch("/contas/{id}", s.ajustarConta)
+				r.Delete("/contas/{id}", s.apagarContaPeloAdmin)
+				r.Post("/contas/{id}/aprovar", s.aprovarConta)
+				r.Post("/contas/{id}/negar", s.negarConta)
+				r.Patch("/contas/{id}/envio", s.definirEnvio)
+
+				r.Get("/faixas", s.listarFaixasAdmin)
+				r.Delete("/faixas/{id}", s.apagarFaixaPeloAdmin)
+				r.Get("/ingestoes", s.listarIngestoes)
+
+				r.Get("/config", s.lerConfigAdmin)
+				r.Put("/config", s.gravarConfigAdmin)
+				r.Get("/convites", s.listarConvites)
+				r.Post("/convites", s.convidar)
+				r.Delete("/convites", s.removerConvite)
+
+				r.Get("/planos", s.listarPlanos)
+				r.Post("/planos", s.criarPlano)
+				r.Patch("/planos/{id}", s.atualizarPlano)
+
+				r.Get("/eventos", s.listarEventos)
+			})
 		})
 
 		// Curtidas: sessão, NUNCA token, pela mesma régua do PATCH /auth/prefs
@@ -288,23 +328,43 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 	if !lerJSON(w, r, &req) {
 		return
 	}
-	if !s.cfg.AllowedSignup(req.Email) {
-		escreverErro(w, http.StatusForbidden, "cadastro fechado")
-		return
-	}
 	ip := clienteIP(r)
 	if !s.cadastroLimiter.Permitido(ip) {
 		slog.Warn("cadastro bloqueado por tentativas", "ip", ip)
 		escreverErro(w, http.StatusTooManyRequests, "muitas tentativas — espere alguns minutos")
 		return
 	}
-	status := auth.StatusPendente
-	if s.cfg.SignupSemAnalise(req.Email) {
-		status = auth.StatusAprovada
+	// Quem decide é o banco (migração 0012): o cadastro aberto deixa PEDIR, e o
+	// convite do admin faz a conta nascer aprovada — com o que o convite disse
+	// que ela já pode. Uma falha de leitura aqui fecha a porta, não abre.
+	convite, err := s.painel.ConvitePara(r.Context(), req.Email)
+	if err != nil {
+		slog.Error("signup: convite", "erro", err)
+		escreverErro(w, http.StatusInternalServerError, "não foi possível criar a conta")
+		return
 	}
-	user, err := s.users.Create(r.Context(), auth.Nova{
-		Email: req.Email, Senha: req.Password, Nome: req.Name, Mensagem: req.Mensagem, Status: status,
-	})
+	nova := auth.Nova{
+		Email: req.Email, Senha: req.Password, Nome: req.Name, Mensagem: req.Mensagem,
+		Status: auth.StatusPendente,
+	}
+	if convite != nil {
+		nova.Status = auth.StatusAprovada
+		nova.PodeEnviar = convite.PodeEnviar
+		nova.RecebeDoBot = convite.RecebeDoBot
+	} else {
+		aberto, err := s.painel.CadastroAberto(r.Context())
+		if err != nil {
+			slog.Error("signup: cadastro aberto", "erro", err)
+			escreverErro(w, http.StatusInternalServerError, "não foi possível criar a conta")
+			return
+		}
+		if !aberto {
+			escreverErro(w, http.StatusForbidden, "cadastro fechado")
+			return
+		}
+	}
+	status := nova.Status
+	user, err := s.users.Create(r.Context(), nova)
 	switch {
 	case errors.Is(err, auth.ErrEmailInvalido), errors.Is(err, auth.ErrNomeInvalido):
 		escreverErro(w, http.StatusBadRequest, err.Error())
@@ -330,6 +390,12 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 		escreverJSON(w, http.StatusAccepted, map[string]string{"status": auth.StatusPendente})
 		return
 	}
+	// O convite foi usado: sai da lista. Melhor-esforço — a conta já existe, e
+	// um convite que sobrou não aprova ninguém de novo (o e-mail está em uso).
+	if _, err := s.painel.RemoverConvite(r.Context(), req.Email); err != nil {
+		slog.Error("signup: consumir convite", "erro", err)
+	}
+	slog.Info("conta criada por convite", "conta", user.ID, "ip", ip)
 	s.gravarCookie(w, user.ID)
 	escreverJSON(w, http.StatusCreated, user)
 }
@@ -374,8 +440,25 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		escreverErro(w, http.StatusForbidden, "cadastro negado")
 		return
 	}
+	// Melhor-esforço: é rastro para o admin, não parte do login.
+	if err := s.users.RegistrarLogin(r.Context(), user.ID); err != nil {
+		slog.Error("login: registrar", "erro", err)
+	}
 	s.gravarCookie(w, user.ID)
 	escreverJSON(w, http.StatusOK, user)
+}
+
+// usoDaConta diz quanto a conta ocupa e quanto ela tem (plano + extra).
+//
+// Nesta versão é só informação: nada recusa envio por causa da cota.
+func (s *Server) usoDaConta(w http.ResponseWriter, r *http.Request) {
+	uso, err := s.painel.UsoDaConta(r.Context(), usuarioDe(r.Context()).ID)
+	if err != nil {
+		slog.Error("uso da conta", "erro", err)
+		escreverErro(w, http.StatusInternalServerError, "não foi possível ler o uso da conta")
+		return
+	}
+	escreverJSON(w, http.StatusOK, uso)
 }
 
 func (s *Server) logout(w http.ResponseWriter, _ *http.Request) {

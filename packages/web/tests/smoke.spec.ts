@@ -385,6 +385,16 @@ async function stubApi(page: Page) {
     return route.fulfill({ status: 200, json: { status: 'ok' } });
   });
 
+  // A ocupação do acervo da conta, que o `ondas whoami` lê ao abrir.
+  await page.route('**/api/auth/uso', async (route) =>
+    logado
+      ? route.fulfill({
+          status: 200,
+          json: { usadoBytes: 312 * 1024 * 1024, cotaBytes: 1024 * 1024 * 1024 },
+        })
+      : route.fulfill({ status: 401, json: { error: 'sessão expirada' } }),
+  );
+
   await page.route('**/api/auth/me', async (route) =>
     logado
       ? route.fulfill({
@@ -848,6 +858,9 @@ test('login libera o catálogo, e a conta sai da biblioteca para `ondas whoami`'
   // O e-mail com que se entrou: o nome é livre, e é esta linha que diz qual
   // conta é.
   await expect(conta.getByText('thiago@ondas.app', { exact: true })).toBeVisible();
+  // E quanto do acervo a conta ocupa, contra o que o plano dá — número do
+  // servidor, diferente do `espaço` do aparelho, mais abaixo.
+  await expect(conta.getByText('312,0 MB de 1,0 GB')).toBeVisible();
 
   // Esc fecha uma camada e devolve o endereço.
   await page.keyboard.press('Escape');

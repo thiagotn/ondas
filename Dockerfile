@@ -9,9 +9,14 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/core/package.json packages/core/
 COPY packages/web/package.json packages/web/
+# O painel de admin não entra NESTA imagem, mas é um pacote do workspace: sem o
+# manifest dele o `--frozen-lockfile` recusa a instalação, porque o lockfile
+# descreve um importador que não está no disco.
+COPY packages/admin/package.json packages/admin/
 RUN pnpm install --frozen-lockfile
 
-COPY packages/ packages/
+COPY packages/core/ packages/core/
+COPY packages/web/ packages/web/
 # `build` = typecheck + vite build. Os ícones da PWA são versionados (gerados por
 # `pnpm --filter @ondas/web icons` quando o logo muda), então sharp não entra aqui.
 RUN pnpm --filter @ondas/web build

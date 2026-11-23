@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -135,25 +137,33 @@ func (s *Server) apagarConta(w http.ResponseWriter, r *http.Request) {
 	}
 	s.senhaLimiter.Esquecer(userID)
 
-	ids, err := s.tracks.IDsDoDono(ctx, userID)
+	faixas, err := s.apagarContaInteira(ctx, userID)
 	if err != nil {
-		slog.Error("apagar conta: listar faixas", "erro", err)
-		escreverErro(w, http.StatusInternalServerError, "não foi possível apagar a conta")
-		return
-	}
-	for _, id := range ids {
-		if err := s.apagarFaixa(ctx, userID, id); err != nil {
-			slog.Error("apagar conta: faixa", "faixa", id, "erro", err)
-			escreverErro(w, http.StatusInternalServerError, "não foi possível apagar a conta")
-			return
-		}
-	}
-	if err := s.users.Apagar(ctx, userID); err != nil {
 		slog.Error("apagar conta", "erro", err)
 		escreverErro(w, http.StatusInternalServerError, "não foi possível apagar a conta")
 		return
 	}
-	slog.Info("conta apagada pelo dono", "conta", userID, "faixas", len(ids))
+	slog.Info("conta apagada pelo dono", "conta", userID, "faixas", faixas)
 	s.limparCookie(w)
 	escreverJSON(w, http.StatusOK, map[string]string{"status": "apagada"})
+}
+
+// apagarContaInteira tira as faixas e depois a conta, e devolve quantas faixas
+// saíram. É função própria porque dois caminhos apagam conta — o dono, com a
+// senha, e o admin, pelo painel — e a ordem (faixas ANTES da conta, e a conta
+// fica se uma faixa falhar) não pode existir em um só deles.
+func (s *Server) apagarContaInteira(ctx context.Context, userID string) (int, error) {
+	ids, err := s.tracks.IDsDoDono(ctx, userID)
+	if err != nil {
+		return 0, fmt.Errorf("listar faixas: %w", err)
+	}
+	for _, id := range ids {
+		if err := s.apagarFaixa(ctx, userID, id); err != nil {
+			return 0, fmt.Errorf("faixa %s: %w", id, err)
+		}
+	}
+	if err := s.users.Apagar(ctx, userID); err != nil {
+		return 0, err
+	}
+	return len(ids), nil
 }

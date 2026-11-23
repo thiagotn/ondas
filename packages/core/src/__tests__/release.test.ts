@@ -7,7 +7,12 @@ afterEach(() => definirIdioma('pt-BR'));
 /** Um arquivo do repositório, a partir daqui (`packages/core/src/__tests__/`). */
 const doRepo = (rel: string) => readFileSync(new URL('../../../../' + rel, import.meta.url), 'utf8');
 
-const PACOTES = ['package.json', 'packages/core/package.json', 'packages/web/package.json'];
+const PACOTES = [
+  'package.json',
+  'packages/core/package.json',
+  'packages/web/package.json',
+  'packages/admin/package.json',
+];
 
 const comparar = (a: string, b: string) => {
   const [a1 = 0, a2 = 0, a3 = 0] = a.split('.').map(Number);

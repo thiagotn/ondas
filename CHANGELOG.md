@@ -7,6 +7,10 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.11.0 — 2026-11-23
+
+- `ondas whoami` mostra quanto do seu acervo está ocupado e qual é o limite do seu plano, numa linha `acervo`. Por enquanto é só informação: passar do limite não bloqueia envio nem apaga nada
+
 ## 1.10.0 — 2026-11-22
 
 - `ondas whoami` mostra o e-mail da conta, numa linha logo abaixo do nome: depois de renomear, é ela que diz com qual conta você entrou

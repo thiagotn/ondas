@@ -1,5 +1,16 @@
 [
   {
+    "versao": "1.11.0",
+    "data": "2026-11-23",
+    "itens": [
+      {
+        "pt-BR": "`ondas whoami` mostra quanto do seu acervo está ocupado e qual é o limite do seu plano, numa linha `acervo`. Por enquanto é só informação: passar do limite não bloqueia envio nem apaga nada",
+        "en": "`ondas whoami` now shows how much of your archive is in use and what your plan's limit is, on an `archive` line. For now it is information only: going over the limit does not block uploads or delete anything",
+        "es": "`ondas whoami` muestra cuánto de tu archivo está ocupado y cuál es el límite de tu plan, en una línea `archivo`. Por ahora es solo información: superar el límite no bloquea subidas ni borra nada"
+      }
+    ]
+  },
+  {
     "versao": "1.10.0",
     "data": "2026-11-22",
     "itens": [

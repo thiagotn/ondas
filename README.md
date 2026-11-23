@@ -104,19 +104,21 @@ TEST_DATABASE_URL='postgres://postgres:teste@127.0.0.1:55432/ondas_test' go test
 
 ### Cadastro e administração (`ondasctl`)
 
-Com `SIGNUP_OPEN=true`, qualquer pessoa pede uma conta em `/signup`. O pedido **não entra**: a conta
+Com o cadastro **aberto** (chave no painel de admin; antes era `SIGNUP_OPEN`), qualquer pessoa pede
+uma conta em `/signup`. O pedido **não entra**: a conta
 nasce `pendente`, e quem decide é o admin. Não há e-mail de aviso — é o próprio login que responde
 "em análise", "negado" ou deixa entrar. A conta aprovada usa a plataforma inteira e administra a si
 mesma, mas **não envia arquivo** (`pode_enviar` nasce `false`); o envio é liberado conta por conta.
 As contas que já existiam antes da migração `0011` continuam aprovadas e enviando.
 
-Não existe papel de admin em `users` nem tela de administração: as rotas de `/api/admin` abrem com
-um token próprio, e quem as consome é a **`ondasctl`** (`api/cmd/ondasctl`), que só fala HTTP.
+Não existe papel de admin em `users`, e nada de administração entra na PWA: as rotas de
+`/api/admin` abrem com um token próprio. Quem as consome são o **painel de admin** (abaixo) e a
+**`ondasctl`** (`api/cmd/ondasctl`), que só fala HTTP.
 
 ```bash
 # Uma vez: gera o token NESTA máquina e imprime só o SHA-256, que é o que a API guarda.
 scripts/gerar-token-admin.sh                 # grava em ~/.config/ondas/admin-token
-# → ponha a soma em ADMIN_TOKEN_SHA256 (Secret do ondas-api) e SIGNUP_OPEN=true (ConfigMap)
+# → ponha a soma em ADMIN_TOKEN_SHA256 (Secret do ondas-api)
 
 cd api && go build -o ~/bin/ondasctl ./cmd/ondasctl
 export ONDAS_ADMIN_TOKEN_FILE=~/.config/ondas/admin-token
@@ -133,6 +135,40 @@ Feita para script e para skill: toda saída tem `--json`, e o código de saída 
 certo), **1** (a API recusou ou não respondeu) e **2** (uso ou configuração). O token nunca é
 argumento — argumento aparece no `ps` e fica no histórico do shell. Sem `ADMIN_TOKEN_SHA256` na API,
 `/api/admin` responde 404, como rota que não existe.
+
+### Painel de admin (`packages/admin`)
+
+A mesma administração, numa tela: `https://ondas-admin.thiagotn.com`. É **outra aplicação** — outro
+pacote, outra imagem (`Dockerfile.admin`), outro host — e entra com o mesmo token de admin, colado
+uma vez e trocado por um cookie `HttpOnly` que só viaja para `/api/admin` e vence em doze horas.
+
+| Tela | O que faz |
+|---|---|
+| visão geral | pedidos em análise, armazenamento total, ingestões com erro, quem mais ocupa |
+| contas | aprovar, negar, suspender; ligar **envia** e **recebe do bot**; ocupação contra a cota |
+| conta | plano e extra avulso, faixas com o tamanho de cada uma, ingestões, apagar a conta |
+| faixas | o acervo inteiro, das maiores para as menores; apagar faixa |
+| ingestões | a fila e os erros |
+| cadastro | abrir/fechar os pedidos de conta; **convites** (e-mail que já nasce aprovado) |
+| planos | cota de armazenamento de cada plano |
+| histórico | o que foi decidido, quando e de qual IP |
+
+Cadastro aberto, convites e "recebe do bot" moravam no ConfigMap (`SIGNUP_OPEN`,
+`SIGNUP_ALLOWLIST`, `INGEST_DESTINOS`) até a migração `0012`. A API importa os três do ambiente
+**uma vez**, na primeira subida, e daí em diante só o banco vale.
+
+**Cota.** Cada conta tem um plano (`planos.cota_bytes`) e um extra avulso (`cota_extra_bytes`); a
+cota é a soma. Por enquanto ela é só **medida** — aparece aqui e no `ondas whoami` de cada conta, e
+passar dela não bloqueia nada. As capas das faixas ingeridas antes da `0012` entram na conta depois
+de `worker medir-capas --gravar` (uma vez).
+
+```bash
+pnpm --filter @ondas/admin dev        # http://localhost:5174, com /api repassado para ONDAS_API
+                                      # (padrão http://localhost:8080)
+```
+
+O raciocínio está em
+[docs/engenharia/16-painel-de-admin-e-cota.md](docs/engenharia/16-painel-de-admin-e-cota.md).
 
 Uma ressalva para quem automatizar com um agente: nome, e-mail e mensagem do pedido são **texto de
 um desconhecido**. A tabela da CLI já tira caractere de controle; o que um agente lê de `--json` é
@@ -343,8 +379,9 @@ seu — nem em `--compartilhadas`, porque você não tem direito nenhum sobre el
 ouvirem, o destino é `todos`.
 
 **O alcance do token de máquina aumentou, e é limitado por uma lista.** Antes, faixa que entrava por
-token era sempre do dono do homelab; agora o pedido pode nomear um destino. `INGEST_DESTINOS` (no
-ConfigMap) diz para quais contas o **token** pode publicar — sessão não passa por ela. E a recusa é
+token era sempre do dono do homelab; agora o pedido pode nomear um destino. A marca
+**recebe do bot**, que o admin liga conta por conta no painel (antes era a lista `INGEST_DESTINOS`,
+no ConfigMap), diz para quais contas o **token** pode publicar — sessão não passa por ela. E a recusa é
 idêntica para "fora da lista" e para "e-mail sem conta", senão um token vazado descobriria quem tem
 conta tentando e-mail por e-mail.
 

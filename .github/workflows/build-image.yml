@@ -90,11 +90,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: packages/web/playwright-report
+          path: packages/*/playwright-report
           retention-days: 7
 
-  # Duas imagens: a PWA estática e a API do acervo. A matriz mantém um job só
-  # para as duas, e o write-back abaixo acontece uma vez, com as duas tags.
+  # Quatro imagens: a PWA, a API, o worker de ingestão e o painel de admin. A
+  # matriz mantém um job só para todas, e o write-back abaixo acontece uma vez,
+  # com as quatro tags.
   build-push:
     needs: verify
     runs-on: ubuntu-latest
@@ -113,6 +114,9 @@ jobs:
           - name: ondas-worker
             context: api
             dockerfile: api/Dockerfile.worker
+          - name: ondas-admin
+            context: .
+            dockerfile: Dockerfile.admin
     steps:
       - uses: actions/checkout@v4
 
@@ -164,10 +168,10 @@ jobs:
         run: |
           set -euo pipefail
           TAG="sha-${GITHUB_SHA}"
-          # Seleção por nome, não por posição: com três imagens no mesmo
+          # Seleção por nome, não por posição: com quatro imagens no mesmo
           # kustomization, `.images[0]` viraria uma roleta e um dia escreveria
           # a tag da PWA na API.
-          for IMG in ondas ondas-api ondas-worker; do
+          for IMG in ondas ondas-api ondas-worker ondas-admin; do
             SELETOR=".images[] | select(.name == \"ghcr.io/thiagotn/${IMG}\")"
             # Imagem que não está no kustomization faria o `yq -i` não escrever
             # NADA, em silêncio, e o deploy seguiria com a tag velha. Falhar
@@ -185,6 +189,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Tag já é ${TAG}; nada a commitar."
           else
-            git commit -m "deploy(ondas): ${TAG} (pwa + api + worker) [skip ci]"
+            git commit -m "deploy(ondas): ${TAG} (pwa + api + worker + admin) [skip ci]"
             git push
           fi

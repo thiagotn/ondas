@@ -20,8 +20,8 @@ const destinoTodos = "todos"
 // virar trabalho de banco.
 const maxDestinatarios = 32
 
-// Recusa ÚNICA do destino. A mensagem é a mesma para "fora de
-// INGEST_DESTINOS", "e-mail que não existe" e "e-mail malformado", e isso é a
+// Recusa ÚNICA do destino. A mensagem é a mesma para "conta que o admin não
+// liberou para o bot", "e-mail que não existe" e "e-mail malformado", e isso é a
 // regra, não descuido: um token vazado que conseguisse distinguir os casos
 // viraria um enumerador de contas, tentando e-mail por e-mail e lendo a
 // diferença entre as respostas.
@@ -34,7 +34,7 @@ const erroDestino = "destino não disponível"
 //	um e-mail→ a faixa nasce NA CONTA daquela pessoa
 //
 // O terceiro caso é o que amplia o alcance do token de máquina, e é por isso
-// que ele é o único que passa por `INGEST_DESTINOS`. Sessão não passa: pessoa
+// que ele é o único que exige `users.recebe_do_bot`. Sessão não exige: pessoa
 // logada decidindo para quem manda a própria faixa é ato normal.
 func (s *Server) resolverDestino(w http.ResponseWriter, r *http.Request, para string) (acervo.Destino, bool) {
 	para = strings.TrimSpace(para)
@@ -47,14 +47,6 @@ func (s *Server) resolverDestino(w http.ResponseWriter, r *http.Request, para st
 		return acervo.Destino{Visibilidade: acervo.VisibilidadeTodos}, true
 	}
 
-	if porTokenDe(r.Context()) && !s.cfg.DestinoPermitidoPorToken(para) {
-		// Log com o e-mail tentado, porque aqui dentro a informação é útil e
-		// não sai na resposta.
-		slog.Warn("destino recusado para token", "destino", para, "ip", clienteIP(r))
-		escreverErro(w, http.StatusBadRequest, erroDestino)
-		return acervo.Destino{}, false
-	}
-
 	dono, err := s.users.PorEmail(r.Context(), para)
 	if errors.Is(err, auth.ErrNaoEncontrado) {
 		escreverErro(w, http.StatusBadRequest, erroDestino)
@@ -63,6 +55,16 @@ func (s *Server) resolverDestino(w http.ResponseWriter, r *http.Request, para st
 	if err != nil {
 		slog.Error("resolver destino", "erro", err)
 		escreverErro(w, http.StatusInternalServerError, "não foi possível resolver o destino")
+		return acervo.Destino{}, false
+	}
+	// O teto do token (migração 0012): a conta de destino precisa ter sido
+	// marcada pelo admin. A leitura é a MESMA do caso "sem conta" logo acima, e
+	// a resposta também — é isso que impede o token de distinguir os dois.
+	if porTokenDe(r.Context()) && !dono.RecebeDoBot {
+		// Log com o e-mail tentado, porque aqui dentro a informação é útil e
+		// não sai na resposta.
+		slog.Warn("destino recusado para token", "destino", para, "ip", clienteIP(r))
+		escreverErro(w, http.StatusBadRequest, erroDestino)
 		return acervo.Destino{}, false
 	}
 	return acervo.Destino{UserID: dono.ID, Visibilidade: acervo.VisibilidadePrivada}, true

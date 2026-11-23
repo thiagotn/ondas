@@ -10,6 +10,12 @@ tags:
   - cli
 ---
 
+> **Depois deste documento** (migração `0012`): `SIGNUP_OPEN` e a allowlist saíram do ConfigMap e
+> foram para o banco, e a administração ganhou uma tela — outra aplicação, em outro host, com o
+> mesmo token de admin. O que este documento decide continua valendo: o admin não é um usuário, e
+> nada de admin entra na PWA. A continuação está no
+> [documento 16](16-painel-de-admin-e-cota.md).
+
 Até a 1.5 o cadastro do ondas tinha dois estados, e os dois eram ruins para o que eu queria fazer.
 Com `SIGNUP_OPEN=false`, só entrava quem eu pusesse à mão numa allowlist do ConfigMap — um deploy
 por pessoa. Com `SIGNUP_OPEN=true`, qualquer um criava conta e **saía logado**, com direito a enviar

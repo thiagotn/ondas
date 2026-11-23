@@ -1,4 +1,6 @@
 import {
+  acervoUsoLabel,
+  acimaDaCota,
   fmtMB,
   offlineBytes,
   planLabel,
@@ -7,12 +9,13 @@ import {
   t,
   whoAmI,
   type OfflineUsage,
+  type UsoDaConta,
 } from '@ondas/core';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as controller from '../app/controller';
 import { useGuestMode } from '../app/guest';
-import { offlineStore } from '../app/services';
+import { auth, offlineStore } from '../app/services';
 import { libraryStore, useLibrary, useSession } from '../app/stores';
 import { useAccountOverlay } from '../hooks/useAccountOverlay';
 import { useWide } from '../hooks/useWide';
@@ -47,6 +50,7 @@ export function AccountOverlay() {
 
   const count = Object.keys(cached).length;
   const espaco = useEspaco(count);
+  const acervo = useAcervo(!!user);
 
   return (
     <div className={o.backdrop} onClick={closeAccount} role="presentation">
@@ -103,6 +107,23 @@ export function AccountOverlay() {
               <span className={s.panelLabel}>{t('conta.plano')}</span>
               <span className={s.panelValue}>{planLabel(user)}</span>
             </div>
+
+            {/* Quanto do acervo a conta ocupa, contra o que o plano dela dá.
+                Acima do divisor porque é do SERVIDOR — o `espaço` lá embaixo é
+                o disco deste navegador, e os dois números não têm relação. Só
+                aparece quando o servidor respondeu: sem rede, a linha some em
+                vez de mostrar um número velho. */}
+            {user && acervo && (
+              <div className={s.panelRow}>
+                <span className={s.panelLabel}>{t('conta.acervo')}</span>
+                <span className={s.panelValue}>
+                  {acervoUsoLabel(acervo)}
+                  {acimaDaCota(acervo) && (
+                    <span className={o.contaConfirma}> · {t('conta.acervoAcima')}</span>
+                  )}
+                </span>
+              </div>
+            )}
 
             {/* O que a conta muda em si mesma. Acima do divisor pela mesma
                 razão do catálogo, logo abaixo: é do servidor, e segue a pessoa. */}
@@ -210,6 +231,32 @@ export function AccountOverlay() {
       </div>
     </div>
   );
+}
+
+/**
+ * Ocupação do acervo da conta, lida ao abrir o painel.
+ *
+ * Fora do `/me` e do store de sessão de propósito: é uma soma sobre as faixas
+ * que só interessa a quem abriu esta tela, e o `/me` roda em todo boot.
+ */
+function useAcervo(logado: boolean): UsoDaConta | null {
+  const [uso, setUso] = useState<UsoDaConta | null>(null);
+
+  useEffect(() => {
+    if (!logado) {
+      setUso(null);
+      return;
+    }
+    let vivo = true;
+    void auth.uso().then((u) => {
+      if (vivo) setUso(u);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [logado]);
+
+  return uso;
 }
 
 /**

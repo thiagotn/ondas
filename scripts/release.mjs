@@ -24,7 +24,12 @@ import { argv, exit } from 'node:process';
 const RAIZ = new URL('../', import.meta.url);
 const NOTAS = new URL('packages/core/src/release/notas.json', RAIZ);
 const CHANGELOG = new URL('CHANGELOG.md', RAIZ);
-const PACOTES = ['package.json', 'packages/core/package.json', 'packages/web/package.json'];
+const PACOTES = [
+  'package.json',
+  'packages/core/package.json',
+  'packages/web/package.json',
+  'packages/admin/package.json',
+];
 
 const SEMVER = /^\d+\.\d+\.\d+$/;
 const DATA = /^\d{4}-\d{2}-\d{2}$/;

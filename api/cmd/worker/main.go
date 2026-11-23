@@ -70,6 +70,16 @@ func main() {
 		return
 	}
 
+	// `worker medir-capas [--gravar]` preenche o tamanho das capas de quem foi
+	// ingerido antes da migração 0012. Sem `--gravar` só lista.
+	if len(os.Args) > 1 && os.Args[1] == "medir-capas" {
+		if err := medirCapas(os.Args[2:]); err != nil {
+			slog.Error("medir-capas", "erro", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if err := run(); err != nil {
 		slog.Error("encerrando", "erro", err)
 		os.Exit(1)

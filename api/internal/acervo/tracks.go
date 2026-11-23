@@ -155,7 +155,10 @@ type Nova struct {
 	SizeBytes   int64
 	ArtKey      string
 	ArtThumbKey string
-	Peaks       string
+	// Soma das duas capas, em bytes (migração 0012). O áudio já tinha
+	// `SizeBytes`; sem isto a ocupação da conta ficava menor que a do bucket.
+	ArtBytes int64
+	Peaks    string
 	// Vazia vira `privada` no SQL: o worker só a preenche quando o pedido de
 	// ingestão disse `para: todos`.
 	Visibilidade string
@@ -180,12 +183,12 @@ func (r *Tracks) Criar(ctx context.Context, n Nova) (*Track, error) {
 	return scan(r.pool.QueryRow(ctx, `
 		INSERT INTO tracks (id, user_id, title, artist, genre, duration_s,
 		                    audio_key, audio_type, size_bytes, art_key, art_thumb_key, peaks,
-		                    visibilidade)
+		                    visibilidade, art_bytes)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-		        coalesce(nullif($13, ''), 'privada'))
+		        coalesce(nullif($13, ''), 'privada'), $14)
 		RETURNING `+colunas,
 		n.ID, n.UserID, n.Title, n.Artist, n.Genre, n.DurS,
-		n.AudioKey, n.AudioType, n.SizeBytes, art, thumb, picos, n.Visibilidade))
+		n.AudioKey, n.AudioType, n.SizeBytes, art, thumb, picos, n.Visibilidade, n.ArtBytes))
 }
 
 // IDsDoDono lista os ids das faixas que PERTENCEM a esta conta — só as dela,

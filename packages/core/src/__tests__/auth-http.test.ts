@@ -493,3 +493,24 @@ describe('HttpAuthService: a conta administrando a si mesma', () => {
     }
   });
 });
+
+describe('HttpAuthService.uso', () => {
+  it('devolve a ocupação e a cota que o servidor informou', async () => {
+    const fetchImpl = vi.fn(async () => resposta(200, { usadoBytes: 1500, cotaBytes: 4000 }));
+    const auth = new HttpAuthService(memoria({}), fetchImpl as unknown as typeof fetch);
+
+    expect(await auth.uso()).toEqual({ usadoBytes: 1500, cotaBytes: 4000 });
+  });
+
+  it('sem rede, servidor antigo ou meia resposta: não sabe, e não inventa', async () => {
+    const semRede = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    expect(await new HttpAuthService(memoria({}), semRede as unknown as typeof fetch).uso()).toBeNull();
+
+    for (const r of [resposta(404, {}), resposta(200, { usadoBytes: 10 }), resposta(200, { usadoBytes: 'x', cotaBytes: 1 })]) {
+      const fetchImpl = vi.fn(async () => r);
+      expect(await new HttpAuthService(memoria({}), fetchImpl as unknown as typeof fetch).uso()).toBeNull();
+    }
+  });
+});

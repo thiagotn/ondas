@@ -263,7 +263,9 @@ A resposta está na forma do roteador, e não num campo de permissão.
 | Sessão **ou** token | entrar com faixa nova | `POST ingest`, `GET ingest/{id}`, `POST upload`, `POST upload/{id}/finalizar` |
 | Só sessão | mexer no que já existe | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}`, `PATCH {id}/compartilhamento` |
 | Só sessão | mexer na própria conta | `GET /auth/me`, `PATCH /auth/prefs`, `PATCH /auth/conta`, `POST /auth/senha`, `POST /auth/conta/apagar` |
-| Só token de **admin** | decidir quem entra e quem envia | `GET /admin/contas`, `POST /admin/contas/{id}/aprovar`, `POST /admin/contas/{id}/negar`, `PATCH /admin/contas/{id}/envio` |
+| Só sessão | ver a própria ocupação | `GET /auth/uso` |
+| Só credencial de **admin** (token no cabeçalho, ou o cookie do painel) | decidir quem entra, o que cada conta pode e quanto ela tem | tudo em `/admin/…`: contas, faixas, ingestões, config, convites, planos, eventos — ver o [documento 16](16-painel-de-admin-e-cota.md) |
+| Pública, **só** para trocar o token pelo cookie | entrar e sair do painel | `POST /admin/sessao`, `DELETE /admin/sessao` |
 | Só sessão | mexer no próprio gosto | `GET /likes`, `PATCH /likes` |
 | Só sessão | organizar a própria biblioteca | `GET /playlists`, `POST /playlists`, `PATCH /playlists/{id}`, `DELETE /playlists/{id}`, `PATCH /playlists/{id}/itens` |
 | Só sessão | o que a própria conta ouviu | `GET /playback`, `PUT /playback`, `GET /history`, `POST /history`, `DELETE /history` |

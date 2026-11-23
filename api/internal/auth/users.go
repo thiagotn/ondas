@@ -85,6 +85,12 @@ type User struct {
 	// quem não pode usá-lo. É só cortesia de tela: quem recusa de verdade é
 	// `exigirEnvio`, no servidor.
 	PodeEnviar bool `json:"podeEnviar"`
+	// O bot (token de máquina) pode publicar faixa PARA esta conta (migração
+	// 0012, no lugar de `INGEST_DESTINOS`).
+	//
+	// Fora do JSON: é uma decisão do admin sobre o alcance do token, e a conta
+	// não tem o que fazer com ela.
+	RecebeDoBot bool `json:"-"`
 }
 
 // Conta é a linha de `users` como o ADMIN a vê.
@@ -141,7 +147,7 @@ func (p Prefs) Vazio() bool {
 // preferência vazia para uma conta que tem.
 const colunasUser = `id, email, name, publico,
 	pref_tema, pref_idioma, pref_opacity, pref_blur, pref_wall,
-	status, pode_enviar`
+	status, pode_enviar, recebe_do_bot`
 
 // lerUser lê uma linha de `colunasUser`. `extras` são colunas a mais que a
 // consulta pediu DEPOIS delas — o `password_hash` de `Authenticate`.
@@ -150,7 +156,7 @@ func lerUser(linha pgx.Row, extras ...any) (*User, error) {
 	destinos := append([]any{
 		&user.ID, &user.Email, &user.Name, &user.Publico,
 		&user.Prefs.Tema, &user.Prefs.Idioma, &user.Prefs.Opacity, &user.Prefs.Blur, &user.Prefs.Wall,
-		&user.Status, &user.PodeEnviar,
+		&user.Status, &user.PodeEnviar, &user.RecebeDoBot,
 	}, extras...)
 	if err := linha.Scan(destinos...); err != nil {
 		return nil, err
@@ -171,8 +177,12 @@ type Nova struct {
 	// O que a pessoa quis dizer ao admin. Opcional.
 	Mensagem string
 	// `StatusPendente` para o pedido comum; `StatusAprovada` para quem está na
-	// allowlist, que o operador já decidiu de antemão.
+	// convite, que o admin já decidiu de antemão.
 	Status string
+	// O que o CONVITE disse que a conta já nasce podendo. Num pedido comum os
+	// dois ficam `false`, que é o padrão das colunas.
+	PodeEnviar  bool
+	RecebeDoBot bool
 }
 
 // normalizarNome apara e confere o nome de exibição.
@@ -192,8 +202,9 @@ func normalizarNome(nome string) (string, error) {
 	return nome, nil
 }
 
-// Create grava a conta no estado pedido. `pode_enviar` nasce sempre `false`
-// (o padrão da coluna): liberar envio é decisão à parte, do admin.
+// Create grava a conta no estado pedido. `pode_enviar` e `recebe_do_bot` só
+// nascem ligados quando o convite do admin disse — num pedido comum, liberar é
+// decisão à parte, depois.
 func (u *Users) Create(ctx context.Context, n Nova) (*User, error) {
 	email := strings.TrimSpace(n.Email)
 	if !reEmail.MatchString(email) {
@@ -229,10 +240,12 @@ func (u *Users) Create(ctx context.Context, n Nova) (*User, error) {
 	// Quem já nasce aprovado (allowlist) também ganha a data da decisão: ela
 	// foi tomada quando o operador escreveu o e-mail na lista.
 	user, err := lerUser(u.pool.QueryRow(ctx,
-		`INSERT INTO users (email, name, password_hash, status, pedido_msg, decidido_em)
-		 VALUES ($1, $2, $3, $4, nullif($5, ''), CASE WHEN $4 = 'pendente' THEN NULL ELSE now() END)
+		`INSERT INTO users (email, name, password_hash, status, pedido_msg, decidido_em,
+		                    pode_enviar, recebe_do_bot)
+		 VALUES ($1, $2, $3, $4, nullif($5, ''), CASE WHEN $4 = 'pendente' THEN NULL ELSE now() END,
+		         $6, $7)
 		  RETURNING `+colunasUser,
-		email, nome, hash, status, mensagem,
+		email, nome, hash, status, mensagem, n.PodeEnviar, n.RecebeDoBot,
 	))
 	if err != nil {
 		if strings.Contains(err.Error(), "users_email_lower_idx") {
@@ -266,6 +279,16 @@ func (u *Users) Authenticate(ctx context.Context, email, senha string) (*User, e
 		return nil, ErrSenhaInvalida
 	}
 	return user, nil
+}
+
+// RegistrarLogin anota que a conta acabou de entrar. É o único rastro de
+// atividade de conta que existe: o cookie é sem estado, e sem isto o admin não
+// distingue conta abandonada de conta em uso.
+func (u *Users) RegistrarLogin(ctx context.Context, id string) error {
+	if _, err := u.pool.Exec(ctx, `UPDATE users SET ultimo_login_em = now() WHERE id = $1`, id); err != nil {
+		return fmt.Errorf("users: registrarLogin: %w", err)
+	}
+	return nil
 }
 
 func (u *Users) ByID(ctx context.Context, id string) (*User, error) {
@@ -316,8 +339,9 @@ func (u *Users) NomesPorIDs(ctx context.Context, ids []string) ([]string, error)
 	return nomes, nil
 }
 
-// PorEmail resolve o dono configurado para a ingestão por token (o bot não tem
-// sessão, então é o e-mail do ConfigMap que diz de quem é a faixa).
+// PorEmail resolve uma conta pelo e-mail: o dono configurado para a ingestão
+// por token (o bot não tem sessão, então é `INGEST_USER_EMAIL` que diz de quem
+// é a faixa) e o destino de uma faixa publicada para alguém.
 func (u *Users) PorEmail(ctx context.Context, email string) (*User, error) {
 	user, err := lerUser(u.pool.QueryRow(ctx,
 		`SELECT `+colunasUser+` FROM users WHERE lower(email) = lower($1)`, email))

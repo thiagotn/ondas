@@ -44,6 +44,17 @@ func (l *Limiter) Permitido(chave string) bool {
 	return true
 }
 
+// Bloqueado diz se a chave já estourou o teto, SEM registrar tentativa.
+//
+// É para quem só quer contar os erros: o painel de admin faz vários pedidos
+// válidos em paralelo, e se cada um contasse como tentativa o próprio uso
+// normal trancaria o admin para fora.
+func (l *Limiter) Bloqueado(chave string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.recentes(chave, l.agora())) >= l.max
+}
+
 // Esquecer limpa o histórico depois de um login bem-sucedido.
 func (l *Limiter) Esquecer(chave string) {
 	l.mu.Lock()

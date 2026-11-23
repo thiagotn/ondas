@@ -10,6 +10,12 @@ tags:
   - cli
 ---
 
+> **After this document** (migration `0012`): `SIGNUP_OPEN` and the allowlist left the ConfigMap for
+> the database, and administration gained a screen — a separate application, on another host, with
+> the same admin token. What this document decides still holds: the admin is not a user, and nothing
+> admin-related ships in the PWA. The continuation is in
+> [document 16](16-painel-de-admin-e-cota.en.md).
+
 Up to 1.5, sign-up in ondas had two states, and both were wrong for what I wanted. With
 `SIGNUP_OPEN=false`, only people I added by hand to a ConfigMap allowlist could join — one deploy per
 person. With `SIGNUP_OPEN=true`, anyone created an account and **came out signed in**, entitled to

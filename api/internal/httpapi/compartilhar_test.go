@@ -309,11 +309,11 @@ func TestIngestaoSemDestinoContinuaPrivadaEDeQuemPediu(t *testing.T) {
 // "fora da lista" de "não existe", ele descobriria quem tem conta tentando
 // e-mail por e-mail.
 func TestTokenNaoDistingueDestinoForaDaListaDeDestinoInexistente(t *testing.T) {
-	r, pool, cfg := montar(t, true)
+	r, pool, _ := montar(t, true)
 	dbtest.CriarUsuario(t, pool, "dono@exemplo.test")
-	// Existe, tem conta, e NÃO está em INGEST_DESTINOS.
+	// Existe, tem conta, e o admin NÃO a liberou para o bot.
 	dbtest.CriarUsuario(t, pool, "forade@exemplo.test")
-	cfg.IngestDestinos = "liberado@exemplo.test"
+	liberarParaOBot(t, pool, dbtest.CriarUsuario(t, pool, "liberado@exemplo.test"))
 
 	respostas := map[string]string{}
 	for _, email := range []string{"forade@exemplo.test", "nao-existe@exemplo.test"} {
@@ -329,11 +329,11 @@ func TestTokenNaoDistingueDestinoForaDaListaDeDestinoInexistente(t *testing.T) {
 }
 
 func TestTokenPublicaParaODestinoQueEstaNaLista(t *testing.T) {
-	r, pool, cfg := montar(t, true)
+	r, pool, _ := montar(t, true)
 	ctx := context.Background()
 	dono := dbtest.CriarUsuario(t, pool, "dono@exemplo.test")
 	liberado := dbtest.CriarUsuario(t, pool, "liberado@exemplo.test")
-	cfg.IngestDestinos = "liberado@exemplo.test"
+	liberarParaOBot(t, pool, liberado)
 
 	req := ingerirPara(t, "liberado@exemplo.test")
 	req.Header.Set("X-Ondas-Token", tokenDoBot)
@@ -346,14 +346,12 @@ func TestTokenPublicaParaODestinoQueEstaNaLista(t *testing.T) {
 	require.Equal(t, liberado, job.DestinoID)
 }
 
-// Com a lista VAZIA — o padrão, e o estado da API recém-subida antes do
-// ConfigMap — o token não alcança destino nenhum. É o que deixa o passo 1 subir
-// sozinho sem mudar comportamento.
-func TestListaDeDestinosVaziaFechaOCaminhoDoToken(t *testing.T) {
-	r, pool, cfg := montar(t, true)
+// Sem ninguém marcado — o padrão da coluna, e o estado de toda conta nova — o
+// token não alcança destino nenhum.
+func TestSemContaLiberadaOTokenNaoAlcancaDestinoNenhum(t *testing.T) {
+	r, pool, _ := montar(t, true)
 	dbtest.CriarUsuario(t, pool, "dono@exemplo.test")
 	dbtest.CriarUsuario(t, pool, "alguem@exemplo.test")
-	require.Empty(t, cfg.IngestDestinos)
 
 	req := ingerirPara(t, "alguem@exemplo.test")
 	req.Header.Set("X-Ondas-Token", tokenDoBot)
@@ -370,13 +368,12 @@ func TestListaDeDestinosVaziaFechaOCaminhoDoToken(t *testing.T) {
 	require.Equal(t, http.StatusAccepted, w.Code)
 }
 
-// Sessão NÃO passa pela lista do token: limitar um robô e limitar gente são
+// Sessão NÃO passa pelo teto do token: limitar um robô e limitar gente são
 // decisões diferentes.
-func TestSessaoPublicaParaQualquerContaMesmoForaDaLista(t *testing.T) {
+func TestSessaoPublicaParaQualquerContaMesmoNaoLiberadaParaOBot(t *testing.T) {
 	r, pool, cfg := montar(t, true)
 	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
 	dbtest.CriarUsuario(t, pool, "forade@exemplo.test")
-	cfg.IngestDestinos = "so-este@exemplo.test"
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, comCookie(t, cfg, ingerirPara(t, "forade@exemplo.test"), eu))

@@ -59,6 +59,7 @@ A razão teste/produção em `core` é 0,91:1. Nos dois pacotes Go de maior risc
 | 13 | [QA](13-qa.md) | A disciplina de tirar a correção para ver se o teste reclama — e as quatro vezes em que ele não reclamou |
 | 14 | [Versionamento e releases](14-versionamento-e-releases.md) | Por que a nota de versão é a fonte, e não o subproduto, de cada entrega |
 | 15 | [Cadastro e administração](15-cadastro-e-administracao.md) | Como abrir o cadastro sem abrir a porta: o pedido que é a conta, o admin que não é um usuário e a CLI que passa pela API |
+| 16 | [Painel de admin e cota](16-painel-de-admin-e-cota.md) | O que é configuração e o que é dado: as decisões de produto fora do ConfigMap, o painel que não é a PWA e a cota que mede antes de recusar |
 
 ## Três jeitos de ler
 

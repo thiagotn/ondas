@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/thiagotn/ondas/api/internal/acervo"
+	"github.com/thiagotn/ondas/api/internal/admin"
 	"github.com/thiagotn/ondas/api/internal/auth"
 	"github.com/thiagotn/ondas/api/internal/config"
 	"github.com/thiagotn/ondas/api/internal/dbtest"
@@ -68,9 +69,33 @@ func contaComSenha(t *testing.T, pool *pgxpool.Pool, email string) string {
 func montarComAdmin(t *testing.T) (http.Handler, *pgxpool.Pool, *config.Config) {
 	t.Helper()
 	r, pool, cfg := montar(t, true)
-	cfg.SignupOpen = true
+	abrirCadastro(t, pool)
 	cfg.AdminTokenSHA256 = somaDoToken(tokenDoAdmin)
 	return r, pool, cfg
+}
+
+// abrirCadastro liga a chave que mora no banco desde a migração 0012 (era
+// `SIGNUP_OPEN`). Direto pelo repositório: o que estes testes exercitam é o
+// cadastro, e a rota que liga a chave tem os testes dela em admin_test.go.
+func abrirCadastro(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	require.NoError(t, admin.New(pool).DefinirCadastroAberto(context.Background(), true))
+}
+
+// convidar grava um convite direto pelo repositório.
+func convidar(t *testing.T, pool *pgxpool.Pool, c admin.Convite) {
+	t.Helper()
+	_, err := admin.New(pool).Convidar(context.Background(), c)
+	require.NoError(t, err)
+}
+
+// liberarParaOBot marca a conta como destino permitido do token (era estar em
+// `INGEST_DESTINOS`).
+func liberarParaOBot(t *testing.T, pool *pgxpool.Pool, userID string) {
+	t.Helper()
+	sim := true
+	_, err := admin.New(pool).AjustarConta(context.Background(), userID, admin.Ajuste{RecebeDoBot: &sim})
+	require.NoError(t, err)
 }
 
 func TestCadastroFechadoRecusaOPedido(t *testing.T) {
@@ -167,16 +192,46 @@ func TestNegarDerrubaASessaoQueJaExistia(t *testing.T) {
 	require.Equal(t, http.StatusOK, me(), "aprovar de novo devolve o acesso")
 }
 
-// A allowlist é a decisão do admin tomada de antemão: pula a análise, com o
+// O convite é a decisão do admin tomada de antemão: pula a análise, com o
 // cadastro aberto ou fechado.
-func TestAllowlistEntraSemAnalise(t *testing.T) {
-	r, _, cfg := montar(t, true)
-	cfg.SignupAllowlist = "amiga@exemplo.test"
+func TestConviteEntraSemAnalise(t *testing.T) {
+	r, pool, _ := montar(t, true)
+	convidar(t, pool, admin.Convite{Email: "amiga@exemplo.test"})
 
 	w := pedirConta(t, r, "Amiga@exemplo.test")
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
-	require.NotEmpty(t, w.Result().Cookies(), "conta da allowlist já sai logada")
-	require.Equal(t, false, corpoDe(t, w)["podeEnviar"], "mas sem envio, como toda conta nova")
+	require.NotEmpty(t, w.Result().Cookies(), "conta convidada já sai logada")
+	require.Equal(t, false, corpoDe(t, w)["podeEnviar"], "mas sem envio: o convite não o deu")
+
+	// O convite foi consumido: não fica uma aprovação sobrando na lista.
+	sobrou, err := admin.New(pool).ConvitePara(context.Background(), "amiga@exemplo.test")
+	require.NoError(t, err)
+	require.Nil(t, sobrou)
+}
+
+// O convite diz com o que a conta nasce — é o que tira do admin o segundo passo
+// de liberar envio e destino do bot depois que a pessoa se cadastra.
+func TestConviteLevaAsMarcasParaAConta(t *testing.T) {
+	r, pool, _ := montar(t, true)
+	convidar(t, pool, admin.Convite{Email: "amiga@exemplo.test", PodeEnviar: true, RecebeDoBot: true})
+
+	w := pedirConta(t, r, "amiga@exemplo.test")
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	require.Equal(t, true, corpoDe(t, w)["podeEnviar"])
+
+	var recebe bool
+	require.NoError(t, pool.QueryRow(context.Background(),
+		`SELECT recebe_do_bot FROM users WHERE email = 'amiga@exemplo.test'`).Scan(&recebe))
+	require.True(t, recebe)
+}
+
+// Convite de UM e-mail não abre a porta para outro.
+func TestConviteNaoAbreOCadastroParaOutroEmail(t *testing.T) {
+	r, pool, _ := montar(t, true)
+	convidar(t, pool, admin.Convite{Email: "amiga@exemplo.test"})
+
+	w := pedirConta(t, r, "outra@exemplo.test")
+	require.Equal(t, http.StatusForbidden, w.Code)
 }
 
 func TestCadastroRecusaNomeEMensagemInvalidos(t *testing.T) {
@@ -215,6 +270,25 @@ func TestAdminExigeOTokenDeAdmin(t *testing.T) {
 		{http.MethodPost, "/api/admin/contas/" + eu + "/aprovar"},
 		{http.MethodPost, "/api/admin/contas/" + eu + "/negar"},
 		{http.MethodPatch, "/api/admin/contas/" + eu + "/envio"},
+		// O painel (migração 0012). Toda rota nova de `/api/admin` entra aqui:
+		// é esta lista que prova que nenhuma ficou fora de `exigirAdmin`.
+		{http.MethodGet, "/api/admin/sessao"},
+		{http.MethodGet, "/api/admin/resumo"},
+		{http.MethodGet, "/api/admin/contas/" + eu},
+		{http.MethodPatch, "/api/admin/contas/" + eu},
+		{http.MethodDelete, "/api/admin/contas/" + eu},
+		{http.MethodGet, "/api/admin/faixas"},
+		{http.MethodDelete, "/api/admin/faixas/" + eu},
+		{http.MethodGet, "/api/admin/ingestoes"},
+		{http.MethodGet, "/api/admin/config"},
+		{http.MethodPut, "/api/admin/config"},
+		{http.MethodGet, "/api/admin/convites"},
+		{http.MethodPost, "/api/admin/convites"},
+		{http.MethodDelete, "/api/admin/convites?email=x@exemplo.test"},
+		{http.MethodGet, "/api/admin/planos"},
+		{http.MethodPost, "/api/admin/planos"},
+		{http.MethodPatch, "/api/admin/planos/padrao"},
+		{http.MethodGet, "/api/admin/eventos"},
 	}
 
 	// Cada pedido chega de um IP diferente: são dezesseis recusas, e o que este

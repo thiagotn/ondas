@@ -5,6 +5,7 @@ import type {
   Credentials,
   PedidoDeConta,
   ResultadoDoPedido,
+  UsoDaConta,
 } from '../ports/auth.js';
 import type { KeyValueStore } from '../ports/key-value-store.js';
 import { lePrefs, type PrefsDaConta } from '../prefs.js';
@@ -22,6 +23,7 @@ const ROTAS = {
   conta: '/api/auth/conta',
   senha: '/api/auth/senha',
   apagar: '/api/auth/conta/apagar',
+  uso: '/api/auth/uso',
 } as const;
 
 interface RespostaUsuario {
@@ -224,6 +226,20 @@ export class HttpAuthService implements AuthService {
       throw new AuthError(msg, erro);
     }
     return res;
+  }
+
+  async uso(): Promise<UsoDaConta | null> {
+    try {
+      const res = await this.pedir(ROTAS.uso);
+      if (!res.ok) return null;
+      const corpo = (await res.json()) as { usadoBytes?: unknown; cotaBytes?: unknown };
+      // Os DOIS números ou nada: meia resposta desenharia "312 MB de NaN".
+      const valido = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0;
+      if (!valido(corpo.usadoBytes) || !valido(corpo.cotaBytes)) return null;
+      return { usadoBytes: corpo.usadoBytes, cotaBytes: corpo.cotaBytes };
+    } catch {
+      return null;
+    }
   }
 
   private async gravarPrefs(corpo: unknown, init: RequestInit = {}): Promise<User> {

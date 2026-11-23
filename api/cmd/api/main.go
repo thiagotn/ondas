@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/thiagotn/ondas/api/internal/admin"
 	"github.com/thiagotn/ondas/api/internal/config"
 	"github.com/thiagotn/ondas/api/internal/db"
 	"github.com/thiagotn/ondas/api/internal/httpapi"
@@ -46,6 +47,16 @@ func run() error {
 	defer pool.Close()
 
 	if err := db.Migrate(ctx, pool); err != nil {
+		return err
+	}
+
+	// Só a API importa, e não o worker: são dois processos subindo juntos, e a
+	// decisão de quem pode se cadastrar não é assunto de quem baixa mídia.
+	if _, err := admin.ImportarEnv(ctx, pool, admin.DoEnv{
+		CadastroAberto: cfg.SignupOpen,
+		Allowlist:      cfg.SignupAllowlist,
+		Destinos:       cfg.IngestDestinos,
+	}); err != nil {
 		return err
 	}
 

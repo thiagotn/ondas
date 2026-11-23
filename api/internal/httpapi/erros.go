@@ -51,6 +51,12 @@ const (
 	CodFalhaLiberarArquivo   = "falha_liberar_arquivo"
 	CodFalhaPrepararEnvio    = "falha_preparar_envio"
 	CodFalhaLerContas        = "falha_ler_contas"
+	CodFalhaLerPainel        = "falha_ler_painel"
+	CodFalhaSalvarPainel     = "falha_salvar_painel"
+	CodConviteNaoEncontrado  = "convite_nao_encontrado"
+	CodPlanoNaoEncontrado    = "plano_nao_encontrado"
+	CodPlanoJaExiste         = "plano_ja_existe"
+	CodFalhaLerUso           = "falha_ler_uso"
 	CodFalhaRemover          = "falha_remover"
 	CodFalhaSalvarConta      = "falha_salvar_conta"
 	CodFalhaResolverDestino  = "falha_resolver_destino"
@@ -104,6 +110,12 @@ var codigoPorMensagem = map[string]string{
 	"envio de arquivos não liberado para esta conta":  CodEnvioNaoPermitido,
 	"não foi possível apagar a conta":                 CodFalhaApagarConta,
 	"não foi possível ler as contas":                  CodFalhaLerContas,
+	"não foi possível ler os dados":                   CodFalhaLerPainel,
+	"não foi possível salvar":                         CodFalhaSalvarPainel,
+	"convite não encontrado":                          CodConviteNaoEncontrado,
+	"plano não encontrado":                            CodPlanoNaoEncontrado,
+	"plano já existe":                                 CodPlanoJaExiste,
+	"não foi possível ler o uso da conta":             CodFalhaLerUso,
 	"não foi possível salvar a conta":                 CodFalhaSalvarConta,
 	"senha atual incorreta":                           CodSenhaAtualIncorreta,
 	"credenciais inválidas":                           CodCredenciaisInvalidas,

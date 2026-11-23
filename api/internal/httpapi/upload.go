@@ -85,6 +85,9 @@ func (s *Server) pedirVagaDeUpload(w http.ResponseWriter, r *http.Request) {
 			"arquivo grande demais: o limite é "+megabytes(max), map[string]any{"limite": max})
 		return
 	}
+	// COTA: o primeiro dos três pontos onde entraria a recusa por falta de
+	// espaço — aqui com o tamanho DECLARADO, pelo mesmo motivo do teto acima.
+	// Hoje a cota só é medida e mostrada (`admin.UsoDaConta`).
 
 	user := usuarioDe(r.Context())
 	id := uuid.NewString()
@@ -160,6 +163,9 @@ func (s *Server) finalizarUpload(w http.ResponseWriter, r *http.Request) {
 			"arquivo grande demais: o limite é "+megabytes(max), map[string]any{"limite": max})
 		return
 	}
+	// COTA: o segundo ponto, e o que valeria — tamanho REAL, e contra a conta
+	// que vai ser dona da faixa (`destino`, resolvido acima), não quem enviou.
+	// O terceiro é o worker, para a ingestão por URL (`worker.processar`).
 
 	titulo := cortar(req.Title, maxNomeArquivo)
 	artista := cortar(req.Artist, maxNomeArquivo)

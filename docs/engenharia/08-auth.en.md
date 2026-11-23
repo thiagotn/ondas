@@ -266,7 +266,9 @@ The answer is in the router's shape, not in a permission field.
 | Session **or** token | bringing in a new track | `POST ingest`, `GET ingest/{id}`, `POST upload`, `POST upload/{id}/finalizar` |
 | Session only | touching what already exists | `GET /acervo/`, `GET {id}/audio`, `GET {id}/art`, `DELETE {id}`, `PATCH {id}/compartilhamento` |
 | Session only | touching one's own account | `GET /auth/me`, `PATCH /auth/prefs`, `PATCH /auth/conta`, `POST /auth/senha`, `POST /auth/conta/apagar` |
-| **Admin** token only | deciding who gets in and who uploads | `GET /admin/contas`, `POST /admin/contas/{id}/aprovar`, `POST /admin/contas/{id}/negar`, `PATCH /admin/contas/{id}/envio` |
+| Session only | seeing one's own usage | `GET /auth/uso` |
+| **Admin** credential only (token in the header, or the panel's cookie) | deciding who gets in, what each account may do and how much it has | everything under `/admin/…`: accounts, tracks, ingestions, config, invites, plans, events — see [document 16](16-painel-de-admin-e-cota.en.md) |
+| Public, **only** to trade the token for the cookie | signing in and out of the panel | `POST /admin/sessao`, `DELETE /admin/sessao` |
 | Session only | touching one's own taste | `GET /likes`, `PATCH /likes` |
 | Session only | organising one's own library | `GET /playlists`, `POST /playlists`, `PATCH /playlists/{id}`, `DELETE /playlists/{id}`, `PATCH /playlists/{id}/itens` |
 | Session only | what one's own account listened to | `GET /playback`, `PUT /playback`, `GET /history`, `POST /history`, `DELETE /history` |

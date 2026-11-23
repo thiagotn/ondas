@@ -6,20 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCadastroFechadoRespeitaALista(t *testing.T) {
-	cfg := &Config{SignupOpen: false, SignupAllowlist: " Thiago@exemplo.com , outro@exemplo.com "}
-	assert.True(t, cfg.AllowedSignup("thiago@exemplo.com"), "a comparação ignora caixa e espaços")
-	assert.True(t, cfg.AllowedSignup("outro@exemplo.com"))
-	assert.False(t, cfg.AllowedSignup("estranho@exemplo.com"))
-}
-
-func TestCadastroAbertoAceitaQualquerUm(t *testing.T) {
-	cfg := &Config{SignupOpen: true}
-	assert.True(t, cfg.AllowedSignup("qualquer@exemplo.com"))
-}
-
-func TestListaVaziaNaoLiberaNinguem(t *testing.T) {
-	cfg := &Config{}
-	assert.False(t, cfg.AllowedSignup(""))
-	assert.False(t, cfg.AllowedSignup("alguem@exemplo.com"))
+// As regras de cadastro e de destino do bot saíram daqui na migração 0012: são
+// dado do banco, testado em `internal/admin` e `internal/httpapi`. O que sobrou
+// neste pacote é ler o ambiente.
+func TestAdminSoExisteComASomaDoToken(t *testing.T) {
+	assert.False(t, (&Config{}).AdminConfigurado())
+	assert.False(t, (&Config{AdminTokenSHA256: "   "}).AdminConfigurado(), "só espaço não é token")
+	assert.True(t, (&Config{AdminTokenSHA256: "abc"}).AdminConfigurado())
 }

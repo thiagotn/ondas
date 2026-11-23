@@ -12,6 +12,7 @@ export type {
   AuthService,
   Credentials,
   PedidoDeConta,
+  UsoDaConta,
   ResultadoDoPedido,
 } from './auth.js';
 export { AuthError } from './auth.js';

@@ -83,6 +83,11 @@ export class LocalAuthService implements AuthService {
   /** Não há senha guardada para trocar: o login local aceita qualquer uma. */
   async trocarSenha(): Promise<void> {}
 
+  /** Sem servidor não há acervo de conta, nem cota. */
+  async uso(): Promise<null> {
+    return null;
+  }
+
   /** A "conta" é o espelho; apagar é esquecê-lo. */
   async apagarConta(): Promise<void> {
     await this.store.remove(SESSION_KEY);

@@ -50,6 +50,16 @@ export interface PedidoDeConta {
  */
 export type ResultadoDoPedido = { status: 'pendente' } | { status: 'aprovada'; user: User };
 
+/**
+ * Quanto do acervo a conta ocupa, e quanto ela tem (plano + extra avulso).
+ *
+ * Nesta versão é só informação: passar da cota não bloqueia envio.
+ */
+export interface UsoDaConta {
+  usadoBytes: number;
+  cotaBytes: number;
+}
+
 /** Autenticação. `LocalAuthService` implementa as regras do protótipo; OAuth/JWT entram aqui depois. */
 export interface AuthService {
   /** Rejeita com `AuthError` e mensagem em pt-BR quando as credenciais não servem. */
@@ -84,4 +94,10 @@ export interface AuthService {
   trocarSenha(atual: string, nova: string): Promise<void>;
   /** Apaga a conta e tudo que é dela, no servidor. Sem volta; pede a senha. */
   apagarConta(senha: string): Promise<void>;
+  /**
+   * Ocupação do acervo da conta. `null` quando não dá para saber — sem rede,
+   * servidor de antes da cota, ou resposta estranha. Nunca rejeita: é uma linha
+   * informativa do painel da conta, e a falta dela não é erro de ninguém.
+   */
+  uso(): Promise<UsoDaConta | null>;
 }
