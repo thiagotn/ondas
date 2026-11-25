@@ -2,7 +2,10 @@ import notas from './notas.json';
 import { idioma, type Locale } from '../i18n/motor.js';
 
 /**
- * As notas de versão — a fonte única de onde saem três coisas.
+ * As notas de versão DO PRODUTO — a fonte única de onde saem três coisas.
+ *
+ * O painel de administração é outro sistema e tem a sua própria nota, no pacote
+ * dele (`packages/admin/src/release/`), com versão independente desta.
  *
  * O dado mora num JSON, e não num `.ts`, porque ele é lido por dois mundos: o
  * bundle (este módulo, que desenha a página `/changelog`) e `scripts/release.mjs`,

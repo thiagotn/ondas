@@ -2,14 +2,19 @@
 /**
  * `pnpm release` — a versão e o CHANGELOG saem da nota, não da mão.
  *
- * A fonte única é `packages/core/src/release/notas.json` (o formato está
- * explicado em `packages/core/src/release/index.ts`). Daqui saem os dois
- * destinos que o JSON não alcança sozinho:
+ * São DUAS linhas de entrega, porque são dois sistemas: o produto (a PWA e o
+ * core que ela embarca) e o painel de administração, que é outro bundle, em
+ * outro host, para outro público. Cada linha tem a sua nota, o seu número e o
+ * seu CHANGELOG — uma entrega do painel não empurra a versão do app, e não
+ * aparece na página `/changelog` de quem só ouve música.
  *
- *   1. o campo `version` dos três `package.json` (raiz, core, web) — é dele que
- *      o Vite monta `__APP_VERSION__`, a versão que `ondas --about` e a tela de
- *      login mostram;
- *   2. o `CHANGELOG.md` da raiz, para quem lê o repositório e não o app.
+ * De cada nota (o formato está explicado em `packages/core/src/release/index.ts`)
+ * saem os dois destinos que o JSON não alcança sozinho:
+ *
+ *   1. o campo `version` dos `package.json` da linha — é dele que o Vite monta
+ *      o `__APP_VERSION__` que a tela mostra (`ondas --about` e login na PWA,
+ *      rodapé no painel);
+ *   2. o `CHANGELOG.md` da linha, para quem lê o repositório e não o app.
  *
  * Com `--check` nada é escrito: o script só confere e sai com código 1 se algum
  * destino estiver fora de sincronia. É esse o modo que o CI roda, para uma nota
@@ -22,13 +27,45 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { argv, exit } from 'node:process';
 
 const RAIZ = new URL('../', import.meta.url);
-const NOTAS = new URL('packages/core/src/release/notas.json', RAIZ);
-const CHANGELOG = new URL('CHANGELOG.md', RAIZ);
-const PACOTES = [
-  'package.json',
-  'packages/core/package.json',
-  'packages/web/package.json',
-  'packages/admin/package.json',
+
+const LINHAS = [
+  {
+    nome: 'produto',
+    notas: 'packages/core/src/release/notas.json',
+    pacotes: ['package.json', 'packages/core/package.json', 'packages/web/package.json'],
+    changelog: 'CHANGELOG.md',
+    cabecalho: [
+      '# Changelog',
+      '',
+      'Todas as entregas do ondas, da mais nova para a mais velha. As do painel de administração',
+      'têm versão e arquivo próprios: [`packages/admin/CHANGELOG.md`](./packages/admin/CHANGELOG.md).',
+      '',
+      '**Este arquivo é gerado.** A nota se escreve em',
+      '`packages/core/src/release/notas.json` e sai daqui por `pnpm release` — a mesma lista é a',
+      'página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o',
+      'próximo `pnpm release` desfaz.',
+      '',
+    ],
+  },
+  {
+    nome: 'admin',
+    notas: 'packages/admin/src/release/notas.json',
+    pacotes: ['packages/admin/package.json'],
+    changelog: 'packages/admin/CHANGELOG.md',
+    cabecalho: [
+      '# Changelog do painel de administração',
+      '',
+      'Todas as entregas do painel, da mais nova para a mais velha. O painel é um sistema à parte:',
+      'a versão dele não acompanha a do app, cujas entregas estão em',
+      '[`CHANGELOG.md`](../../CHANGELOG.md).',
+      '',
+      '**Este arquivo é gerado.** A nota se escreve em',
+      '`packages/admin/src/release/notas.json` e sai daqui por `pnpm release` — a mesma lista é a',
+      'tela `/changelog` do painel, nos três idiomas. Editar este arquivo à mão é trabalho que o',
+      'próximo `pnpm release` desfaz.',
+      '',
+    ],
+  },
 ];
 
 const SEMVER = /^\d+\.\d+\.\d+$/;
@@ -37,16 +74,13 @@ const IDIOMAS = ['pt-BR', 'en', 'es'];
 
 const checando = argv.includes('--check');
 
-const releases = JSON.parse(readFileSync(NOTAS, 'utf8'));
-validar(releases);
-const versao = releases[0].versao;
-
 /**
  * O que um JSON mal escrito faria sem isto: um `CHANGELOG` com `undefined` no
  * meio, ou uma versão que não é versão escrita nos três pacotes. Barato de
  * conferir, caro de descobrir depois.
  */
-function validar(lista) {
+function validar(lista, nome) {
+  const falhar = (msg) => falharGeral(`${nome}: ${msg}`);
   if (!Array.isArray(lista) || lista.length === 0) falhar('notas.json está vazio');
   const vistas = new Set();
   for (const r of lista) {
@@ -75,24 +109,14 @@ function comparar(a, b) {
   return a1 - b1 || a2 - b2 || a3 - b3;
 }
 
-function falhar(msg) {
+function falharGeral(msg) {
   console.error(`release: ${msg}`);
   exit(1);
 }
 
-/** O arquivo que o repositório deveria ter, dado o JSON de agora. */
-function changelog() {
-  const linhas = [
-    '# Changelog',
-    '',
-    'Todas as entregas do ondas, da mais nova para a mais velha.',
-    '',
-    '**Este arquivo é gerado.** A nota se escreve em',
-    '`packages/core/src/release/notas.json` e sai daqui por `pnpm release` — a mesma lista é a',
-    'página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o',
-    'próximo `pnpm release` desfaz.',
-    '',
-  ];
+/** O arquivo que o repositório deveria ter, dada a nota de agora. */
+function changelog(linha, releases) {
+  const linhas = [...linha.cabecalho];
   for (const r of releases) {
     linhas.push(`## ${r.versao} — ${r.data}`, '');
     for (const item of r.itens) linhas.push(`- ${item['pt-BR']}`);
@@ -101,40 +125,49 @@ function changelog() {
   return linhas.join('\n');
 }
 
-const alvo = changelog();
 const pendencias = [];
+const prontas = [];
 
-for (const caminho of PACOTES) {
-  const url = new URL(caminho, RAIZ);
-  const texto = readFileSync(url, 'utf8');
-  const atual = JSON.parse(texto).version;
-  if (atual === versao) continue;
-  if (checando) {
-    pendencias.push(`${caminho}: version ${atual}, notas.json diz ${versao}`);
-    continue;
+for (const linha of LINHAS) {
+  const releases = JSON.parse(readFileSync(new URL(linha.notas, RAIZ), 'utf8'));
+  validar(releases, linha.nome);
+  const versao = releases[0].versao;
+  prontas.push(`${linha.nome} ${versao}`);
+
+  for (const caminho of linha.pacotes) {
+    const url = new URL(caminho, RAIZ);
+    const texto = readFileSync(url, 'utf8');
+    const atual = JSON.parse(texto).version;
+    if (atual === versao) continue;
+    if (checando) {
+      pendencias.push(`${caminho}: version ${atual}, ${linha.notas} diz ${versao}`);
+      continue;
+    }
+    // Substituição na LINHA, e não `JSON.stringify` do objeto inteiro: reescrever
+    // o `package.json` todo mudaria indentação e ordem de chaves, e o diff da
+    // entrega deixaria de mostrar só a versão.
+    const novo = texto.replace(/("version"\s*:\s*)"[^"]*"/, `$1"${versao}"`);
+    if (novo === texto) falharGeral(`não achei o campo version em ${caminho}`);
+    writeFileSync(url, novo);
+    console.log(`release: ${caminho} → ${versao}`);
   }
-  // Substituição na LINHA, e não `JSON.stringify` do objeto inteiro: reescrever
-  // o `package.json` todo mudaria indentação e ordem de chaves, e o diff da
-  // entrega deixaria de mostrar só a versão.
-  const novo = texto.replace(/("version"\s*:\s*)"[^"]*"/, `$1"${versao}"`);
-  if (novo === texto) falhar(`não achei o campo version em ${caminho}`);
-  writeFileSync(url, novo);
-  console.log(`release: ${caminho} → ${versao}`);
-}
 
-let changelogAtual = '';
-try {
-  changelogAtual = readFileSync(CHANGELOG, 'utf8');
-} catch {
-  changelogAtual = '';
-}
+  const alvo = changelog(linha, releases);
+  const destino = new URL(linha.changelog, RAIZ);
+  let atual = '';
+  try {
+    atual = readFileSync(destino, 'utf8');
+  } catch {
+    atual = '';
+  }
 
-if (changelogAtual !== alvo) {
-  if (checando) {
-    pendencias.push('CHANGELOG.md está fora de sincronia com notas.json');
-  } else {
-    writeFileSync(CHANGELOG, alvo);
-    console.log(`release: CHANGELOG.md → ${releases.length} entrada(s)`);
+  if (atual !== alvo) {
+    if (checando) {
+      pendencias.push(`${linha.changelog} está fora de sincronia com ${linha.notas}`);
+    } else {
+      writeFileSync(destino, alvo);
+      console.log(`release: ${linha.changelog} → ${releases.length} entrada(s)`);
+    }
   }
 }
 
@@ -144,7 +177,7 @@ if (checando) {
     console.error('release: rode `pnpm release` e commite o resultado.');
     exit(1);
   }
-  console.log(`release: tudo em sincronia na ${versao}.`);
+  console.log(`release: tudo em sincronia — ${prontas.join(', ')}.`);
 } else {
-  console.log(`release: ${versao} pronta.`);
+  console.log(`release: ${prontas.join(', ')} — pronto.`);
 }

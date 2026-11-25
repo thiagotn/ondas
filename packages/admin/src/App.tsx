@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { api, ErroDaApi, ouvirSessaoPerdida } from './api';
 import { t } from './i18n';
 import { Cadastro } from './telas/Cadastro';
+import { Changelog } from './telas/Changelog';
 import { ContaDetalhe } from './telas/Conta';
 import { Contas } from './telas/Contas';
 import { Entrada } from './telas/Entrada';
@@ -103,6 +104,7 @@ export function App() {
           <Route path="/signup" element={<Cadastro />} />
           <Route path="/plans" element={<Planos />} />
           <Route path="/history" element={<Historico />} />
+          <Route path="/changelog" element={<Changelog />} />
           {/* Os endereços antigos, em português: quem guardou um continua
               chegando à mesma tela, com o recorte (`?status=`, `?ord=`) junto. */}
           {Object.entries(ANTIGOS).map(([de, para]) => (
@@ -111,7 +113,12 @@ export function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-      <footer className="rodape mudo">ondas admin {__APP_VERSION__}</footer>
+      <footer className="rodape mudo">
+        ondas admin{' '}
+        <Link to="/changelog" aria-label={t('changelog.link', { versao: __APP_VERSION__ })}>
+          {__APP_VERSION__}
+        </Link>
+      </footer>
     </div>
   );
 }

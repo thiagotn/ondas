@@ -98,6 +98,39 @@ A outra metade da disciplina é de teste de ponta a ponta: o smoke abre o `ondas
 sai do `package.json` do pacote, e não de um `'1.1.0'` fixado no teste — fixar faria o teste quebrar
 na próxima entrega, que é exatamente quando ele precisa continuar valendo.
 
+## Duas linhas: o produto e o painel
+
+Em 23/11/2026 o projeto ganhou um painel de administração, e ele entrou na nota que já existia. Em
+dois dias a página `/changelog` da PWA tinha duas versões inteiras — 1.13.0 e 1.15.0 — que não
+mudavam nada para quem ouve música: filtro nas listas do painel, endereços do painel em inglês. O
+número do app subia por entregas que o app não tinha recebido.
+
+O painel é outro sistema: outro bundle, outro host, outro público. Então ele ganhou a sua própria
+linha, com o mesmo mecanismo:
+
+| | produto | painel |
+|---|---|---|
+| nota | `packages/core/src/release/notas.json` | `packages/admin/src/release/notas.json` |
+| pacotes | raiz, `core`, `web` | `admin` |
+| arquivo gerado | `CHANGELOG.md` | `packages/admin/CHANGELOG.md` |
+| tela | `/changelog` da PWA | `/changelog` do painel, pelo rodapé |
+
+`scripts/release.mjs` deixou de ter um arquivo de nota e passou a ter uma lista de linhas; valida,
+propaga e confere cada uma. Os testes de sincronia rodam sobre as duas (`describe.each`).
+
+Duas decisões de migração, as duas discutíveis:
+
+- **O painel recomeçou em 1.0.0.** As entregas dele foram renumeradas (1.0.0 o nascimento, 1.1.0,
+  1.2.0), e o rodapé caiu de 1.15.0 para 1.3.0. Um número que anda para trás é feio, mas o painel
+  tem um usuário, e carregar para sempre um `1.15` herdado de outro sistema seria pior.
+- **O produto não andou para trás.** As entradas 1.13.0 e 1.15.0 saíram da nota do app, e ele subiu
+  para 1.15.1 com um item dizendo isso. A lista ficou com dois buracos; a alternativa era a PWA em
+  produção passar de 1.15.0 para 1.14.1, e versão que diminui num app instalado é o tipo de coisa
+  que faz alguém achar que o deploy deu errado.
+
+A regra de qual nota tocar é de quem VÊ a mudança, não de onde está o diff: uma rota nova na API que
+só o painel chama é entrega do painel.
+
 ## O que SemVer significa aqui
 
 Um app não tem API pública, então as três casas precisam de uma leitura própria. A que eu adotei:

@@ -1,16 +1,16 @@
 # Changelog
 
-Todas as entregas do ondas, da mais nova para a mais velha.
+Todas as entregas do ondas, da mais nova para a mais velha. As do painel de administração
+têm versão e arquivo próprios: [`packages/admin/CHANGELOG.md`](./packages/admin/CHANGELOG.md).
 
 **Este arquivo é gerado.** A nota se escreve em
 `packages/core/src/release/notas.json` e sai daqui por `pnpm release` — a mesma lista é a
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
-## 1.15.0 — 2026-11-25
+## 1.15.1 — 2026-11-25
 
-- no painel de administração, os endereços das telas passam a ser em inglês — `/accounts`, `/tracks`, `/ingestions`, `/signup`, `/plans` e `/history`. Os endereços antigos continuam funcionando: quem guardou um chega à mesma tela, com o mesmo filtro
-- no painel de administração, a lista de faixas abre com as mais novas em vez das maiores
+- as notas do painel de administração saíram desta página: ele passa a ter versão e notas próprias. Por isso a lista não tem mais a 1.13.0 nem a 1.15.0, que só falavam dele
 
 ## 1.14.1 — 2026-11-25
 
@@ -20,11 +20,6 @@ próximo `pnpm release` desfaz.
 
 - você apaga faixas do seu próprio acervo: segure uma faixa na biblioteca (ou use `v`) para marcar, e toque em `[apagar do acervo]`. Pede uma confirmação, porque não tem volta — o arquivo sai do servidor, das suas playlists e curtidas, e o espaço volta para a sua cota. Faixa que outra conta compartilhou com você não pode ser apagada
 - a mesma faixa não entra duas vezes no acervo: enviar de novo um arquivo que você já tem, ou colar um link que você já trouxe, é recusado com o aviso de que a faixa já está lá. Vale por conta — duas pessoas podem ter a mesma faixa — e uma faixa apagada pode ser trazida de novo
-
-## 1.13.0 — 2026-11-23
-
-- no painel de administração, toda lista ganhou um campo de filtro e colunas que ordenam ao clique — contas, faixas, ingestões, convites, planos e histórico. O filtro ignora acento e maiúsculas, e o recorte fica no endereço: recarregar a página não o desfaz
-- o painel de administração passa a ter os nove temas do app e os três idiomas (português, inglês e espanhol), trocados na barra do topo e guardados no navegador
 
 ## 1.12.0 — 2026-11-23
 

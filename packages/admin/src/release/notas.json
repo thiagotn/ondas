@@ -1,0 +1,61 @@
+[
+  {
+    "versao": "1.3.0",
+    "data": "2026-11-25",
+    "itens": [
+      {
+        "pt-BR": "o painel passa a ter versão e notas próprias, separadas das do app: a versão do rodapé abre a lista do que mudou em cada entrega, no idioma do painel",
+        "en": "the panel now has its own version and release notes, separate from the app's: the version in the footer opens the list of what changed in each release, in the panel's language",
+        "es": "el panel pasa a tener versión y notas propias, separadas de las de la app: la versión del pie abre la lista de lo que cambió en cada entrega, en el idioma del panel"
+      }
+    ]
+  },
+  {
+    "versao": "1.2.0",
+    "data": "2026-11-25",
+    "itens": [
+      {
+        "pt-BR": "os endereços das telas passam a ser em inglês — `/accounts`, `/tracks`, `/ingestions`, `/signup`, `/plans` e `/history`. Os endereços antigos continuam funcionando: quem guardou um chega à mesma tela, com o mesmo filtro",
+        "en": "screen addresses are now in English — `/accounts`, `/tracks`, `/ingestions`, `/signup`, `/plans` and `/history`. The old addresses still work: a saved one lands on the same screen, with the same filter",
+        "es": "las direcciones de las pantallas pasan a estar en inglés — `/accounts`, `/tracks`, `/ingestions`, `/signup`, `/plans` y `/history`. Las direcciones antiguas siguen funcionando: una guardada llega a la misma pantalla, con el mismo filtro"
+      },
+      {
+        "pt-BR": "a lista de faixas abre com as mais novas em vez das maiores",
+        "en": "the track list opens with the newest instead of the largest",
+        "es": "la lista de pistas se abre con las más nuevas en vez de las más grandes"
+      }
+    ]
+  },
+  {
+    "versao": "1.1.0",
+    "data": "2026-11-23",
+    "itens": [
+      {
+        "pt-BR": "toda lista ganhou um campo de filtro e colunas que ordenam ao clique — contas, faixas, ingestões, convites, planos e histórico. O filtro ignora acento e maiúsculas, e o recorte fica no endereço: recarregar a página não o desfaz",
+        "en": "every list gained a filter field and columns that sort on click — accounts, tracks, ingestions, invites, plans and history. The filter ignores accents and capitals, and the view stays in the address: reloading the page does not undo it",
+        "es": "cada lista ganó un campo de filtro y columnas que ordenan al hacer clic — cuentas, pistas, ingestas, invitaciones, planes e historial. El filtro ignora acentos y mayúsculas, y la vista queda en la dirección: recargar la página no la deshace"
+      },
+      {
+        "pt-BR": "o painel passa a ter os nove temas do app e os três idiomas (português, inglês e espanhol), trocados na barra do topo e guardados no navegador",
+        "en": "the panel now has the app's nine themes and three languages (Portuguese, English and Spanish), switched from the top bar and remembered in the browser",
+        "es": "el panel ahora tiene los nueve temas de la app y los tres idiomas (portugués, inglés y español), que se cambian en la barra superior y quedan guardados en el navegador"
+      }
+    ]
+  },
+  {
+    "versao": "1.0.0",
+    "data": "2026-11-23",
+    "itens": [
+      {
+        "pt-BR": "o painel de administração nasce: a visão geral mostra o que espera decisão, e as contas são aprovadas, negadas, liberadas para envio, ajustadas de plano e apagadas daqui",
+        "en": "the admin panel is born: the overview shows what is waiting for a decision, and accounts are approved, denied, cleared to upload, moved between plans and deleted from here",
+        "es": "nace el panel de administración: la vista general muestra lo que espera decisión, y las cuentas se aprueban, se rechazan, se habilitan para subir, se cambian de plan y se borran desde aquí"
+      },
+      {
+        "pt-BR": "as outras telas: faixas do acervo inteiro, ingestões recentes, abertura do cadastro e convites, planos com a cota de cada um, e o histórico do que foi decidido",
+        "en": "the other screens: tracks across the whole archive, recent ingestions, opening sign-up and invites, plans with each one's quota, and the history of what was decided",
+        "es": "las otras pantallas: pistas de todo el archivo, ingestas recientes, apertura del registro e invitaciones, planes con la cuota de cada uno, y el historial de lo que se decidió"
+      }
+    ]
+  }
+]

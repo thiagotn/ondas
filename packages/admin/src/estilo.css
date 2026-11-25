@@ -202,6 +202,16 @@ p {
   text-align: right;
 }
 
+/* As notas de versão: prosa, e não tabela — a linha quebra dentro da coluna. */
+.notas {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  max-width: 78ch;
+}
+.notas li {
+  margin-bottom: 6px;
+}
+
 .centro {
   min-height: 100dvh;
   display: flex;

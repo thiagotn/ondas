@@ -1,17 +1,12 @@
 [
   {
-    "versao": "1.15.0",
+    "versao": "1.15.1",
     "data": "2026-11-25",
     "itens": [
       {
-        "pt-BR": "no painel de administração, os endereços das telas passam a ser em inglês — `/accounts`, `/tracks`, `/ingestions`, `/signup`, `/plans` e `/history`. Os endereços antigos continuam funcionando: quem guardou um chega à mesma tela, com o mesmo filtro",
-        "en": "in the admin panel, screen addresses are now in English — `/accounts`, `/tracks`, `/ingestions`, `/signup`, `/plans` and `/history`. The old addresses still work: a saved one lands on the same screen, with the same filter",
-        "es": "en el panel de administración, las direcciones de las pantallas pasan a estar en inglés — `/accounts`, `/tracks`, `/ingestions`, `/signup`, `/plans` y `/history`. Las direcciones antiguas siguen funcionando: una guardada llega a la misma pantalla, con el mismo filtro"
-      },
-      {
-        "pt-BR": "no painel de administração, a lista de faixas abre com as mais novas em vez das maiores",
-        "en": "in the admin panel, the track list opens with the newest instead of the largest",
-        "es": "en el panel de administración, la lista de pistas se abre con las más nuevas en vez de las más grandes"
+        "pt-BR": "as notas do painel de administração saíram desta página: ele passa a ter versão e notas próprias. Por isso a lista não tem mais a 1.13.0 nem a 1.15.0, que só falavam dele",
+        "en": "the admin panel's notes have left this page: it now has its own version and release notes. That is why the list no longer has 1.13.0 or 1.15.0, which were only about it",
+        "es": "las notas del panel de administración salieron de esta página: pasa a tener versión y notas propias. Por eso la lista ya no tiene la 1.13.0 ni la 1.15.0, que solo hablaban de él"
       }
     ]
   },
@@ -39,22 +34,6 @@
         "pt-BR": "a mesma faixa não entra duas vezes no acervo: enviar de novo um arquivo que você já tem, ou colar um link que você já trouxe, é recusado com o aviso de que a faixa já está lá. Vale por conta — duas pessoas podem ter a mesma faixa — e uma faixa apagada pode ser trazida de novo",
         "en": "the same track no longer enters your archive twice: uploading a file you already have, or pasting a link you already brought in, is refused with a notice that the track is already there. It applies per account — two people can have the same track — and a deleted track can be brought back",
         "es": "la misma pista ya no entra dos veces en el archivo: volver a subir un archivo que ya tienes, o pegar un enlace que ya trajiste, se rechaza con el aviso de que la pista ya está ahí. Vale por cuenta — dos personas pueden tener la misma pista — y una pista borrada se puede volver a traer"
-      }
-    ]
-  },
-  {
-    "versao": "1.13.0",
-    "data": "2026-11-23",
-    "itens": [
-      {
-        "pt-BR": "no painel de administração, toda lista ganhou um campo de filtro e colunas que ordenam ao clique — contas, faixas, ingestões, convites, planos e histórico. O filtro ignora acento e maiúsculas, e o recorte fica no endereço: recarregar a página não o desfaz",
-        "en": "in the admin panel, every list gained a filter field and columns that sort on click — accounts, tracks, ingestions, invites, plans and history. The filter ignores accents and capitals, and the view stays in the address: reloading the page does not undo it",
-        "es": "en el panel de administración, cada lista ganó un campo de filtro y columnas que ordenan al hacer clic — cuentas, pistas, ingestas, invitaciones, planes e historial. El filtro ignora acentos y mayúsculas, y la vista queda en la dirección: recargar la página no la deshace"
-      },
-      {
-        "pt-BR": "o painel de administração passa a ter os nove temas do app e os três idiomas (português, inglês e espanhol), trocados na barra do topo e guardados no navegador",
-        "en": "the admin panel now has the app's nine themes and three languages (Portuguese, English and Spanish), switched from the top bar and remembered in the browser",
-        "es": "el panel de administración ahora tiene los nueve temas de la app y los tres idiomas (portugués, inglés y español), que se cambian en la barra superior y quedan guardados en el navegador"
       }
     ]
   },

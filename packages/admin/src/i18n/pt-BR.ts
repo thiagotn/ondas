@@ -17,6 +17,11 @@ export const PT_BR = {
   'aba.planos': 'planos',
   'aba.historico': 'histórico',
 
+  'changelog.titulo': 'notas da versão',
+  'changelog.explica': 'o que mudou no painel a cada entrega. as do app ficam no próprio app.',
+  'changelog.emUso': '[em uso]',
+  'changelog.link': 'Notas da versão {versao}',
+
   'prefs.tema': 'Tema',
   'prefs.idioma': 'Idioma',
 

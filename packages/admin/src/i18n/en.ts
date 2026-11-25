@@ -14,6 +14,11 @@ export const EN: Record<Chave, Frase> = {
   'aba.planos': 'plans',
   'aba.historico': 'history',
 
+  'changelog.titulo': 'release notes',
+  'changelog.explica': "what changed in the panel with each release. the app's live in the app itself.",
+  'changelog.emUso': '[in use]',
+  'changelog.link': 'Release notes for version {versao}',
+
   'prefs.tema': 'Theme',
   'prefs.idioma': 'Language',
 

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 
 /**
@@ -10,6 +11,14 @@ import { expect, test, type Page } from '@playwright/test';
  */
 
 const TOKEN = 'token-de-teste-do-admin';
+
+const lerJson = (rel: string): unknown => JSON.parse(readFileSync(new URL(rel, import.meta.url), 'utf8'));
+
+/** A versão que o rodapé mostra: a que `pnpm release` escreve NESTE pacote. */
+const VERSAO = (lerJson('../package.json') as { version: string }).version;
+
+/** A nota de versão do painel, de onde a tela `/changelog` é desenhada. */
+const NOTAS = lerJson('../src/release/notas.json') as { versao: string; itens: Record<string, string>[] }[];
 
 interface ContaFalsa {
   id: string;
@@ -372,4 +381,17 @@ test('a tela de faixas abre pedindo as mais novas', async ({ page }) => {
 
   await expect(page.getByText('o acervo está vazio.')).toBeVisible();
   expect(ordensDeFaixas[0]).toBe('recentes');
+});
+
+test('a versão do rodapé abre as notas do painel, com a versão em uso marcada', async ({ page }) => {
+  await apiFalsa(page);
+  await entrar(page);
+
+  // A versão e a nota saem dos arquivos do PAINEL — não dos do app, que têm
+  // outro número. Fixá-las aqui quebraria o teste na próxima entrega.
+  await page.getByRole('link', { name: `Notas da versão ${VERSAO}` }).click();
+  await expect(page).toHaveURL(/\/changelog$/);
+  await expect(page.getByRole('heading', { name: 'notas da versão' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: `v${VERSAO}` })).toContainText('[em uso]');
+  await expect(page.getByText(NOTAS[0]!.itens[0]!['pt-BR']!)).toBeVisible();
 });

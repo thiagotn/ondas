@@ -27,7 +27,7 @@ pnpm preview    # serve o build em :4173 (service worker ativo)
 | `pnpm typecheck` | `tsc --noEmit` nos dois pacotes |
 | `pnpm test` | Vitest em `core` (325 testes) |
 | `pnpm test:e2e` | Playwright na web (build + preview + smoke) |
-| `pnpm release` | propaga a versão da nota para os `package.json` e gera o `CHANGELOG.md` (`--check` só confere) |
+| `pnpm release` | propaga a versão de cada nota (produto e painel de admin) para os `package.json` e gera os dois `CHANGELOG.md` (`--check` só confere) |
 | `pnpm --filter @ondas/web icons` | regenera favicon e ícones do sistema a partir dos SVGs da marca |
 | `pnpm --filter @ondas/web splash` | regenera as telas de abertura do iOS a partir do `splash.svg` da marca |
 
@@ -49,6 +49,11 @@ release, nos três idiomas —, e dela `pnpm release` tira três coisas: a vers�
 `package.json` (é o `__APP_VERSION__` que o `ondas --about` mostra), o
 [`CHANGELOG.md`](./CHANGELOG.md) e a página `/changelog` do próprio app, linkada pela linha da
 versão no sobre.
+
+O painel de admin é outro sistema e tem a sua própria linha, com número independente: a nota em
+[`packages/admin/src/release/notas.json`](./packages/admin/src/release/notas.json), o
+[`packages/admin/CHANGELOG.md`](./packages/admin/CHANGELOG.md) e a tela `/changelog` do painel,
+aberta pela versão do rodapé. O mesmo `pnpm release` cuida das duas.
 
 O ritual está em [`CLAUDE.md`](./CLAUDE.md); o raciocínio, em
 [`docs/engenharia/14-versionamento-e-releases.md`](./docs/engenharia/14-versionamento-e-releases.md).

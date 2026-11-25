@@ -1,18 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
-import { definirIdioma, itensDe, LOCALES, RELEASES, versaoAtual } from '../index.js';
+import { definirIdioma, itensDe, LOCALES, RELEASES, versaoAtual, type Release } from '../index.js';
 
 afterEach(() => definirIdioma('pt-BR'));
 
 /** Um arquivo do repositório, a partir daqui (`packages/core/src/__tests__/`). */
 const doRepo = (rel: string) => readFileSync(new URL('../../../../' + rel, import.meta.url), 'utf8');
-
-const PACOTES = [
-  'package.json',
-  'packages/core/package.json',
-  'packages/web/package.json',
-  'packages/admin/package.json',
-];
 
 const comparar = (a: string, b: string) => {
   const [a1 = 0, a2 = 0, a3 = 0] = a.split('.').map(Number);
@@ -59,6 +52,10 @@ describe('notas de versão', () => {
     }
   });
 
+  it('`versaoAtual` é o topo da lista', () => {
+    expect(versaoAtual()).toBe(RELEASES[0]!.versao);
+  });
+
   it('`itensDe` acompanha o idioma de agora', () => {
     const [primeiro] = RELEASES;
     definirIdioma('en');
@@ -71,29 +68,74 @@ describe('notas de versão', () => {
 /**
  * O ritual de entrega, travado por teste.
  *
- * A nota é a fonte única: dela `pnpm release` escreve a versão nos três
- * `package.json` (é de lá que sai o `__APP_VERSION__` que o `ondas --about`
- * mostra) e gera o `CHANGELOG.md`. Esquecer de rodar o script deixa o app
- * anunciando uma versão que a nota não conhece — e é esse o furo que os três
- * casos abaixo fecham, sem depender do passo de CI.
+ * São duas linhas, porque são dois sistemas: o produto (PWA + core) e o painel
+ * de administração, cada um com a sua nota, o seu número e o seu CHANGELOG. De
+ * cada nota `pnpm release` escreve a versão nos `package.json` da linha (é de
+ * lá que sai o `__APP_VERSION__` que a tela mostra) e gera o `CHANGELOG.md`.
+ * Esquecer de rodar o script deixa o app anunciando uma versão que a nota não
+ * conhece — e é esse o furo que os casos abaixo fecham, sem depender do CI.
+ *
+ * A nota do painel é lida do disco, e não importada: ela é do pacote dele, que
+ * o core não conhece. Por isso o formato dela também é conferido aqui — o
+ * bloco de cima só alcança `RELEASES`, que é a do produto.
  */
-describe('a nota, os pacotes e o CHANGELOG contam a mesma história', () => {
-  it('os três `package.json` estão na versão do topo da nota', () => {
-    for (const caminho of PACOTES) {
+const LINHAS: { nome: string; notas: readonly Release[]; pacotes: string[]; changelog: string }[] = [
+  {
+    nome: 'produto',
+    notas: RELEASES,
+    pacotes: ['package.json', 'packages/core/package.json', 'packages/web/package.json'],
+    changelog: 'CHANGELOG.md',
+  },
+  {
+    nome: 'admin',
+    notas: JSON.parse(doRepo('packages/admin/src/release/notas.json')) as Release[],
+    pacotes: ['packages/admin/package.json'],
+    changelog: 'packages/admin/CHANGELOG.md',
+  },
+];
+
+describe.each(LINHAS)('$nome: a nota, os pacotes e o CHANGELOG contam a mesma história', (linha) => {
+  it('a nota é SemVer descendo da mais nova, com data e os três idiomas', () => {
+    expect(linha.notas.length).toBeGreaterThan(0);
+    linha.notas.forEach((r, i) => {
+      expect(r.versao, r.versao).toMatch(/^\d+\.\d+\.\d+$/);
+      expect(r.data, r.versao).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      const anterior = linha.notas[i - 1];
+      if (anterior) expect(comparar(anterior.versao, r.versao), r.versao).toBeGreaterThan(0);
+      expect(r.itens.length, r.versao).toBeGreaterThan(0);
+      for (const item of r.itens) {
+        for (const locale of LOCALES) {
+          expect(item[locale]?.trim(), `${r.versao}/${locale}`).toBeTruthy();
+        }
+      }
+    });
+  });
+
+  it('os `package.json` da linha estão na versão do topo da nota', () => {
+    for (const caminho of linha.pacotes) {
       const { version } = JSON.parse(doRepo(caminho)) as { version: string };
-      expect(version, caminho).toBe(versaoAtual());
+      expect(version, caminho).toBe(linha.notas[0]!.versao);
     }
   });
 
-  it('o `CHANGELOG.md` tem a entrada da versão de agora', () => {
-    const topo = RELEASES[0]!;
-    expect(doRepo('CHANGELOG.md')).toContain(`## ${topo.versao} — ${topo.data}`);
+  it('o CHANGELOG tem a entrada da versão de agora', () => {
+    const topo = linha.notas[0]!;
+    expect(doRepo(linha.changelog)).toContain(`## ${topo.versao} — ${topo.data}`);
   });
 
   it('e nenhum item em português ficou de fora dele', () => {
-    const changelog = doRepo('CHANGELOG.md');
-    for (const r of RELEASES) {
+    const changelog = doRepo(linha.changelog);
+    for (const r of linha.notas) {
       for (const item of r.itens) expect(changelog, r.versao).toContain(item['pt-BR']);
     }
   });
+});
+
+/**
+ * O que separou as duas linhas: nota do painel na página `/changelog` do app.
+ * Uma entrega só do painel escrita na nota errada passa em tudo acima.
+ */
+it('a nota do produto não fala do painel de administração além de dizer que ele saiu', () => {
+  const doPainel = RELEASES.filter((r) => r.itens.some((i) => /painel de administração/.test(i['pt-BR'])));
+  expect(doPainel.map((r) => r.versao)).toEqual(['1.15.1']);
 });

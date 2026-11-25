@@ -99,6 +99,39 @@ The other half of the discipline is end-to-end: the smoke test opens `ondas --ab
 version comes from the package's `package.json`, not from a `'1.1.0'` pinned in the test — pinning
 it would break the test on the next delivery, which is exactly when it needs to keep holding.
 
+## Two lines: the product and the panel
+
+On 23/11/2026 the project gained an admin panel, and it went into the note that already existed.
+Within two days the PWA's `/changelog` page had two whole versions — 1.13.0 and 1.15.0 — that changed
+nothing for someone listening to music: filters on the panel's lists, the panel's addresses in
+English. The app's number was climbing for releases the app had not received.
+
+The panel is a different system: another bundle, another host, another audience. So it got its own
+line, built on the same mechanism:
+
+| | product | panel |
+|---|---|---|
+| note | `packages/core/src/release/notas.json` | `packages/admin/src/release/notas.json` |
+| packages | root, `core`, `web` | `admin` |
+| generated file | `CHANGELOG.md` | `packages/admin/CHANGELOG.md` |
+| screen | the PWA's `/changelog` | the panel's `/changelog`, from the footer |
+
+`scripts/release.mjs` no longer has one note file; it has a list of lines, and validates, propagates
+and checks each. The sync tests run over both (`describe.each`).
+
+Two migration decisions, both debatable:
+
+- **The panel restarted at 1.0.0.** Its releases were renumbered (1.0.0 for its birth, 1.1.0,
+  1.2.0), and the footer dropped from 1.15.0 to 1.3.0. A number going backwards is ugly, but the
+  panel has one user, and carrying forever a `1.15` inherited from another system would be worse.
+- **The product did not go backwards.** Entries 1.13.0 and 1.15.0 left the app's note, and it moved
+  up to 1.15.1 with an item saying so. The list now has two gaps; the alternative was the PWA in
+  production going from 1.15.0 to 1.14.1, and a version that shrinks on an installed app is the kind
+  of thing that makes someone think the deploy went wrong.
+
+The rule for which note to touch is about who SEES the change, not where the diff is: a new API route
+only the panel calls is a panel release.
+
 ## What SemVer means here
 
 An app has no public API, so the three numbers need a reading of their own. The one I adopted:
