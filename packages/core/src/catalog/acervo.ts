@@ -119,4 +119,33 @@ export class AcervoCatalogClient {
     }
     return corpo.tracks.map(valida).filter((t): t is Track => t !== null);
   }
+
+  /**
+   * Apaga uma faixa do acervo de quem está logado. Não tem volta: o servidor
+   * leva junto o áudio, as capas, as curtidas, os itens de playlist e o
+   * histórico que apontavam para ela.
+   *
+   * O id vai inteiro (`acervo:<uuid>`); quem tira o prefixo é a API. Só o DONO
+   * apaga — para a faixa que outra conta compartilhou a resposta é 404, a mesma
+   * de uma faixa que não existe.
+   */
+  async remover(id: string): Promise<void> {
+    const res = await this.fetchImpl(`${ROTA}/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+      headers: { accept: 'application/json' },
+    });
+    if (res.ok) return;
+
+    let mensagem = `acervo respondeu ${res.status}`;
+    let codigo: string | undefined;
+    try {
+      const corpo = (await res.json()) as { error?: unknown; code?: unknown };
+      if (typeof corpo.error === 'string' && corpo.error) mensagem = corpo.error;
+      if (typeof corpo.code === 'string' && corpo.code) codigo = corpo.code;
+    } catch {
+      // Corpo que não é JSON (um 502 do proxy): fica a frase com o status.
+    }
+    throw new AcervoError(mensagem, res.status === 401, codigo);
+  }
 }

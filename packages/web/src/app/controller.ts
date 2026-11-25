@@ -1,4 +1,5 @@
 import {
+  AcervoError,
   AuthError,
   faixaPorNumero,
   firstPlayable,
@@ -42,7 +43,7 @@ import { esquecerCurtidas, registrar, sincronizar } from './likes';
 import { trocarIdioma } from './idioma';
 import * as listas from './playlists';
 import * as prefs from './prefs';
-import { auth, connectivity, engine, offlineStore } from './services';
+import { acervoClient, auth, connectivity, engine, offlineStore } from './services';
 import { libraryStore, playerStore, sessionStore, uiStore } from './stores';
 
 /** O rótulo da janela de conta, citado dentro de frase. Ver `view.ts`. */
@@ -618,6 +619,114 @@ export async function removerMarcadas(playlistID: string): Promise<void> {
   if (!(await listas.remover(playlistID, ids))) return;
   uiStore.getState().sairDaSelecao();
   uiStore.getState().flash(t('toast.faixasTiradas', { n: ids.length }));
+}
+
+/** A faixa é do acervo DESTA conta — e não uma que outra conta compartilhou. */
+function ehMinha(id: string): boolean {
+  const faixa = tracks.find((f) => f.id === id);
+  return !!faixa && faixa.source === 'acervo' && !faixa.owner;
+}
+
+/**
+ * Todas as marcadas são faixas próprias? É o que decide se a barra de seleção
+ * oferece `[apagar do acervo]`: com uma faixa do catálogo público ou de outra
+ * conta no meio, "apagar as marcadas" seria uma promessa que não dá para
+ * cumprir — então o botão não aparece, em vez de apagar só uma parte.
+ */
+export function marcadasSaoMinhas(): boolean {
+  const ids = marcadasEmOrdem();
+  return ids.length > 0 && ids.every(ehMinha);
+}
+
+/**
+ * Apaga as marcadas do acervo da conta. NÃO TEM VOLTA: o servidor leva o áudio
+ * do bucket, e quem chama já confirmou em dois toques (`SelectionBar`).
+ *
+ * Primeiro o servidor, faixa a faixa, e a tela só perde o que ele confirmou:
+ * se a terceira de cinco falhar, as duas primeiras saem da lista e as outras
+ * continuam marcadas, com o aviso do que aconteceu.
+ */
+export async function apagarMarcadasDoAcervo(): Promise<void> {
+  const ui = uiStore.getState();
+  const ids = marcadasEmOrdem().filter(ehMinha);
+  if (!ids.length) return;
+
+  const apagadas = new Set<string>();
+  let falha: unknown;
+  for (const id of ids) {
+    try {
+      await acervoClient.remover(id);
+      apagadas.add(id);
+    } catch (err) {
+      // 404 é "já não existe": apagada em outro aparelho. O resultado que a
+      // pessoa pediu é o mesmo, então sai da tela como as outras.
+      if (err instanceof AcervoError && err.codigo === 'faixa_nao_encontrada') {
+        apagadas.add(id);
+        continue;
+      }
+      falha = err;
+      break;
+    }
+  }
+
+  if (apagadas.size) {
+    // A faixa que toca foi apagada: o áudio para. Deixá-la tocando seria tocar
+    // um arquivo que não existe mais, com a barra de baixo mostrando uma faixa
+    // que nenhuma lista tem.
+    const player = playerStore.getState();
+    if (player.curId && apagadas.has(player.curId)) {
+      engine.pause();
+      setMediaPlaybackState(false);
+      armado = null;
+      pendencia = null;
+      player.reset();
+    }
+
+    // Sai do cache do catálogo JÁ, nos dois escopos do logado: o
+    // `invalidateQueries` abaixo busca a versão do servidor, mas até ela chegar
+    // a linha apagada ainda estaria na tela, tocável.
+    queryClient.setQueriesData<{ tracks: Track[]; acervo?: number }>(
+      { queryKey: CATALOG_LOGADO_KEY },
+      (dado) =>
+        dado && {
+          ...dado,
+          tracks: dado.tracks.filter((f) => !apagadas.has(f.id)),
+          ...(typeof dado.acervo === 'number'
+            ? { acervo: Math.max(0, dado.acervo - apagadas.size) }
+            : {}),
+        },
+    );
+    void queryClient.invalidateQueries({ queryKey: CATALOG_LOGADO_KEY });
+
+    // A cópia baixada no aparelho vai junto: sem a faixa, são bytes que
+    // nenhuma tela mostra.
+    for (const id of apagadas) {
+      if (!libraryStore.getState().cached[id]) continue;
+      await offlineStore.remove(id).catch(() => undefined);
+      libraryStore.getState().unmarkCached(id);
+    }
+
+    // O servidor já tirou a faixa das curtidas e das playlists da conta; os
+    // espelhos daqui se acertam com ele.
+    void sincronizar();
+    void listas.carregarPlaylists();
+  }
+
+  if (falha) {
+    console.warn('[ondas] não foi possível apagar do acervo:', falha);
+    const frase =
+      falha instanceof AcervoError
+        ? (tErro(falha.codigo) ?? falha.message)
+        : t('semRede.faixaNaoApagada');
+    // As que saíram deixam de estar marcadas; as que ficaram continuam, para a
+    // pessoa tentar de novo sem remarcar.
+    for (const id of apagadas) if (uiStore.getState().marcadas[id]) ui.alternarMarca(id);
+    ui.flash(frase);
+    return;
+  }
+
+  ui.sairDaSelecao();
+  ui.flash(t('toast.faixasApagadas', { n: apagadas.size }));
 }
 
 /**

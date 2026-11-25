@@ -33,10 +33,21 @@ export function SelectionBar({ playlistID }: SelectionBarProps) {
   const marcadas = useUi((st) => st.marcadas);
   const playlists = useLibrary((st) => st.playlists);
   const [criando, setCriando] = useState(false);
+  // Apagar do acervo não tem volta, então pede dois toques — o mesmo arranjo
+  // do `[apagar]` de playlist. Guarda QUAIS marcas foram confirmadas: mudou a
+  // seleção, a pergunta some, e ninguém confirma uma lista que não leu.
+  const [apagando, setApagando] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
 
   if (!user || !selecionando) return null;
 
   const quantas = Object.keys(marcadas).length;
+  const assinatura = Object.keys(marcadas).join(',');
+  const perguntando = apagando !== null && apagando === assinatura;
+  // Só com TODAS as marcadas sendo faixas próprias. Fora de playlist: lá
+  // `[remover]` tira da playlist, e dois botões vermelhos lado a lado com
+  // alcances tão diferentes é pedir o toque errado.
+  const podeApagar = !playlistID && quantas > 0 && controller.marcadasSaoMinhas();
 
   return (
     <>
@@ -88,6 +99,42 @@ export function SelectionBar({ playlistID }: SelectionBarProps) {
                   onClick={() => controller.moverNaPlaylist(playlistID, 1)}
                 >
                   ↓
+                </button>
+              </>
+            )}
+            {podeApagar && !perguntando && (
+              <button
+                type="button"
+                className={`${s.acao} ${s.acaoRisco}`}
+                onClick={() => setApagando(assinatura)}
+              >
+                {t('acervo.apagar')}
+              </button>
+            )}
+            {podeApagar && perguntando && (
+              <>
+                <span className={s.contador}>{t('acervo.apagarPergunta', { n: quantas })}</span>
+                <button
+                  type="button"
+                  className={`${s.acao} ${s.acaoRisco}`}
+                  disabled={ocupado}
+                  onClick={() => {
+                    setOcupado(true);
+                    void controller.apagarMarcadasDoAcervo().finally(() => {
+                      setOcupado(false);
+                      setApagando(null);
+                    });
+                  }}
+                >
+                  {t('ui.sim')}
+                </button>
+                <button
+                  type="button"
+                  className={s.acao}
+                  disabled={ocupado}
+                  onClick={() => setApagando(null)}
+                >
+                  {t('ui.nao')}
                 </button>
               </>
             )}

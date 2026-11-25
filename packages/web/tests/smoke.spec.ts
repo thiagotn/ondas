@@ -157,6 +157,9 @@ function semearCurtida(page: Page, id: string) {
 /** O acervo mutável da API falsa, por página — ver `semearCompartilhada`. */
 const acervoSemeado = new WeakMap<Page, Record<string, unknown>[]>();
 
+/** Os ids que chegaram ao `DELETE /api/acervo/<id>` de mentira. */
+const apagadasNoServidor = new WeakMap<Page, string[]>();
+
 /** As URLs que chegaram ao `POST /api/acervo/ingest` de mentira. */
 const linksPedidos = new WeakMap<Page, string[]>();
 
@@ -573,6 +576,27 @@ async function stubApi(page: Page) {
       : route.fulfill({ status: 401, json: { error: 'sessão expirada' } }),
   );
 
+  // Apagar faixa do acervo. Registrada ANTES das rotas de envio e de link de
+  // propósito: o glob também casa com `/api/acervo/ingest`, e o Playwright
+  // tenta primeiro a rota registrada por último — então elas ganham, e o que
+  // não é DELETE segue adiante.
+  apagadasNoServidor.set(page, []);
+  await page.route('**/api/acervo/*', async (route) => {
+    if (route.request().method() !== 'DELETE') return route.fallback();
+    if (!logado) return route.fulfill({ status: 401, json: { error: 'sessão expirada' } });
+    const id = decodeURIComponent(new URL(route.request().url()).pathname.split('/').pop() ?? '');
+    const onde = acervo.findIndex((f) => f.id === id && !('owner' in f));
+    if (onde < 0) {
+      return route.fulfill({
+        status: 404,
+        json: { error: 'faixa não encontrada', code: 'faixa_nao_encontrada' },
+      });
+    }
+    acervo.splice(onde, 1);
+    apagadasNoServidor.get(page)!.push(id);
+    return route.fulfill({ status: 200, json: { status: 'removida' } });
+  });
+
   // A capa da faixa do acervo: 1x1 transparente, só para existir um <img>.
   await page.route('**/capa-teste.png', async (route) =>
     route.fulfill({
@@ -655,6 +679,16 @@ async function stubApi(page: Page) {
     if (!logado) return route.fulfill({ status: 401, json: { error: 'sessão expirada' } });
     const { url } = JSON.parse(route.request().postData() ?? '{}');
     linksPedidos.get(page)!.push(String(url));
+    if (String(url).includes('ja-tenho')) {
+      return route.fulfill({
+        status: 409,
+        json: {
+          error: 'esta faixa já está no acervo',
+          code: 'faixa_repetida',
+          params: { titulo: 'Fita Caseira' },
+        },
+      });
+    }
     if (String(url).includes('conta-cheia')) {
       return route.fulfill({
         status: 413,
@@ -2467,6 +2501,74 @@ async function segurar(page: Page, alvo: Locator) {
   await page.waitForTimeout(600);
   await page.mouse.up();
 }
+
+test('apagar uma faixa do próprio acervo pede dois toques e não tem volta', async ({ page }) => {
+  await blockAudius(page);
+  await logar(page);
+  await page.keyboard.press('3');
+
+  await segurar(page, page.getByRole('button', { name: /Fita Caseira/ }));
+  await expect(marcadas(page)).toHaveText('1 marcada');
+
+  // O primeiro toque só pergunta: nada foi ao servidor ainda.
+  await page.getByRole('button', { name: '[apagar do acervo]' }).click();
+  await expect(page.getByText('apagar 1 faixa do acervo? não tem volta')).toBeVisible();
+  expect(apagadasNoServidor.get(page)).toHaveLength(0);
+
+  // `[não]` desiste e devolve o botão.
+  await page.getByRole('button', { name: '[não]' }).click();
+  await expect(page.getByRole('button', { name: '[apagar do acervo]' })).toBeVisible();
+  expect(apagadasNoServidor.get(page)).toHaveLength(0);
+
+  await page.getByRole('button', { name: '[apagar do acervo]' }).click();
+  await page.getByRole('button', { name: '[sim]' }).click();
+
+  await expect(page.getByText('1 faixa apagada do acervo')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Fita Caseira/ })).toHaveCount(0);
+  await expect(marcadas(page)).toHaveCount(0);
+  expect(apagadasNoServidor.get(page)).toEqual(['acervo:11111111-1111-4111-8111-111111111111']);
+
+  // E não volta com um reload: saiu do servidor, não só da tela.
+  //
+  // A espera é a do persistidor do cache (`throttleTime: 1000` em
+  // `query/client.ts`): recarregar antes de ele gravar reidrata a lista de
+  // antes, que ainda vale por 5 minutos. É uma janela real, de um segundo.
+  await page.waitForTimeout(1500);
+  await page.reload();
+  await skipSplash(page);
+  await page.keyboard.press('3');
+  await expect(page.getByRole('button', { name: /Fita Caseira/ })).toHaveCount(0);
+});
+
+test('apagar a faixa que está tocando para o som e esvazia a barra de baixo', async ({ page }) => {
+  await blockAudius(page);
+  await logarEtocarAcervo(page);
+  await expect(page.getByText('Fita Caseira — Eu Mesmo')).toBeVisible();
+  await page.keyboard.press('3');
+
+  await segurar(page, page.getByRole('button', { name: /Fita Caseira/ }));
+  await page.getByRole('button', { name: '[apagar do acervo]' }).click();
+  await page.getByRole('button', { name: '[sim]' }).click();
+
+  await expect(page.getByText('1 faixa apagada do acervo')).toBeVisible();
+  await expect(page.getByText('Fita Caseira — Eu Mesmo')).toHaveCount(0);
+});
+
+test('a faixa que outra conta compartilhou não pode ser apagada por quem a recebeu', async ({
+  page,
+}) => {
+  await blockAudius(page);
+  semearCompartilhada(page);
+  await logar(page);
+  await page.keyboard.press('3');
+  await page.getByRole('button', { name: '--compartilhadas' }).click();
+
+  await segurar(page, page.getByRole('button', { name: /Vinda de Longe/ }));
+  await expect(marcadas(page)).toHaveText('1 marcada');
+  // As outras ações da barra existem; a de apagar, não.
+  await expect(page.getByRole('button', { name: '[+ playlist]' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '[apagar do acervo]' })).toHaveCount(0);
+});
 
 test('marcar faixas e criar uma playlist com elas', async ({ page }) => {
   await blockAudius(page);
@@ -4382,6 +4484,18 @@ test('[+ link] lê o clipboard no toque, e a recusa por cota aparece traduzida',
   await expect(
     page.getByText('sem espaço no acervo: a conta chegou ao limite do plano'),
   ).toBeVisible();
+});
+
+test('[+ link] de uma faixa que a conta já tem é recusado, e a recusa aparece traduzida', async ({
+  page,
+}) => {
+  await clipboardDeMentira(page, false);
+  await logar(page);
+  await page.keyboard.press('3');
+  await page.evaluate(() => navigator.clipboard.writeText('https://cdn.exemplo.test/ja-tenho/a.mp3'));
+
+  await page.getByRole('button', { name: '[+ link]' }).click();
+  await expect(page.getByText('esta faixa já está no seu acervo')).toBeVisible();
 });
 
 test('[+ link] sem link no clipboard abre um campo para colar', async ({ page }) => {

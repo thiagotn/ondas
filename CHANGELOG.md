@@ -7,6 +7,11 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.14.0 — 2026-11-25
+
+- você apaga faixas do seu próprio acervo: segure uma faixa na biblioteca (ou use `v`) para marcar, e toque em `[apagar do acervo]`. Pede uma confirmação, porque não tem volta — o arquivo sai do servidor, das suas playlists e curtidas, e o espaço volta para a sua cota. Faixa que outra conta compartilhou com você não pode ser apagada
+- a mesma faixa não entra duas vezes no acervo: enviar de novo um arquivo que você já tem, ou colar um link que você já trouxe, é recusado com o aviso de que a faixa já está lá. Vale por conta — duas pessoas podem ter a mesma faixa — e uma faixa apagada pode ser trazida de novo
+
 ## 1.13.0 — 2026-11-23
 
 - no painel de administração, toda lista ganhou um campo de filtro e colunas que ordenam ao clique — contas, faixas, ingestões, convites, planos e histórico. O filtro ignora acento e maiúsculas, e o recorte fica no endereço: recarregar a página não o desfaz

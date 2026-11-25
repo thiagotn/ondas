@@ -104,6 +104,9 @@ const (
 	CodPaginaIndisponivel = "pagina_indisponivel"
 	CodPaginaLongaDemais  = "pagina_longa_demais"
 	CodPaginaFalhou       = "pagina_falhou"
+
+	// A conta já tem esta faixa (migração 0014): mesmo arquivo ou mesmo link.
+	CodFaixaRepetida = "faixa_repetida"
 )
 
 // As frases que o NODE pode gravar num job de página, pelo código que ele
@@ -215,4 +218,5 @@ var codigoPorMensagem = map[string]string{
 	"o link não está disponível":                              CodPaginaIndisponivel,
 	"a faixa deste link é longa demais":                       CodPaginaLongaDemais,
 	"não foi possível baixar este link":                       CodPaginaFalhou,
+	"esta faixa já está no acervo":                            CodFaixaRepetida,
 }

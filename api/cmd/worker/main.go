@@ -81,6 +81,16 @@ func main() {
 		return
 	}
 
+	// `worker medir-hash [--gravar]` preenche o SHA-256 do áudio de quem foi
+	// ingerido antes da migração 0014, e lista os pares repetidos que achar.
+	if len(os.Args) > 1 && os.Args[1] == "medir-hash" {
+		if err := medirHash(os.Args[2:]); err != nil {
+			slog.Error("medir-hash", "erro", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if err := run(); err != nil {
 		slog.Error("encerrando", "erro", err)
 		os.Exit(1)

@@ -141,6 +141,12 @@ URL — the only moment the size of a URL ingestion is known, and there the fail
 repeating the download creates no space. In all of them, the account that counts is the one that
 will **own** the track, not the one that asked.
 
+With refusal in force, the way out was missing: until 1.13 only the admin could delete a track, so
+a full account depended on them. In 1.14 people delete from their own archive in the PWA (the
+`DELETE /api/acervo/{id}` route already existed, session-only and owner-only), and the same track no
+longer enters twice — which was quota spent for nothing ([document 10](10-ingestao-e-ssrf.en.md),
+"Duplicate tracks").
+
 ## What was discarded
 
 | Alternative | Why not |

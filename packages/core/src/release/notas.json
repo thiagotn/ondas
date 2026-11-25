@@ -1,5 +1,21 @@
 [
   {
+    "versao": "1.14.0",
+    "data": "2026-11-25",
+    "itens": [
+      {
+        "pt-BR": "você apaga faixas do seu próprio acervo: segure uma faixa na biblioteca (ou use `v`) para marcar, e toque em `[apagar do acervo]`. Pede uma confirmação, porque não tem volta — o arquivo sai do servidor, das suas playlists e curtidas, e o espaço volta para a sua cota. Faixa que outra conta compartilhou com você não pode ser apagada",
+        "en": "you can delete tracks from your own archive: hold a track in the library (or press `v`) to select it, then tap `[delete from archive]`. It asks for confirmation, because it cannot be undone — the file leaves the server, your playlists and likes, and the space goes back to your quota. A track another account shared with you cannot be deleted",
+        "es": "puedes borrar pistas de tu propio archivo: mantén pulsada una pista en la biblioteca (o usa `v`) para marcarla, y toca `[borrar del archivo]`. Pide confirmación, porque no se puede deshacer — el archivo sale del servidor, de tus listas y de tus favoritos, y el espacio vuelve a tu cuota. Una pista que otra cuenta compartió contigo no se puede borrar"
+      },
+      {
+        "pt-BR": "a mesma faixa não entra duas vezes no acervo: enviar de novo um arquivo que você já tem, ou colar um link que você já trouxe, é recusado com o aviso de que a faixa já está lá. Vale por conta — duas pessoas podem ter a mesma faixa — e uma faixa apagada pode ser trazida de novo",
+        "en": "the same track no longer enters your archive twice: uploading a file you already have, or pasting a link you already brought in, is refused with a notice that the track is already there. It applies per account — two people can have the same track — and a deleted track can be brought back",
+        "es": "la misma pista ya no entra dos veces en el archivo: volver a subir un archivo que ya tienes, o pegar un enlace que ya trajiste, se rechaza con el aviso de que la pista ya está ahí. Vale por cuenta — dos personas pueden tener la misma pista — y una pista borrada se puede volver a traer"
+      }
+    ]
+  },
+  {
     "versao": "1.13.0",
     "data": "2026-11-23",
     "itens": [

@@ -326,6 +326,55 @@ describe('loadCatalog com as duas fontes', () => {
   });
 });
 
+describe('AcervoCatalogClient.remover', () => {
+  const id = 'acervo:abb38f1b-2929-48fe-afbb-f376a479d196';
+
+  it('manda DELETE para a faixa, com o id inteiro', async () => {
+    const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) =>
+      resposta(200, { status: 'removida' }),
+    );
+    await new AcervoCatalogClient(fetchImpl as unknown as typeof fetch).remover(id);
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe(`/api/acervo/${encodeURIComponent(id)}`);
+    expect(init?.method).toBe('DELETE');
+    expect(init?.credentials).toBe('same-origin');
+  });
+
+  it('recusa da API vira AcervoError com o código, para a tela traduzir', async () => {
+    const fetchImpl = vi.fn(async () =>
+      resposta(404, { error: 'faixa não encontrada', code: 'faixa_nao_encontrada' }),
+    );
+    const erro = await new AcervoCatalogClient(fetchImpl as unknown as typeof fetch)
+      .remover(id)
+      .catch((e: unknown) => e);
+
+    expect(erro).toBeInstanceOf(AcervoError);
+    expect((erro as AcervoError).codigo).toBe('faixa_nao_encontrada');
+    expect((erro as AcervoError).semSessao).toBe(false);
+  });
+
+  it('401 é sessão que acabou, e resposta sem JSON não derruba o erro', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        ({
+          ok: false,
+          status: 401,
+          json: async () => {
+            throw new SyntaxError('não é JSON');
+          },
+        }) as unknown as Response,
+    );
+    const erro = await new AcervoCatalogClient(fetchImpl as unknown as typeof fetch)
+      .remover(id)
+      .catch((e: unknown) => e);
+
+    expect(erro).toBeInstanceOf(AcervoError);
+    expect((erro as AcervoError).semSessao).toBe(true);
+  });
+});
+
 describe('o acervo não colide com o heurístico [pro] do protótipo', () => {
   it('faixa própria nunca é premium, mesmo na posição em que o heurístico dispara', async () => {
     // O heurístico marca cada 3ª faixa (índices 2, 5, 8...). Com as próprias na

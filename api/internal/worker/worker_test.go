@@ -53,6 +53,13 @@ func (b *baixadorDeArquivo) Baixar(_ context.Context, _ string, destino io.Write
 	return "audio/mpeg", n, err
 }
 
+// baixadorPorURL entrega um arquivo local diferente para cada URL.
+type baixadorPorURL map[string]string
+
+func (b baixadorPorURL) Baixar(ctx context.Context, url string, destino io.Writer) (string, int64, error) {
+	return (&baixadorDeArquivo{caminho: b[url]}).Baixar(ctx, url, destino)
+}
+
 // s3Gravador é um S3 de brinquedo. Começou só registrando o que subia; passou
 // a GUARDAR e SERVIR bytes quando o worker ganhou a fonte `upload:`, em que a
 // mídia vem do próprio bucket em vez de uma URL — um dublê que só aceitasse
@@ -467,12 +474,16 @@ func TestArquivoQueNaoEhAudioNaoSobeNada(t *testing.T) {
 // Fila com vários: uma rodada esvazia tudo.
 func TestUmaRodadaEsvaziaAFila(t *testing.T) {
 	exigirFFmpeg(t)
-	bx := &baixadorDeArquivo{caminho: mp3DeTeste(t, "x", "y", false)}
+	// Um arquivo por URL: três pedidos do MESMO arquivo seriam, desde a
+	// migração 0014, uma faixa e duas recusas por repetição.
+	bx := baixadorPorURL{}
 	w, jobs, tracks, _, dono := montar(t, bx)
 	ctx := context.Background()
 
 	for _, u := range []string{"a", "b", "c"} {
-		_, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/"+u+".mp3", "", "", acervo.Destino{})
+		url := "https://exemplo.test/" + u + ".mp3"
+		bx[url] = mp3DeTeste(t, u, "y", false)
+		_, _, err := jobs.Enfileirar(ctx, dono, url, "", "", acervo.Destino{})
 		require.NoError(t, err)
 	}
 	feitos, err := w.Rodar(ctx)
@@ -843,4 +854,145 @@ func TestContaSemEspacoDesisteNaPrimeiraTentativa(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, faixas)
 	require.Empty(t, s3.chaves(), "nada foi para o bucket")
+}
+
+// --- faixa repetida (migração 0014) ---
+
+// enviarArquivo semeia um arquivo na área de espera e enfileira o job, como a
+// tela de envio da PWA faz.
+func enviarArquivo(t *testing.T, jobs *acervo.Jobs, s3 *s3Gravador, quem, envio string, bytes []byte, d acervo.Destino) (*acervo.Job, string) {
+	t.Helper()
+	stage := storage.KeyUploadStage(quem, envio)
+	s3.semear(stage, "application/octet-stream", bytes, time.Now())
+	job, _, err := jobs.Enfileirar(context.Background(), quem, acervo.FonteUpload(envio), "", "", d)
+	require.NoError(t, err)
+	return job, stage
+}
+
+// O caso que motivou a trava: o mesmo arquivo enviado duas vezes virava duas
+// faixas iguais. A segunda é recusada de primeira, e não deixa nada para trás.
+func TestMesmoArquivoEnviadoDeNovoEhRecusado(t *testing.T) {
+	exigirFFmpeg(t)
+	w, jobs, tracks, s3, dono := montar(t, &baixadorQueNaoDeveriaSerChamado{t: t})
+	ctx := context.Background()
+	bytesMP3, err := os.ReadFile(mp3DeTeste(t, "The Door", "Teddy Swims", false))
+	require.NoError(t, err)
+
+	primeiro, _ := enviarArquivo(t, jobs, s3, dono, "11111111-1111-4111-8111-111111111111", bytesMP3, acervo.Destino{})
+	_, err = w.Rodar(ctx)
+	require.NoError(t, err)
+	depois, err := jobs.PorID(ctx, dono, primeiro.ID)
+	require.NoError(t, err)
+	require.Equal(t, "ready", depois.Status, "erro: %s", depois.Error)
+	antes := len(s3.chaves())
+
+	segundo, stage := enviarArquivo(t, jobs, s3, dono, "22222222-2222-4222-8222-222222222222", bytesMP3, acervo.Destino{})
+	_, err = w.Rodar(ctx)
+	require.NoError(t, err)
+
+	depois, err = jobs.PorID(ctx, dono, segundo.ID)
+	require.NoError(t, err)
+	require.Equal(t, "error", depois.Status)
+	require.Equal(t, acervo.MensagemRepetida, depois.Error)
+	require.Equal(t, 1, depois.Attempts, "definitiva: uma tentativa só")
+
+	faixas, err := tracks.Listar(ctx, dono)
+	require.NoError(t, err)
+	require.Len(t, faixas, 1, "a segunda não virou faixa")
+	require.False(t, s3.tem(stage), "a cópia na área de espera foi descartada")
+	require.Len(t, s3.chaves(), antes, "nada novo ficou no bucket")
+}
+
+// A mesma URL depois de PRONTA: o índice de jobs em andamento já não segura.
+// Aqui o arquivo é outro a cada download (como num link de página), e quem
+// reconhece é a origem.
+func TestMesmaOrigemEhRecusadaMesmoComBytesDiferentes(t *testing.T) {
+	exigirFFmpeg(t)
+	bx := &baixadorDeArquivo{caminho: mp3DeTeste(t, "Primeira", "Banda", false)}
+	w, jobs, tracks, _, dono := montar(t, bx)
+	ctx := context.Background()
+	const url = "https://exemplo.test/faixa.mp3"
+
+	_, _, err := jobs.Enfileirar(ctx, dono, url, "", "", acervo.Destino{})
+	require.NoError(t, err)
+	_, err = w.Rodar(ctx)
+	require.NoError(t, err)
+
+	bx.caminho = mp3DeTeste(t, "Outro Encode", "Banda", true)
+	segundo, novo, err := jobs.Enfileirar(ctx, dono, url, "", "", acervo.Destino{})
+	require.NoError(t, err)
+	require.True(t, novo, "o primeiro já terminou; este é um pedido novo")
+	_, err = w.Rodar(ctx)
+	require.NoError(t, err)
+
+	depois, err := jobs.PorID(ctx, dono, segundo.ID)
+	require.NoError(t, err)
+	require.Equal(t, "error", depois.Status)
+	require.Equal(t, acervo.MensagemRepetida, depois.Error)
+
+	faixas, err := tracks.Listar(ctx, dono)
+	require.NoError(t, err)
+	require.Len(t, faixas, 1)
+}
+
+// Apagar tem de devolver o direito de trazer de novo: a identidade mora na
+// linha da faixa, não no job que a criou.
+func TestFaixaApagadaPodeVoltar(t *testing.T) {
+	exigirFFmpeg(t)
+	w, jobs, tracks, s3, dono := montar(t, &baixadorQueNaoDeveriaSerChamado{t: t})
+	ctx := context.Background()
+	bytesMP3, err := os.ReadFile(mp3DeTeste(t, "Vai e Volta", "Banda", false))
+	require.NoError(t, err)
+
+	enviarArquivo(t, jobs, s3, dono, "11111111-1111-4111-8111-111111111111", bytesMP3, acervo.Destino{})
+	_, err = w.Rodar(ctx)
+	require.NoError(t, err)
+	faixas, err := tracks.Listar(ctx, dono)
+	require.NoError(t, err)
+	require.Len(t, faixas, 1)
+	_, err = tracks.Remover(ctx, dono, faixas[0].ID)
+	require.NoError(t, err)
+
+	de_novo, _ := enviarArquivo(t, jobs, s3, dono, "22222222-2222-4222-8222-222222222222", bytesMP3, acervo.Destino{})
+	_, err = w.Rodar(ctx)
+	require.NoError(t, err)
+	depois, err := jobs.PorID(ctx, dono, de_novo.ID)
+	require.NoError(t, err)
+	require.Equal(t, "ready", depois.Status, "erro: %s", depois.Error)
+}
+
+// A trava é por DONO. Duas contas podem ter a mesma faixa, e o bot publicando
+// para alguém é conferido contra a conta de quem recebe — não a dele.
+func TestRepetidaEhPorContaEContraQuemRecebe(t *testing.T) {
+	exigirFFmpeg(t)
+	w, jobs, tracks, s3, bot, pool := montarComPool(t, &baixadorQueNaoDeveriaSerChamado{t: t}, tetoDeTeste)
+	ctx := context.Background()
+	ela := dbtest.CriarUsuario(t, pool, "ela@exemplo.test")
+	bytesMP3, err := os.ReadFile(mp3DeTeste(t, "De Todo Mundo", "Banda", false))
+	require.NoError(t, err)
+
+	rodar := func(envio string, d acervo.Destino) *acervo.Job {
+		t.Helper()
+		job, _ := enviarArquivo(t, jobs, s3, bot, envio, bytesMP3, d)
+		_, err := w.Rodar(ctx)
+		require.NoError(t, err)
+		depois, err := jobs.PorID(ctx, bot, job.ID)
+		require.NoError(t, err)
+		return depois
+	}
+
+	// O bot tem a faixa na própria conta…
+	require.Equal(t, "ready", rodar("11111111-1111-4111-8111-111111111111", acervo.Destino{}).Status)
+	// …e isso não impede publicá-la para ela, que ainda não tem.
+	para := acervo.Destino{UserID: ela}
+	primeira := rodar("22222222-2222-4222-8222-222222222222", para)
+	require.Equal(t, "ready", primeira.Status, "erro: %s", primeira.Error)
+	// A segunda vez PARA ELA é que é repetida.
+	segunda := rodar("33333333-3333-4333-8333-333333333333", para)
+	require.Equal(t, "error", segunda.Status)
+	require.Equal(t, acervo.MensagemRepetida, segunda.Error)
+
+	dela, err := tracks.Listar(ctx, ela)
+	require.NoError(t, err)
+	require.Len(t, dela, 1)
 }

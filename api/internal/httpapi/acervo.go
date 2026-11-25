@@ -407,6 +407,29 @@ func (s *Server) ingerir(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// REPETIDA, pela origem: o link (já canonizado) que esta conta já trouxe
+	// nem enfileira. É a recusa barata — nada é baixado. A do CONTEÚDO, pelo
+	// hash do arquivo, só o worker pode fazer, e ele repete esta também.
+	//
+	// Erro de leitura não recusa, como na cota: o worker confere de novo.
+	switch existente, errRep := s.tracks.Repetida(ctx, dono, "", req.URL); {
+	case errRep == nil:
+		escreverErroCod(w, http.StatusConflict, CodFaixaRepetida, acervo.MensagemRepetida,
+			map[string]any{"titulo": existente.Title})
+		return
+	case !errors.Is(errRep, acervo.ErrNaoEncontrada):
+		slog.Error("conferir repetida", "erro", errRep)
+	}
+	// O mesmo link AINDA em andamento devolve o pedido que já existe. O índice
+	// de dedupe não cobre isto depois que o node entrega o arquivo (ver
+	// `Jobs.PaginaAtiva`).
+	if tipo == ingest.LinkPagina {
+		if emCurso, errCurso := s.jobs.PaginaAtiva(ctx, user.ID, req.URL); errCurso == nil {
+			escreverJSON(w, http.StatusOK, paraJobJSON(emCurso))
+			return
+		}
+	}
+
 	var (
 		job  *acervo.Job
 		novo bool

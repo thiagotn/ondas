@@ -13,6 +13,12 @@ import (
 
 var ErrNaoEncontrada = errors.New("faixa não encontrada")
 
+// MensagemRepetida é a frase da recusa por repetição (migração 0014), a mesma
+// na resposta da API e na linha do job. Fixa, sem o título da faixa: é ela que
+// vira código (`faixa_repetida`) na hora de servir o status do job, e a PWA
+// traduz pelo código.
+const MensagemRepetida = "esta faixa já está no acervo"
+
 type Track struct {
 	ID        string
 	UserID    string
@@ -162,6 +168,10 @@ type Nova struct {
 	// Vazia vira `privada` no SQL: o worker só a preenche quando o pedido de
 	// ingestão disse `para: todos`.
 	Visibilidade string
+	// O que identifica a faixa para a recusa de repetida (migração 0014): o
+	// SHA-256 do arquivo, e o link de onde ela veio. Vazios viram NULL.
+	AudioSHA256 string
+	OrigemURL   string
 }
 
 func (r *Tracks) Criar(ctx context.Context, n Nova) (*Track, error) {
@@ -177,18 +187,47 @@ func (r *Tracks) Criar(ctx context.Context, n Nova) (*Track, error) {
 	if n.Peaks != "" {
 		picos = &n.Peaks
 	}
+	var sha, origem *string
+	if n.AudioSHA256 != "" {
+		sha = &n.AudioSHA256
+	}
+	if n.OrigemURL != "" {
+		origem = &n.OrigemURL
+	}
 	// `nullif(…, '')` deixa o DEFAULT da coluna valer quando ninguém escolheu
 	// visibilidade — e o default é `privada`, de modo que um campo esquecido no
 	// caminho da ingestão nunca publica faixa por acidente.
 	return scan(r.pool.QueryRow(ctx, `
 		INSERT INTO tracks (id, user_id, title, artist, genre, duration_s,
 		                    audio_key, audio_type, size_bytes, art_key, art_thumb_key, peaks,
-		                    visibilidade, art_bytes)
+		                    visibilidade, art_bytes, audio_sha256, origem_url)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-		        coalesce(nullif($13, ''), 'privada'), $14)
+		        coalesce(nullif($13, ''), 'privada'), $14, $15, $16)
 		RETURNING `+colunas,
 		n.ID, n.UserID, n.Title, n.Artist, n.Genre, n.DurS,
-		n.AudioKey, n.AudioType, n.SizeBytes, art, thumb, picos, n.Visibilidade, n.ArtBytes))
+		n.AudioKey, n.AudioType, n.SizeBytes, art, thumb, picos, n.Visibilidade, n.ArtBytes,
+		sha, origem))
+}
+
+// Repetida diz se esta conta já tem ESTA faixa, e devolve a que tem.
+//
+// "Esta" é uma de duas coisas (migração 0014): o mesmo arquivo, byte a byte, ou
+// o mesmo link de origem. Critério vazio não casa com nada — uma faixa sem hash
+// não é "igual" a outra sem hash.
+//
+// É por DONO: duas contas podem ter a mesma faixa, e a de uma não impede a da
+// outra. E é contra a tabela de faixas, não a de jobs: apagada a faixa, o hash
+// e a origem somem com a linha, e ela pode voltar.
+func (r *Tracks) Repetida(ctx context.Context, dono, sha256, origemURL string) (*Track, error) {
+	if sha256 == "" && origemURL == "" {
+		return nil, ErrNaoEncontrada
+	}
+	return scan(r.pool.QueryRow(ctx, `
+		SELECT `+colunas+` FROM tracks
+		 WHERE user_id = $1
+		   AND (($2 <> '' AND audio_sha256 = $2) OR ($3 <> '' AND origem_url = $3))
+		 ORDER BY created_at
+		 LIMIT 1`, dono, sha256, origemURL))
 }
 
 // IDsDoDono lista os ids das faixas que PERTENCEM a esta conta — só as dela,

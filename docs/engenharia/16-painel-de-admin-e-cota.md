@@ -137,6 +137,11 @@ que o node baixou (`httpapi/paginas.go`) e o worker depois de baixar uma URL —
 o tamanho de uma ingestão por URL é conhecido, e ali a falha é definitiva: repetir o download não
 cria espaço. Em todos, a conta que conta é a que vai ser **dona** da faixa, não quem pediu.
 
+Com a recusa valendo, faltava a saída: até a 1.13 só o admin apagava faixa, então conta cheia
+dependia dele. Na 1.14 a própria pessoa apaga do acervo pela PWA (a rota `DELETE /api/acervo/{id}`
+já existia, só de sessão e só para o dono), e a mesma faixa deixa de entrar duas vezes — que era
+cota gasta à toa ([documento 10](10-ingestao-e-ssrf.md), "Faixa repetida").
+
 ## O que foi descartado
 
 | Alternativa | Por que não |

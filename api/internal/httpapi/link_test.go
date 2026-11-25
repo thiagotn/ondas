@@ -366,3 +366,78 @@ func TestErroDoWorkerComParametroGanhaCodigo(t *testing.T) {
 	require.Equal(t, CodIngestSemAudio, codigoDoJob("o arquivo não tem faixa de áudio"))
 	require.Empty(t, codigoDoJob("frase que ninguém conhece"))
 }
+
+// --- faixa repetida (migração 0014) ---
+
+// faixaComOrigem grava uma faixa pronta que veio deste link, como o worker faz.
+func faixaComOrigem(t *testing.T, pool *pgxpool.Pool, dono, id, origem string) {
+	t.Helper()
+	_, err := acervo.NewTracks(pool).Criar(context.Background(), acervo.Nova{
+		ID: id, UserID: dono, Title: "The Door", Artist: "Teddy Swims", Genre: "acervo",
+		DurS: 212, AudioKey: "u/" + dono + "/a/" + id + ".mp3", AudioType: "audio/mpeg",
+		SizeBytes: 1000, OrigemURL: origem,
+	})
+	require.NoError(t, err)
+}
+
+// O link que a conta já trouxe nem enfileira: a recusa barata, sem download.
+func TestLinkQueAContaJaTrouxeEhRecusadoNaEntrada(t *testing.T) {
+	r, pool, cfg := montar(t, true)
+	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
+	outra := dbtest.CriarUsuario(t, pool, "outra@exemplo.test")
+	faixaComOrigem(t, pool, eu, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", videoCanonico)
+
+	// Colado de outro jeito, é o mesmo vídeo.
+	w := servir(r, comCookie(t, cfg, ingerirURL(t, linkDoYouTube), eu))
+	require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+	corpo := corpoDe(t, w)
+	require.Equal(t, CodFaixaRepetida, corpo["code"])
+	require.Equal(t, "The Door", corpo["params"].(map[string]any)["titulo"])
+
+	ativos, err := acervo.NewJobs(pool).Ativos(context.Background(), eu)
+	require.NoError(t, err)
+	require.Zero(t, ativos, "nada foi enfileirado")
+
+	// É por conta: a outra pessoa pode trazer o mesmo link.
+	w = servir(r, comCookie(t, cfg, ingerirURL(t, linkDoYouTube), outra))
+	require.Equal(t, http.StatusAccepted, w.Code, w.Body.String())
+
+	// E apagada a faixa, o link volta a valer.
+	_, err = acervo.NewTracks(pool).Remover(context.Background(), eu, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+	require.NoError(t, err)
+	w = servir(r, comCookie(t, cfg, ingerirURL(t, linkDoYouTube), eu))
+	require.Equal(t, http.StatusAccepted, w.Code, w.Body.String())
+}
+
+// Depois que o node entrega o arquivo, a fonte do job vira `upload:<id>` e o
+// índice de dedupe deixa de reconhecer o link. Colar de novo nessa janela tem
+// de devolver o MESMO pedido, não abrir um segundo download.
+func TestLinkEmAndamentoDevolveOMesmoPedidoMesmoDepoisDaEntrega(t *testing.T) {
+	r, pool, cfg := montar(t, true)
+	ctx := context.Background()
+	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
+	jobs := acervo.NewJobs(pool)
+
+	w := servir(r, comCookie(t, cfg, ingerirURL(t, linkDoYouTube), eu))
+	require.Equal(t, http.StatusAccepted, w.Code, w.Body.String())
+	id := corpoDe(t, w)["id"].(string)
+
+	_, err := jobs.ReivindicarPagina(ctx)
+	require.NoError(t, err)
+	_, err = jobs.EntregarPagina(ctx, id, "11111111-1111-4111-8111-111111111111", "The Door", "Teddy Swims", "the-door.mp3")
+	require.NoError(t, err)
+
+	w = servir(r, comCookie(t, cfg, ingerirURL(t, linkDoYouTube), eu))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.Equal(t, id, corpoDe(t, w)["id"])
+
+	ativos, err := jobs.Ativos(ctx, eu)
+	require.NoError(t, err)
+	require.Equal(t, 1, ativos)
+}
+
+// O job que o worker recusou por repetição chega à PWA com código, não com a
+// frase crua em pt-BR.
+func TestJobRecusadoPorRepeticaoTemCodigo(t *testing.T) {
+	require.Equal(t, CodFaixaRepetida, codigoDoJob(acervo.MensagemRepetida))
+}

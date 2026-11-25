@@ -148,6 +148,47 @@ escolher **202** (aceitei algo novo) ou **200** (nada novo; o pedido anterior co
 Há uma fragilidade assumida aqui: o predicado do `ON CONFLICT` é escrito à mão e tem de casar
 **literalmente** com o do índice. Divergir não dá erro de compilação; dá duplicação silenciosa.
 
+### Faixa repetida: a identidade mora na faixa, não no job
+
+O índice acima segura a repetição **enquanto o pedido anda**. Pronto o job, ele sai do índice, e
+mandar o mesmo arquivo de novo criava uma segunda linha igual — cada uma contando na cota. Foi o que
+apareceu em produção: a mesma faixa duas vezes na mesma conta, no mesmo dia.
+
+Faltava identidade de conteúdo. A key no R2 é um uuid sorteado, e `tracks` não guardava de onde a
+faixa veio. A migração 0014 põe duas colunas na faixa, e a regra é uma só — por **dono**:
+
+| Coluna | Reconhece | Onde é conferida |
+|---|---|---|
+| `audio_sha256` | o mesmo arquivo, byte a byte | no worker, depois de baixar |
+| `origem_url` | o mesmo link, já canonizado | na API ao enfileirar, e de novo no worker |
+
+As duas existem porque nenhuma cobre o caso da outra. Dois downloads do mesmo vídeo do YouTube não
+saem idênticos, então o hash não pega link repetido; e arquivo enviado não tem link.
+
+O hash sai da mesma passada que grava o arquivo no disco (`io.MultiWriter`), e a conferência fica
+**antes** da cota e do envio ao R2: recusar depois de subir seria pagar para descobrir. A recusa é
+definitiva (`Jobs.Desistir`), como a de cota — tentar de novo não faz a faixa deixar de existir.
+
+Três decisões que parecem detalhe:
+
+- **Título, artista e duração ficam de fora.** Uma versão ao vivo com o mesmo tempo, um remaster ou
+  duas faixas sem tag ("sem título" / "acervo") seriam barradas por engano. Recusa errada é pior que
+  repetida ocasional, e a pessoa agora apaga a repetida pelo app.
+- **Os índices não são únicos.** O acervo já tinha pares repetidos, e um `UNIQUE` faria a migração
+  falhar em produção. O worker atende um job por vez, então não há corrida que pague apagar faixa de
+  alguém para criar o índice.
+- **A conferência é contra `tracks`, não contra `ingest_jobs`.** Apagada a faixa, hash e origem somem
+  com a linha, e ela pode voltar. Se a regra olhasse os jobs, uma faixa apagada ficaria proibida para
+  sempre.
+
+Um buraco menor fechou junto: quando o node entrega o arquivo de um link de página, o `source_url`
+do job vira `upload:<id>` e o índice de dedupe deixa de reconhecer o link. Colar o mesmo link nessa
+janela abria um segundo download; agora devolve o pedido que já existe (`Jobs.PaginaAtiva`).
+
+As faixas anteriores à 0014 não têm hash até o `worker medir-hash --gravar` passar por elas. Ele
+baixa cada áudio (o ETag do R2 não é o hash do objeto em envio multipart), lista os pares repetidos
+que encontra e **não apaga nada**.
+
 ### Reivindicar sem dois workers pegarem o mesmo
 
 ```sql

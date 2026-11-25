@@ -9,6 +9,8 @@ package worker
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -69,6 +71,25 @@ type Worker struct {
 type ErrSemEspaco struct{ Mensagem string }
 
 func (e *ErrSemEspaco) Error() string { return e.Mensagem }
+
+// ErrRepetida é a recusa da faixa que a conta já tem (migração 0014): o mesmo
+// arquivo, ou o mesmo link de origem. Carrega a que já existe só para o log.
+type ErrRepetida struct{ Existente string }
+
+func (e *ErrRepetida) Error() string { return acervo.MensagemRepetida }
+
+// OrigemDe é o link de onde a faixa de um job veio, ou vazio quando ela foi
+// enviada como arquivo. O link de página ganha: é ele que a pessoa colou, e a
+// `SourceURL` de um job de página já foi trocada por `upload:<id>`.
+func OrigemDe(job *acervo.Job) string {
+	if job.PaginaURL != "" {
+		return job.PaginaURL
+	}
+	if _, envio := acervo.IDDoUpload(job.SourceURL); envio {
+		return ""
+	}
+	return job.SourceURL
+}
 
 // ComCota liga a conferência de cota. Fora do `New` para não mudar a assinatura
 // que os testes e os comandos de operador já usam.
@@ -132,6 +153,17 @@ func (w *Worker) processar(ctx context.Context, job *acervo.Job) {
 			w.descartarEnvio(ctx, job, log)
 			return
 		}
+		// Repetida também é DEFINITIVA, pelo mesmo motivo: tentar de novo não
+		// faz a faixa deixar de existir. E o arquivo da área de espera sai já —
+		// é uma cópia do que a conta tem.
+		var repetida *ErrRepetida
+		if errors.As(err, &repetida) {
+			if erroMarcar := w.jobs.Desistir(ctx, job.ID, acervo.MensagemRepetida); erroMarcar != nil {
+				log.Error("não deu para marcar a falha", "erro", erroMarcar)
+			}
+			w.descartarEnvio(ctx, job, log)
+			return
+		}
 		if erroMarcar := w.jobs.Falhar(ctx, job.ID, mensagemDeErro(err)); erroMarcar != nil {
 			log.Error("não deu para marcar a falha", "erro", erroMarcar)
 		}
@@ -185,7 +217,10 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 	if err != nil {
 		return nil, err
 	}
-	tipoDeclarado, tamanho, err := w.origem(ctx, job, arquivo)
+	// O hash sai da mesma passada que grava o arquivo: é a identidade da faixa
+	// para a recusa de repetida, e medir depois seria ler tudo de novo.
+	resumo := sha256.New()
+	tipoDeclarado, tamanho, err := w.origem(ctx, job, io.MultiWriter(arquivo, resumo))
 	if cerr := arquivo.Close(); err == nil && cerr != nil {
 		err = cerr
 	}
@@ -210,6 +245,19 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 	dono := job.UserID
 	if job.DestinoID != "" {
 		dono = job.DestinoID
+	}
+
+	// REPETIDA: antes da cota e antes de subir qualquer coisa. É contra `dono`,
+	// como a cota — o bot publicando para outra conta não pode duplicar a
+	// faixa DELA, e a que o bot tem na própria conta não vem ao caso.
+	sha := hex.EncodeToString(resumo.Sum(nil))
+	origemURL := OrigemDe(job)
+	existente, err := w.tracks.Repetida(ctx, dono, sha, origemURL)
+	if err == nil {
+		return nil, &ErrRepetida{Existente: existente.ID}
+	}
+	if !errors.Is(err, acervo.ErrNaoEncontrada) {
+		return nil, fmt.Errorf("conferir repetida: %w", err)
 	}
 
 	// Key com o dono na frente, como as fotos do prumo (ADR 0011): a fronteira
@@ -267,6 +315,8 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 		// Vazia vira `privada` no SQL — faixa nunca nasce publicada por um
 		// campo esquecido no caminho.
 		Visibilidade: job.Visibilidade,
+		AudioSHA256:  sha,
+		OrigemURL:    origemURL,
 	}
 	track, err := w.tracks.Criar(ctx, nova)
 	if err != nil {

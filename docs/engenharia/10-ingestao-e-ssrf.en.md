@@ -149,6 +149,51 @@ There is an accepted fragility here: the `ON CONFLICT` predicate is written by h
 the index's **literally**. Drifting does not produce a compile error; it produces silent
 duplication.
 
+### Duplicate tracks: identity lives on the track, not on the job
+
+The index above stops repetition **while the request is in flight**. Once the job is done it leaves
+the index, and sending the same file again created a second identical row — each one counting
+against the quota. That is what showed up in production: the same track twice in one account, on
+the same day.
+
+What was missing was content identity. The R2 key is a random uuid, and `tracks` did not record
+where a track came from. Migration 0014 adds two columns to the track, with a single rule — per
+**owner**:
+
+| Column | Recognises | Where it is checked |
+|---|---|---|
+| `audio_sha256` | the same file, byte for byte | in the worker, after downloading |
+| `origem_url` | the same link, already canonicalised | in the API when enqueueing, and again in the worker |
+
+Both exist because neither covers the other's case. Two downloads of the same YouTube video are not
+byte-identical, so the hash does not catch a repeated link; and an uploaded file has no link.
+
+The hash is computed in the same pass that writes the file to disk (`io.MultiWriter`), and the check
+sits **before** the quota check and the upload to R2: refusing after uploading would mean paying to
+find out. The refusal is final (`Jobs.Desistir`), like the quota one — retrying does not make the
+track stop existing.
+
+Three decisions that look like details:
+
+- **Title, artist and duration are left out.** A live version with the same length, a remaster, or
+  two untagged tracks ("sem título" / "acervo") would be blocked by mistake. A wrong refusal is worse
+  than an occasional duplicate, and people can now delete the duplicate from the app.
+- **The indexes are not unique.** The archive already had duplicate pairs, and a `UNIQUE` would make
+  the migration fail in production. The worker handles one job at a time, so there is no race worth
+  deleting someone's track to create the index.
+- **The check is against `tracks`, not `ingest_jobs`.** When a track is deleted, hash and origin go
+  with the row, and it can come back. If the rule looked at jobs, a deleted track would be banned
+  forever.
+
+A smaller hole closed along the way: when the node delivers the file for a page link, the job's
+`source_url` becomes `upload:<id>` and the dedupe index stops recognising the link. Pasting the same
+link in that window started a second download; it now returns the existing request
+(`Jobs.PaginaAtiva`).
+
+Tracks older than 0014 have no hash until `worker medir-hash --gravar` goes through them. It
+downloads each audio file (the R2 ETag is not the object's hash for multipart uploads), lists the
+duplicate pairs it finds and **deletes nothing**.
+
 ### Claiming without two workers taking the same job
 
 ```sql

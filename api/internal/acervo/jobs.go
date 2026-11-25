@@ -215,6 +215,22 @@ func (r *Jobs) enfileirar(ctx context.Context, userID, url, title, artist, reser
 	return j, false, nil
 }
 
+// PaginaAtiva devolve o pedido EM ANDAMENTO desta conta para este link de
+// página, se houver.
+//
+// O índice `ingest_jobs_ativo_idx` segura a repetição pelo `source_url`, e
+// deixa de segurar no instante em que o node entrega o arquivo: `EntregarPagina`
+// troca a fonte por `upload:<id>`. Colar o mesmo link nessa janela criava um
+// segundo job — e, antes da 0014, uma segunda faixa. `pagina_url` não muda.
+func (r *Jobs) PaginaAtiva(ctx context.Context, userID, paginaURL string) (*Job, error) {
+	return scanJob(r.pool.QueryRow(ctx, `
+		SELECT `+colunasJob+` FROM ingest_jobs
+		 WHERE user_id = $1 AND pagina_url = $2
+		   AND status IN ('pending', 'processing')
+		 ORDER BY created_at
+		 LIMIT 1`, userID, paginaURL))
+}
+
 func (r *Jobs) PorID(ctx context.Context, userID, id string) (*Job, error) {
 	return scanJob(r.pool.QueryRow(ctx,
 		`SELECT `+colunasJob+` FROM ingest_jobs WHERE id = $1 AND user_id = $2`, id, userID))
