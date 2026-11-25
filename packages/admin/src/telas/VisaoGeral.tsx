@@ -37,7 +37,7 @@ export function VisaoGeral() {
       <Estado carregando={resumo.carregando} erro={resumo.erro} tem={!!r}>
         {r && (
           <div className="cartoes">
-            <Link className="cartao" to="/contas?status=pendente">
+            <Link className="cartao" to="/accounts?status=pendente">
               <span className="rotulo">{t('geral.pedidos')}</span>
               <span className={r.contas['pendente'] ? 'numero aviso' : 'numero'}>
                 {r.contas['pendente'] ?? 0}
@@ -49,7 +49,7 @@ export function VisaoGeral() {
                 })}
               </span>
             </Link>
-            <Link className="cartao" to="/faixas">
+            <Link className="cartao" to="/tracks">
               <span className="rotulo">{t('geral.armazenamento')}</span>
               <span className="numero">{fmtBytes(r.audioBytes + r.capaBytes)}</span>
               <span className="mudo">
@@ -60,7 +60,7 @@ export function VisaoGeral() {
                 })}
               </span>
             </Link>
-            <Link className="cartao" to="/ingestoes?status=error">
+            <Link className="cartao" to="/ingestions?status=error">
               <span className="rotulo">{t('geral.ingestoes')}</span>
               <span className={r.ingestoes['error'] ? 'numero erro' : 'numero'}>
                 {t('geral.comErro', { n: r.ingestoes['error'] ?? 0 })}
@@ -72,14 +72,14 @@ export function VisaoGeral() {
                 })}
               </span>
             </Link>
-            <Link className="cartao" to="/cadastro">
+            <Link className="cartao" to="/signup">
               <span className="rotulo">{t('geral.cadastro')}</span>
               <span className={r.cadastroAberto ? 'numero ok' : 'numero'}>
                 {r.cadastroAberto ? t('geral.aberto') : t('geral.fechado')}
               </span>
               <span className="mudo">{t('geral.convites', { n: r.convites })}</span>
             </Link>
-            <Link className="cartao" to="/contas?ord=-usado">
+            <Link className="cartao" to="/accounts?ord=-usado">
               <span className="rotulo">{t('geral.acimaDaCota')}</span>
               <span className={r.acimaDaCota ? 'numero aviso' : 'numero'}>{r.acimaDaCota}</span>
               <span className="mudo">{t('geral.bloqueioEmPlanos')}</span>
@@ -117,7 +117,7 @@ export function VisaoGeral() {
               {lista.visiveis.map((c) => (
                 <tr key={c.id}>
                   <td>
-                    <Link to={`/contas/${c.id}`}>{c.email}</Link>
+                    <Link to={`/accounts/${c.id}`}>{c.email}</Link>
                   </td>
                   <td className="num">{c.faixas}</td>
                   <td>

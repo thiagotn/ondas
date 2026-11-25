@@ -1,5 +1,21 @@
 [
   {
+    "versao": "1.15.0",
+    "data": "2026-11-25",
+    "itens": [
+      {
+        "pt-BR": "no painel de administração, os endereços das telas passam a ser em inglês — `/accounts`, `/tracks`, `/ingestions`, `/signup`, `/plans` e `/history`. Os endereços antigos continuam funcionando: quem guardou um chega à mesma tela, com o mesmo filtro",
+        "en": "in the admin panel, screen addresses are now in English — `/accounts`, `/tracks`, `/ingestions`, `/signup`, `/plans` and `/history`. The old addresses still work: a saved one lands on the same screen, with the same filter",
+        "es": "en el panel de administración, las direcciones de las pantallas pasan a estar en inglés — `/accounts`, `/tracks`, `/ingestions`, `/signup`, `/plans` y `/history`. Las direcciones antiguas siguen funcionando: una guardada llega a la misma pantalla, con el mismo filtro"
+      },
+      {
+        "pt-BR": "no painel de administração, a lista de faixas abre com as mais novas em vez das maiores",
+        "en": "in the admin panel, the track list opens with the newest instead of the largest",
+        "es": "en el panel de administración, la lista de pistas se abre con las más nuevas en vez de las más grandes"
+      }
+    ]
+  },
+  {
     "versao": "1.14.1",
     "data": "2026-11-25",
     "itens": [

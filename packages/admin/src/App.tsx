@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { api, ErroDaApi, ouvirSessaoPerdida } from './api';
 import { t } from './i18n';
 import { Cadastro } from './telas/Cadastro';
@@ -18,13 +18,27 @@ type Sessao = 'verificando' | 'fora' | 'dentro' | 'desligado';
 // Chave, e não a frase: este módulo é avaliado antes de o idioma ser decidido.
 const ABAS = [
   { para: '/', chave: 'aba.visaoGeral', fim: true },
-  { para: '/contas', chave: 'aba.contas', fim: false },
-  { para: '/faixas', chave: 'aba.faixas', fim: false },
-  { para: '/ingestoes', chave: 'aba.ingestoes', fim: false },
-  { para: '/cadastro', chave: 'aba.cadastro', fim: false },
-  { para: '/planos', chave: 'aba.planos', fim: false },
-  { para: '/historico', chave: 'aba.historico', fim: false },
+  { para: '/accounts', chave: 'aba.contas', fim: false },
+  { para: '/tracks', chave: 'aba.faixas', fim: false },
+  { para: '/ingestions', chave: 'aba.ingestoes', fim: false },
+  { para: '/signup', chave: 'aba.cadastro', fim: false },
+  { para: '/plans', chave: 'aba.planos', fim: false },
+  { para: '/history', chave: 'aba.historico', fim: false },
 ] as const;
+
+const ANTIGOS = {
+  contas: 'accounts',
+  faixas: 'tracks',
+  ingestoes: 'ingestions',
+  cadastro: 'signup',
+  planos: 'plans',
+  historico: 'history',
+} as const;
+
+function Antigo({ de, para }: { de: string; para: string }) {
+  const { pathname, search } = useLocation();
+  return <Navigate to={`/${para}${pathname.slice(de.length + 1)}${search}`} replace />;
+}
 
 export function App() {
   const [sessao, setSessao] = useState<Sessao>('verificando');
@@ -82,13 +96,18 @@ export function App() {
       <main className="conteudo">
         <Routes>
           <Route path="/" element={<VisaoGeral />} />
-          <Route path="/contas" element={<Contas />} />
-          <Route path="/contas/:id" element={<ContaDetalhe />} />
-          <Route path="/faixas" element={<Faixas />} />
-          <Route path="/ingestoes" element={<Ingestoes />} />
-          <Route path="/cadastro" element={<Cadastro />} />
-          <Route path="/planos" element={<Planos />} />
-          <Route path="/historico" element={<Historico />} />
+          <Route path="/accounts" element={<Contas />} />
+          <Route path="/accounts/:id" element={<ContaDetalhe />} />
+          <Route path="/tracks" element={<Faixas />} />
+          <Route path="/ingestions" element={<Ingestoes />} />
+          <Route path="/signup" element={<Cadastro />} />
+          <Route path="/plans" element={<Planos />} />
+          <Route path="/history" element={<Historico />} />
+          {/* Os endereços antigos, em português: quem guardou um continua
+              chegando à mesma tela, com o recorte (`?status=`, `?ord=`) junto. */}
+          {Object.entries(ANTIGOS).map(([de, para]) => (
+            <Route key={de} path={`/${de}/*`} element={<Antigo de={de} para={para} />} />
+          ))}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

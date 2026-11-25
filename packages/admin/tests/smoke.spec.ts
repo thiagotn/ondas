@@ -62,6 +62,7 @@ async function apiFalsa(page: Page) {
     cotaBytes: 1024 ** 3,
   });
 
+  const ordensDeFaixas: (string | null)[] = [];
   await page.route('**/api/admin/**', async (route) => {
     const req = route.request();
     const url = new URL(req.url());
@@ -128,10 +129,14 @@ async function apiFalsa(page: Page) {
       });
     }
     if (caminho === '/convites' && metodo === 'GET') return json(200, { convites: [] });
+    if (caminho === '/faixas' && metodo === 'GET') {
+      ordensDeFaixas.push(url.searchParams.get('ordem'));
+      return json(200, { faixas: [] });
+    }
     return json(404, { error: 'não encontrado' });
   });
 
-  return { pedidos, contas };
+  return { pedidos, contas, ordensDeFaixas };
 }
 
 async function entrar(page: Page) {
@@ -143,7 +148,7 @@ async function entrar(page: Page) {
 
 test('sem sessão o painel pede o token, e token errado não entra', async ({ page }) => {
   await apiFalsa(page);
-  await page.goto('/contas');
+  await page.goto('/accounts');
 
   await expect(page.getByLabel('Token de admin')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'contas' })).toBeHidden();
@@ -177,7 +182,7 @@ test('a visão geral mostra o que espera decisão e leva até lá', async ({ pag
 test('aprovar um pedido e liberar o envio mandam o que foi pedido', async ({ page }) => {
   const { pedidos, contas } = await apiFalsa(page);
   await entrar(page);
-  await page.goto('/contas?status=pendente');
+  await page.goto('/accounts?status=pendente');
   // `goto` recarrega a página: a sessão vem do cookie, que aqui é o estado da
   // API de mentira.
   const linha = page.getByRole('row', { name: /nova@exemplo.test/ });
@@ -340,4 +345,31 @@ test('na tela de entrada já dá para trocar o idioma', async ({ page }) => {
   await expect(page.getByLabel('Token de admin')).toBeVisible();
   await expect(page.getByRole('button', { name: '[entrar]' })).toBeVisible();
   await expect(page.getByText('pega el token de admin', { exact: false })).toBeVisible();
+});
+
+test('os endereços são em inglês, e os antigos levam à mesma tela com o recorte', async ({ page }) => {
+  await apiFalsa(page);
+  await entrar(page);
+
+  await page.getByRole('link', { name: 'contas', exact: true }).click();
+  await expect(page).toHaveURL(/\/accounts$/);
+
+  await page.goto('/contas?status=pendente');
+  await expect(page).toHaveURL(/\/accounts\?status=pendente$/);
+  await expect(page.getByRole('row', { name: /nova@exemplo.test/ })).toBeVisible();
+
+  await page.goto('/contas/22222222-2222-4222-8222-222222222222');
+  await expect(page).toHaveURL(/\/accounts\/22222222-2222-4222-8222-222222222222$/);
+
+  await page.goto('/historico');
+  await expect(page).toHaveURL(/\/history$/);
+});
+
+test('a tela de faixas abre pedindo as mais novas', async ({ page }) => {
+  const { ordensDeFaixas } = await apiFalsa(page);
+  await entrar(page);
+  await page.goto('/tracks');
+
+  await expect(page.getByText('o acervo está vazio.')).toBeVisible();
+  expect(ordensDeFaixas[0]).toBe('recentes');
 });

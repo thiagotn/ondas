@@ -7,6 +7,11 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.15.0 — 2026-11-25
+
+- no painel de administração, os endereços das telas passam a ser em inglês — `/accounts`, `/tracks`, `/ingestions`, `/signup`, `/plans` e `/history`. Os endereços antigos continuam funcionando: quem guardou um chega à mesma tela, com o mesmo filtro
+- no painel de administração, a lista de faixas abre com as mais novas em vez das maiores
+
 ## 1.14.1 — 2026-11-25
 
 - apagar faixa do acervo agora funciona. Na 1.14.0 o pedido era recusado pelo servidor e a faixa voltava para a lista, mesmo com o app dizendo que tinha apagado. Nada foi perdido — nenhuma faixa chegou a ser removida —, e o app passa a avisar quando o servidor recusa, em vez de tirar a faixa da tela

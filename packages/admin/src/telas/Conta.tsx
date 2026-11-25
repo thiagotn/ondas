@@ -81,7 +81,7 @@ export function TabelaDeFaixas({
                 </td>
                 {comDono && (
                   <td>
-                    <Link to={`/contas/${f.donoId}`}>{f.donoEmail}</Link>
+                    <Link to={`/accounts/${f.donoId}`}>{f.donoEmail}</Link>
                   </td>
                 )}
                 <td className="num">{fmtDuracao(f.duracaoS)}</td>
@@ -216,7 +216,7 @@ export function ContaDetalhe() {
   return (
     <section>
       <p>
-        <Link to="/contas">{t('conta.voltar')}</Link>
+        <Link to="/accounts">{t('conta.voltar')}</Link>
       </p>
       <Estado carregando={carregando} erro={erro} tem={!!conta}>
         {conta && dados && (
@@ -392,7 +392,7 @@ export function ContaDetalhe() {
                 disabled={acao.ocupado || confirmaEmail.trim().toLowerCase() !== conta.email.toLowerCase()}
                 onClick={() =>
                   void acao.rodar(() => api.apagarConta(conta.id)).then((ok) => {
-                    if (ok) navegar('/contas');
+                    if (ok) navegar('/accounts');
                   })
                 }
               >

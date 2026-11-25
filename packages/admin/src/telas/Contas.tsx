@@ -116,9 +116,9 @@ export function Contas() {
             </thead>
             <tbody>
               {lista.visiveis.map((c) => (
-                <tr key={c.id} className="clicavel" onClick={() => navegar(`/contas/${c.id}`)}>
+                <tr key={c.id} className="clicavel" onClick={() => navegar(`/accounts/${c.id}`)}>
                   <td>
-                    <Link to={`/contas/${c.id}`} onClick={(e) => e.stopPropagation()}>
+                    <Link to={`/accounts/${c.id}`} onClick={(e) => e.stopPropagation()}>
                       {c.email}
                     </Link>
                     <div className="mudo">{c.name}</div>

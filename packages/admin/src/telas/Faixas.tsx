@@ -11,8 +11,8 @@ import { LISTA_DE_FAIXAS, TabelaDeFaixas } from './Conta';
 const LIMITE = 200;
 
 const ORDENS = [
-  { valor: 'tamanho', chave: 'faixas.maiores' },
   { valor: 'recentes', chave: 'faixas.maisNovas' },
+  { valor: 'tamanho', chave: 'faixas.maiores' },
 ] as const;
 
 const VISIBILIDADES = [
@@ -25,10 +25,10 @@ type Visibilidade = (typeof VISIBILIDADES)[number]['valor'];
 
 export function Faixas() {
   const [params, setParams] = useSearchParams();
-  // QUAIS faixas o servidor manda quando o acervo passa do teto: as maiores ou
-  // as mais novas. É pedido novo à API, e por isso não é a mesma coisa que
+  // QUAIS faixas o servidor manda quando o acervo passa do teto: as mais novas
+  // ou as maiores. É pedido novo à API, e por isso não é a mesma coisa que
   // clicar numa coluna — que só reordena o que já chegou.
-  const [ordem, setOrdem] = useState<'tamanho' | 'recentes'>('tamanho');
+  const [ordem, setOrdem] = useState<'tamanho' | 'recentes'>('recentes');
   const { dados, erro, carregando, recarregar } = useDados(() => api.faixas(ordem), [ordem]);
   const acao = useAcao();
 
