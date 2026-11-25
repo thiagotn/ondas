@@ -329,7 +329,7 @@ describe('loadCatalog com as duas fontes', () => {
 describe('AcervoCatalogClient.remover', () => {
   const id = 'acervo:abb38f1b-2929-48fe-afbb-f376a479d196';
 
-  it('manda DELETE para a faixa, com o id inteiro', async () => {
+  it('manda DELETE só com o uuid: sem o prefixo `acervo:` e sem nada codificado', async () => {
     const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) =>
       resposta(200, { status: 'removida' }),
     );
@@ -337,7 +337,9 @@ describe('AcervoCatalogClient.remover', () => {
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const [url, init] = fetchImpl.mock.calls[0]!;
-    expect(url).toBe(`/api/acervo/${encodeURIComponent(id)}`);
+    // A 1.14.0 mandava `acervo%3A<uuid>`, e a API respondia 404 para toda faixa.
+    expect(url).toBe('/api/acervo/abb38f1b-2929-48fe-afbb-f376a479d196');
+    expect(url).not.toContain('%');
     expect(init?.method).toBe('DELETE');
     expect(init?.credentials).toBe('same-origin');
   });

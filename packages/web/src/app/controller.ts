@@ -658,12 +658,11 @@ export async function apagarMarcadasDoAcervo(): Promise<void> {
       await acervoClient.remover(id);
       apagadas.add(id);
     } catch (err) {
-      // 404 é "já não existe": apagada em outro aparelho. O resultado que a
-      // pessoa pediu é o mesmo, então sai da tela como as outras.
-      if (err instanceof AcervoError && err.codigo === 'faixa_nao_encontrada') {
-        apagadas.add(id);
-        continue;
-      }
+      // Toda recusa é falha, INCLUSIVE o 404. A 1.14.0 tratava "não
+      // encontrada" como "já foi apagada em outro aparelho" e tirava a faixa
+      // da tela com aviso de sucesso — e foi isso que escondeu um defeito em
+      // que a API respondia 404 para TODA faixa: o app dizia "apagada" sem ter
+      // apagado nada. Só sai da tela o que o servidor confirmou.
       falha = err;
       break;
     }
@@ -721,6 +720,9 @@ export async function apagarMarcadasDoAcervo(): Promise<void> {
     // As que saíram deixam de estar marcadas; as que ficaram continuam, para a
     // pessoa tentar de novo sem remarcar.
     for (const id of apagadas) if (uiStore.getState().marcadas[id]) ui.alternarMarca(id);
+    // A lista volta a ser a do servidor: se a faixa já não existe lá (apagada
+    // em outro aparelho), é o refetch que a tira daqui, e não um palpite.
+    void queryClient.invalidateQueries({ queryKey: CATALOG_LOGADO_KEY });
     ui.flash(frase);
     return;
   }

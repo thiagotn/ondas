@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -125,8 +126,18 @@ func paraJobJSON(j *acervo.Job) jobJSON {
 // idDaRota valida o id antes de ir ao banco: um id que não é uuid faria o pgx
 // devolver erro de sintaxe, e o handler responderia 500 onde 404 é o certo.
 // O prefixo `acervo:` é tolerado porque é como a PWA enxerga o id.
+//
+// O trecho é DECODIFICADO antes: `chi.URLParam` devolve o que veio na URL, e um
+// cliente que passe o id por `encodeURIComponent` manda `acervo%3A<uuid>`. Sem
+// decodificar, o prefixo não casava, o resto não era uuid e a resposta era 404
+// para uma faixa que existe — foi assim que a 1.14.0 saiu sem conseguir apagar
+// nada. Trecho que não decodifica segue como veio e morre no `uuid.Parse`.
 func idDaRota(w http.ResponseWriter, r *http.Request) (string, bool) {
-	id := strings.TrimPrefix(chi.URLParam(r, "id"), prefixoID)
+	bruto := chi.URLParam(r, "id")
+	if limpo, err := url.PathUnescape(bruto); err == nil {
+		bruto = limpo
+	}
+	id := strings.TrimPrefix(bruto, prefixoID)
 	if _, err := uuid.Parse(id); err != nil {
 		escreverErro(w, http.StatusNotFound, "faixa não encontrada")
 		return "", false

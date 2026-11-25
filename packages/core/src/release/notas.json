@@ -1,5 +1,16 @@
 [
   {
+    "versao": "1.14.1",
+    "data": "2026-11-25",
+    "itens": [
+      {
+        "pt-BR": "apagar faixa do acervo agora funciona. Na 1.14.0 o pedido era recusado pelo servidor e a faixa voltava para a lista, mesmo com o app dizendo que tinha apagado. Nada foi perdido — nenhuma faixa chegou a ser removida —, e o app passa a avisar quando o servidor recusa, em vez de tirar a faixa da tela",
+        "en": "deleting a track from your archive now works. In 1.14.0 the server refused the request and the track came back to the list, even though the app said it had been deleted. Nothing was lost — no track was actually removed — and the app now tells you when the server refuses, instead of taking the track off the screen",
+        "es": "borrar una pista del archivo ahora funciona. En la 1.14.0 el servidor rechazaba el pedido y la pista volvía a la lista, aunque la app decía que la había borrado. No se perdió nada — ninguna pista llegó a eliminarse —, y la app ahora avisa cuando el servidor rechaza, en vez de quitar la pista de la pantalla"
+      }
+    ]
+  },
+  {
     "versao": "1.14.0",
     "data": "2026-11-25",
     "itens": [

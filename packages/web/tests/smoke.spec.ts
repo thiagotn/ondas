@@ -157,6 +157,9 @@ function semearCurtida(page: Page, id: string) {
 /** O acervo mutável da API falsa, por página — ver `semearCompartilhada`. */
 const acervoSemeado = new WeakMap<Page, Record<string, unknown>[]>();
 
+/** Faixas que o `DELETE` de mentira recusa com 404, como se já não existissem. */
+const naoApagaveis = new WeakMap<Page, Set<string>>();
+
 /** Os ids que chegaram ao `DELETE /api/acervo/<id>` de mentira. */
 const apagadasNoServidor = new WeakMap<Page, string[]>();
 
@@ -584,8 +587,15 @@ async function stubApi(page: Page) {
   await page.route('**/api/acervo/*', async (route) => {
     if (route.request().method() !== 'DELETE') return route.fallback();
     if (!logado) return route.fulfill({ status: 401, json: { error: 'sessão expirada' } });
-    const id = decodeURIComponent(new URL(route.request().url()).pathname.split('/').pop() ?? '');
-    const onde = acervo.findIndex((f) => f.id === id && !('owner' in f));
+    // SEM decodificar, e só uuid puro: é o que a API de verdade aceita sem
+    // depender de tolerância nenhuma. O stub da 1.14.0 decodificava o caminho,
+    // e foi por isso que o `acervo%3A<uuid>` passou aqui e deu 404 em produção.
+    const trecho = route.request().url().split('/').pop() ?? '';
+    const ehUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(trecho);
+    const id = `acervo:${trecho}`;
+    const onde = ehUUID
+      ? acervo.findIndex((f) => f.id === id && !('owner' in f) && !naoApagaveis.get(page)?.has(id))
+      : -1;
     if (onde < 0) {
       return route.fulfill({
         status: 404,
@@ -2538,6 +2548,27 @@ test('apagar uma faixa do próprio acervo pede dois toques e não tem volta', as
   await skipSplash(page);
   await page.keyboard.press('3');
   await expect(page.getByRole('button', { name: /Fita Caseira/ })).toHaveCount(0);
+});
+
+test('quando o servidor recusa, a faixa continua na lista e o app não diz que apagou', async ({
+  page,
+}) => {
+  // Foi o agravante da 1.14.0: a API respondia 404, o app tratava como "já
+  // estava apagada", tirava a linha da tela e mostrava o aviso de sucesso.
+  naoApagaveis.set(page, new Set(['acervo:11111111-1111-4111-8111-111111111111']));
+  await blockAudius(page);
+  await logar(page);
+  await page.keyboard.press('3');
+
+  await segurar(page, page.getByRole('button', { name: /Fita Caseira/ }));
+  await page.getByRole('button', { name: '[apagar do acervo]' }).click();
+  await page.getByRole('button', { name: '[sim]' }).click();
+
+  await expect(page.getByText('faixa não encontrada')).toBeVisible();
+  await expect(page.getByText(/apagada do acervo/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Fita Caseira/ })).toBeVisible();
+  // Continua marcada, para tentar de novo sem remarcar.
+  await expect(marcadas(page)).toHaveText('1 marcada');
 });
 
 test('apagar a faixa que está tocando para o som e esvazia a barra de baixo', async ({ page }) => {

@@ -3,6 +3,9 @@ import type { Track } from '../types.js';
 /** De onde a API do acervo responde. Mesma origem da PWA — sem CORS. */
 const ROTA = '/api/acervo';
 
+/** Como o id da faixa do acervo aparece na PWA: `acervo:<uuid>`. */
+const PREFIXO_ID = 'acervo:';
+
 /**
  * Erro de acesso ao acervo, separado dos outros para quem chama poder decidir.
  *
@@ -125,12 +128,17 @@ export class AcervoCatalogClient {
    * leva junto o áudio, as capas, as curtidas, os itens de playlist e o
    * histórico que apontavam para ela.
    *
-   * O id vai inteiro (`acervo:<uuid>`); quem tira o prefixo é a API. Só o DONO
-   * apaga — para a faixa que outra conta compartilhou a resposta é 404, a mesma
-   * de uma faixa que não existe.
+   * Na URL vai só o uuid, sem o prefixo `acervo:` — é como `stream` e `art` já
+   * chegam da API. A 1.14.0 mandava o id inteiro por `encodeURIComponent`, o
+   * `:` virava `%3A`, e a API respondia 404 para toda faixa. Um uuid não tem o
+   * que codificar; o que não for uuid é recusado lá, não escapado aqui.
+   *
+   * Só o DONO apaga — para a faixa que outra conta compartilhou a resposta é
+   * 404, a mesma de uma faixa que não existe.
    */
   async remover(id: string): Promise<void> {
-    const res = await this.fetchImpl(`${ROTA}/${encodeURIComponent(id)}`, {
+    const uuid = id.startsWith(PREFIXO_ID) ? id.slice(PREFIXO_ID.length) : id;
+    const res = await this.fetchImpl(`${ROTA}/${uuid}`, {
       method: 'DELETE',
       credentials: 'same-origin',
       headers: { accept: 'application/json' },

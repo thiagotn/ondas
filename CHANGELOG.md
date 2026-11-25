@@ -7,6 +7,10 @@ Todas as entregas do ondas, da mais nova para a mais velha.
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.14.1 — 2026-11-25
+
+- apagar faixa do acervo agora funciona. Na 1.14.0 o pedido era recusado pelo servidor e a faixa voltava para a lista, mesmo com o app dizendo que tinha apagado. Nada foi perdido — nenhuma faixa chegou a ser removida —, e o app passa a avisar quando o servidor recusa, em vez de tirar a faixa da tela
+
 ## 1.14.0 — 2026-11-25
 
 - você apaga faixas do seu próprio acervo: segure uma faixa na biblioteca (ou use `v`) para marcar, e toque em `[apagar do acervo]`. Pede uma confirmação, porque não tem volta — o arquivo sai do servidor, das suas playlists e curtidas, e o espaço volta para a sua cota. Faixa que outra conta compartilhou com você não pode ser apagada

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -455,4 +456,47 @@ func TestRespostasDoAcervoNaoEntramEmCache(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	require.Contains(t, w.Header().Get("Cache-Control"), "no-store")
+}
+
+// O dono apaga a própria faixa por qualquer uma das três formas em que o id
+// pode chegar na URL. A terceira é a que a PWA 1.14.0 mandava
+// (`encodeURIComponent('acervo:<uuid>')`), e a API respondia 404 para ela: o
+// trecho vinha codificado, o prefixo não casava e o resto não era uuid.
+func TestDonoApagaAFaixaComOIdEmQualquerForma(t *testing.T) {
+	r, pool, cfg := montar(t, true)
+	ctx := context.Background()
+	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
+	tracks := acervo.NewTracks(pool)
+
+	formas := map[string]func(id string) string{
+		"uuid puro":          func(id string) string { return id },
+		"com prefixo":        func(id string) string { return "acervo:" + id },
+		"prefixo codificado": func(id string) string { return "acervo%3A" + id },
+	}
+	n := 0
+	for nome, forma := range formas {
+		n++
+		id := fmt.Sprintf("%08d-0000-4000-8000-000000000000", n)
+		_, err := tracks.Criar(ctx, acervo.Nova{
+			ID: id, UserID: eu, Title: "Minha", Artist: "Eu", Genre: "acervo", DurS: 1,
+			AudioKey: "u/" + eu + "/a/" + id + ".mp3", AudioType: "audio/mpeg", SizeBytes: 1,
+		})
+		require.NoError(t, err)
+
+		req := comCookie(t, cfg, httptest.NewRequest(http.MethodDelete, "/api/acervo/"+forma(id), nil), eu)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, "%s: %s", nome, w.Body.String())
+
+		_, err = tracks.PorID(ctx, eu, id)
+		require.ErrorIs(t, err, acervo.ErrNaoEncontrada, "%s: a faixa saiu do banco", nome)
+	}
+
+	// Decodificar não afrouxa a validação: o que não é uuid segue 404.
+	for _, lixo := range []string{"acervo%3Anao-e-uuid", "acervo%3A", "acervo%3Aacervo%3A00000001-0000-4000-8000-000000000000"} {
+		req := comCookie(t, cfg, httptest.NewRequest(http.MethodDelete, "/api/acervo/"+lixo, nil), eu)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusNotFound, w.Code, lixo)
+	}
 }
