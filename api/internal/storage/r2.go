@@ -77,7 +77,17 @@ func (r *R2) Enviar(ctx context.Context, key, contentType string, dados io.Reade
 // É o que vai no Location do 302. Nunca embutimos isto no catálogo: o catálogo
 // é persistido 24h no navegador e a assinatura vence antes.
 func (r *R2) URLAssinada(ctx context.Context, key string) (string, error) {
-	u, err := r.client.PresignedGetObject(ctx, r.bucket, key, r.ttl, url.Values{})
+	return r.URLAssinadaPor(ctx, key, r.ttl)
+}
+
+// URLAssinadaPor é `URLAssinada` com a validade escolhida por quem chama — para
+// o áudio de uma faixa mais longa que o TTL, que deixaria de tocar no meio. O
+// TTL configurado é o PISO: validade menor que ele não encurta nada.
+func (r *R2) URLAssinadaPor(ctx context.Context, key string, validade time.Duration) (string, error) {
+	if validade < r.ttl {
+		validade = r.ttl
+	}
+	u, err := r.client.PresignedGetObject(ctx, r.bucket, key, validade, url.Values{})
 	if err != nil {
 		return "", fmt.Errorf("storage: assinar %s: %w", key, err)
 	}

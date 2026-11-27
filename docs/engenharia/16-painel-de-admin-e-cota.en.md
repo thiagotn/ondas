@@ -147,6 +147,35 @@ a full account depended on them. In 1.14 people delete from their own archive in
 longer enters twice — which was quota spent for nothing ([document 10](10-ingestao-e-ssrf.en.md),
 "Duplicate tracks").
 
+## The upload limit can also belong to an account
+
+`INGEST_MAX_MB` is still configuration, and still everyone's limit — until the admin writes another
+number on an account. Migration `0015` adds `users.max_upload_bytes`, nullable: `NULL` means "the
+server default", which is what every account has. Storing the default on each row would make the env
+stop applying the day someone changed it.
+
+The reason was testing the platform with long tracks (a three-hour set is over 150 MB) without
+opening the same limit to every account. Three decisions came out of it:
+
+- **The limit belongs to whoever requests the upload**, not to whoever will own the track: the file
+  is written to the requester's staging area. One place answers the question —
+  `admin.Painel.TetoDeEnvio` — and the API (on the slot and on finalize), the node routes and the
+  worker all ask it.
+- **There is an absolute ceiling, 900 MiB**, in code (`admin.MaxTetoDeEnvio`) and not in the
+  database: it comes from the worker's temporary disk, a 1 GiB emptyDir where the whole file sits
+  before ffprobe. Raising the number without raising the volume kills the pod.
+- **The deadlines designed for 60 MB became proportional.** The signed PUT validity (15 min), the
+  worker's job deadline (`INGEST_TIMEOUT_S`) and how long the PWA follows the ingestion grow one
+  block per 60 MB. The job deadline stops at 12 minutes, below the 15 of `PrazoTravado` — above
+  that the queue would treat the job as stuck and the track would be ingested twice at once.
+  Accounts on the default limit see no difference in any of the three.
+
+The signature of the audio GET was a fixed hour and is now the track's duration plus one hour: the
+player goes back to the same URL on every seek, and a three-hour set stopped responding midway.
+
+`PATCH /api/admin/contas/{id}` uses pointers, where absent means "leave it"; to CLEAR the limit the
+value is zero, which stores `NULL`.
+
 ## What was discarded
 
 | Alternative | Why not |

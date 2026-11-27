@@ -1,5 +1,16 @@
 [
   {
+    "versao": "1.4.0",
+    "data": "2026-11-27",
+    "itens": [
+      {
+        "pt-BR": "cada conta pode ter um teto de envio próprio: na tela da conta, o campo `teto de envio` define o maior arquivo aceito dela (até 900 MB). Vazio, vale o padrão do servidor, como sempre foi para todas",
+        "en": "each account can have its own upload limit: on the account screen, the `upload limit` field sets the largest file accepted from it (up to 900 MB). Left empty, the server default applies, as it always did for everyone",
+        "es": "cada cuenta puede tener su propio tope de envío: en la pantalla de la cuenta, el campo `tope de envío` define el mayor archivo que se le acepta (hasta 900 MB). Vacío, vale el valor por defecto del servidor, como siempre fue para todas"
+      }
+    ]
+  },
+  {
     "versao": "1.3.0",
     "data": "2026-11-25",
     "itens": [

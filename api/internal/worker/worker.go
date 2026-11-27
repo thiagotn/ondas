@@ -63,6 +63,75 @@ type Worker struct {
 	// Confere a cota da conta que vai ser dona da faixa. `nil` = não confere
 	// (os testes do worker que não são sobre cota, e os comandos de operador).
 	cota func(ctx context.Context, dono string, bytes int64) error
+	// Teto de envio da conta que PEDIU o job (migração 0015). `nil` = todo
+	// mundo tem `maxBytes`, que é o que valia antes de existir teto por conta.
+	teto func(ctx context.Context, userID string) (int64, error)
+}
+
+// PrazoMaximo é até onde o prazo de um job estica para uma conta com teto de
+// envio maior que o padrão (ver `prazoPara`).
+//
+// Fica abaixo de `acervo.PrazoTravado` de propósito: um job em `processing` há
+// mais que aquilo é dado como travado e devolvido à fila, e um prazo maior
+// faria a mesma faixa ser ingerida duas vezes ao mesmo tempo.
+const PrazoMaximo = 12 * time.Minute
+
+// ComTeto liga o teto de envio por conta. Fora do `New` pelo mesmo motivo do
+// `ComCota`.
+func (w *Worker) ComTeto(teto func(ctx context.Context, userID string) (int64, error)) *Worker {
+	w.teto = teto
+	return w
+}
+
+// tetoDe é o maior arquivo aceito num job de `userID`. Erro de leitura cai no
+// padrão: é o teto que nunca aceita o que não devia.
+func (w *Worker) tetoDe(ctx context.Context, userID string, log *slog.Logger) int64 {
+	if w.teto == nil {
+		return w.maxBytes
+	}
+	teto, err := w.teto(ctx, userID)
+	if err != nil {
+		log.Error("teto de envio da conta", "erro", err)
+		return w.maxBytes
+	}
+	return teto
+}
+
+// prazoPara estica o prazo do job na proporção do teto da conta.
+//
+// O prazo configurado (`INGEST_TIMEOUT_S`) foi pensado para o teto padrão:
+// baixar, reenviar ao bucket e passar o ffmpeg em até 60MB. Um arquivo de
+// 400MB pede o mesmo trabalho sete vezes maior, e com o prazo fixo morreria
+// em "a origem demorou demais" nas três tentativas. Quem tem o teto padrão
+// continua com o prazo de sempre.
+func (w *Worker) prazoPara(teto int64) time.Duration {
+	if w.maxBytes <= 0 || teto <= w.maxBytes {
+		return w.prazo
+	}
+	blocos := (teto + w.maxBytes - 1) / w.maxBytes
+	prazo := time.Duration(blocos) * w.prazo
+	if prazo > PrazoMaximo && w.prazo < PrazoMaximo {
+		return PrazoMaximo
+	}
+	return prazo
+}
+
+// escritaComTeto interrompe a cópia no primeiro byte além do teto. É o que
+// deixa o teto valer por JOB na ingestão por URL sem o baixador saber de conta:
+// ele continua com o teto absoluto dele, e esta escrita corta antes.
+type escritaComTeto struct {
+	destino io.Writer
+	resta   int64
+	teto    int64
+}
+
+func (e *escritaComTeto) Write(p []byte) (int, error) {
+	if int64(len(p)) > e.resta {
+		return 0, fmt.Errorf("%w de %d bytes", ingest.ErrGrandeDemais, e.teto)
+	}
+	n, err := e.destino.Write(p)
+	e.resta -= int64(n)
+	return n, err
 }
 
 // ErrSemEspaco é a recusa por cota, vista do worker. Ele não importa o pacote
@@ -135,10 +204,13 @@ func (w *Worker) processar(ctx context.Context, job *acervo.Job) {
 	// acima é que para de pegar job novo; o terminationGracePeriod do
 	// Deployment dá tempo para esta terminar. O prazo por job continua, para
 	// que uma origem lenta não prenda o worker para sempre.
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), w.prazo)
+	//
+	// O teto é lido ANTES do prazo porque é ele que diz quanto prazo o job tem.
+	teto := w.tetoDe(ctx, job.UserID, log)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), w.prazoPara(teto))
 	defer cancel()
 
-	track, err := w.ingerir(ctx, job, log)
+	track, err := w.ingerir(ctx, job, teto, log)
 	if err != nil {
 		// A mensagem vai para o banco e o bot a lê: tem de dizer o que
 		// aconteceu sem vazar o que não interessa.
@@ -203,7 +275,7 @@ func mensagemDeErro(err error) string {
 	}
 }
 
-func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger) (*acervo.Track, error) {
+func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, teto int64, log *slog.Logger) (*acervo.Track, error) {
 	// Um diretório por job, apagado no fim: o emptyDir é pequeno e dois jobs
 	// seguidos não podem herdar sobra um do outro.
 	dir, err := os.MkdirTemp(w.trabalho, "ingest-")
@@ -220,7 +292,7 @@ func (w *Worker) ingerir(ctx context.Context, job *acervo.Job, log *slog.Logger)
 	// O hash sai da mesma passada que grava o arquivo: é a identidade da faixa
 	// para a recusa de repetida, e medir depois seria ler tudo de novo.
 	resumo := sha256.New()
-	tipoDeclarado, tamanho, err := w.origem(ctx, job, io.MultiWriter(arquivo, resumo))
+	tipoDeclarado, tamanho, err := w.origem(ctx, job, teto, io.MultiWriter(arquivo, resumo))
 	if cerr := arquivo.Close(); err == nil && cerr != nil {
 		err = cerr
 	}
@@ -372,21 +444,26 @@ func (w *Worker) VarrerAbandonados(ctx context.Context) (int, error) {
 // Vale dizer o que mudou aqui: desde a skill do SoundCloud, o token de máquina
 // ALCANÇA esta fonte, pelo `finalizar`. Antes não alcançava, e o comentário
 // antigo se apoiava nisso. A garantia que continua de pé é a de cima.
-func (w *Worker) origem(ctx context.Context, job *acervo.Job, destino io.Writer) (string, int64, error) {
+//
+// `teto` é o da conta que pediu o job (`tetoDe`), não um número do processo.
+func (w *Worker) origem(ctx context.Context, job *acervo.Job, teto int64, destino io.Writer) (string, int64, error) {
 	id, ok := acervo.IDDoUpload(job.SourceURL)
 	if !ok {
+		if teto > 0 {
+			destino = &escritaComTeto{destino: destino, resta: teto, teto: teto}
+		}
 		return w.baixador.Baixar(ctx, job.SourceURL, destino)
 	}
-	tipo, n, err := w.r2.Baixar(ctx, storage.KeyUploadStage(job.UserID, id), destino, w.maxBytes)
+	tipo, n, err := w.r2.Baixar(ctx, storage.KeyUploadStage(job.UserID, id), destino, teto)
 	if err != nil {
 		return "", 0, err
 	}
 	// O teto é reconferido aqui, e não só no `finalizar` da API, porque a URL
-	// assinada do PUT segue válida por 15 minutos: o arquivo pode ter sido
-	// trocado por um maior DEPOIS da conferência. Sem isto, o emptyDir de 1Gi
-	// enche e o pod morre.
-	if w.maxBytes > 0 && n > w.maxBytes {
-		return "", 0, fmt.Errorf("%w de %d bytes", ingest.ErrGrandeDemais, w.maxBytes)
+	// assinada do PUT segue válida depois da conferência (15 minutos ou mais,
+	// ver `validadeDoPUT`): o arquivo pode ter sido trocado por um maior. Sem
+	// isto, o emptyDir de 1Gi enche e o pod morre.
+	if teto > 0 && n > teto {
+		return "", 0, fmt.Errorf("%w de %d bytes", ingest.ErrGrandeDemais, teto)
 	}
 	return tipo, n, nil
 }

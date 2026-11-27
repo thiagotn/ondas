@@ -199,7 +199,9 @@ export function ContaDetalhe() {
   const { dados, erro, carregando, recarregar } = useDados(() => api.conta(id), [id]);
   const planos = useDados(() => api.planos(), []);
   const acao = useAcao();
+  const config = useDados(() => api.config(), []);
   const [extra, setExtra] = useState('');
+  const [teto, setTeto] = useState('');
   const [confirmaEmail, setConfirmaEmail] = useState('');
 
   const conta = dados?.conta;
@@ -211,7 +213,19 @@ export function ContaDetalhe() {
 
   const fazer = (fn: () => Promise<unknown>) => void acao.rodar(fn).then(() => recarregar());
 
+  useEffect(() => {
+    if (conta) setTeto(conta.maxUploadBytes ? escreverTamanho(conta.maxUploadBytes) : '');
+  }, [conta?.id, conta?.maxUploadBytes]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const extraLido = lerTamanho(extra);
+
+  // Campo vazio é "o padrão do servidor", que a API recebe como zero. `null` é
+  // o que não deu para entender.
+  const tetoLido = teto.trim() === '' ? 0 : lerTamanho(teto);
+  const tetoMaximo = config.dados?.maxUploadTetoBytes;
+  const tetoAlto = tetoLido !== null && tetoMaximo !== undefined && tetoLido > tetoMaximo;
+  const tetoPadrao = config.dados?.maxUploadPadraoBytes;
+  const padraoEscrito = tetoPadrao === undefined ? '—' : fmtBytes(tetoPadrao);
 
   return (
     <section>
@@ -327,6 +341,43 @@ export function ContaDetalhe() {
                 </button>
                 <span className={extraLido === null ? 'erro' : 'mudo'}>
                   {extraLido === null ? t('comum.naoEntendiTamanho') : t('conta.extraExplica')}
+                </span>
+              </form>
+              <form
+                className="linha"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (tetoLido !== null && !tetoAlto) {
+                    fazer(() => api.ajustar(conta.id, { maxUploadBytes: tetoLido }));
+                  }
+                }}
+              >
+                <span className="rotulo">{t('conta.teto')}</span>
+                <input
+                  value={teto}
+                  onChange={(e) => setTeto(e.target.value)}
+                  aria-label={t('conta.tetoRotulo')}
+                  placeholder={t('conta.tetoPadrao', { padrao: padraoEscrito })}
+                  size={16}
+                />
+                <button
+                  type="submit"
+                  className="link"
+                  disabled={
+                    acao.ocupado ||
+                    tetoLido === null ||
+                    tetoAlto ||
+                    tetoLido === (conta.maxUploadBytes ?? 0)
+                  }
+                >
+                  {t('comum.salvar')}
+                </button>
+                <span className={tetoLido === null || tetoAlto ? 'erro' : 'mudo'}>
+                  {tetoLido === null
+                    ? t('comum.naoEntendiTamanho')
+                    : tetoAlto
+                      ? t('conta.tetoAcima', { max: fmtBytes(tetoMaximo ?? 0) })
+                      : t('conta.tetoExplica', { padrao: padraoEscrito })}
                 </span>
               </form>
               <div className="linha">

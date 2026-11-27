@@ -30,6 +30,8 @@ export interface Conta {
   usadoBytes: number;
   ultimoLoginEm?: string;
   ultimaEscutaEm?: string;
+  /** Teto de envio próprio da conta. Ausente = o padrão do servidor. */
+  maxUploadBytes?: number;
 }
 
 export interface Faixa {
@@ -79,6 +81,12 @@ export interface Config {
   cadastroAberto: boolean;
   /** Passar da cota recusa faixa nova? Desligada, a cota só é medida. */
   cotaBloqueia: boolean;
+  /**
+   * Só leitura: o teto de envio de quem não tem um próprio, e o maior que uma
+   * conta pode receber. Ausentes num servidor anterior ao teto por conta.
+   */
+  maxUploadPadraoBytes?: number;
+  maxUploadTetoBytes?: number;
 }
 
 export interface Convite {
@@ -113,6 +121,8 @@ export interface Ajuste {
   recebeDoBot?: boolean;
   planoId?: string;
   cotaExtraBytes?: number;
+  /** Zero volta ao padrão do servidor. */
+  maxUploadBytes?: number;
 }
 
 export class ErroDaApi extends Error {

@@ -4,6 +4,22 @@ const ROTA = '/api/acervo';
 
 /** Quanto tempo esperar a ingestão terminar antes de desistir de acompanhar. */
 const PRAZO_PADRAO_MS = 240_000;
+/** O tamanho para o qual o prazo padrão foi pensado: o teto de envio de sempre. */
+const BYTES_POR_PRAZO = 60 * 1024 * 1024;
+
+/**
+ * O prazo de acompanhamento de um arquivo, na proporção do tamanho dele.
+ *
+ * Uma conta pode ter teto de envio maior que os 60 MB de sempre, e o worker dá
+ * a ela um prazo de ingestão proporcional. Esperar só os 4 minutos de sempre
+ * faria um arquivo grande terminar em "está demorando" com a ingestão ainda no
+ * meio. Até 60 MB nada muda; acima, um prazo padrão a cada 60 MB, até o teto
+ * que já vale para os links.
+ */
+export function prazoDeAcompanhamento(bytes: number): number {
+  const blocos = Math.max(1, Math.ceil(bytes / BYTES_POR_PRAZO));
+  return Math.min(blocos * PRAZO_PADRAO_MS, PRAZO_DE_LINK_MS);
+}
 /**
  * O mesmo, para um LINK. Bem mais longo: um link de página espera o node do
  * Hermes pegá-lo, baixar do site e subir o arquivo, antes de o worker começar.
@@ -145,7 +161,10 @@ export class AcervoUploader<A extends ArquivoEnviavel> {
 
     avisar({ estado: 'processando', fracao: 1 });
     const jobID = await this.finalizar(vaga.id, arquivo, opcoes);
-    const trackId = await this.acompanhar(jobID, opcoes);
+    const trackId = await this.acompanhar(jobID, {
+      ...opcoes,
+      prazoMs: opcoes.prazoMs ?? prazoDeAcompanhamento(arquivo.size),
+    });
     avisar({ estado: 'pronto', fracao: 1, trackId });
     return trackId;
   }
@@ -287,6 +306,10 @@ export class AcervoUploader<A extends ArquivoEnviavel> {
     // em vez de mostrar erro técnico. O código segue junto para a tela poder
     // traduzir a frase — e reconhecer `envio_nao_permitido`, que não é culpa
     // do arquivo.
-    throw new AcervoError(msg, res.status === 401, codigo);
+    const params =
+      typeof json === 'object' && json && typeof (json as { params?: unknown }).params === 'object'
+        ? ((json as { params: Record<string, unknown> | null }).params ?? undefined)
+        : undefined;
+    throw new AcervoError(msg, res.status === 401, codigo, params);
   }
 }

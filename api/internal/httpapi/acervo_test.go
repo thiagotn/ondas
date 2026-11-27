@@ -500,3 +500,33 @@ func TestDonoApagaAFaixaComOIdEmQualquerForma(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, w.Code, lixo)
 	}
 }
+
+// A assinatura do áudio tem de durar a escuta inteira: o player volta à mesma
+// URL a cada seek, e com uma hora fixa um set de três parava no meio.
+func TestAssinaturaDoAudioCobreAFaixaInteira(t *testing.T) {
+	r, pool, cfg := montar(t, true) // TTL de 3600s
+	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
+	tracks := acervo.NewTracks(pool)
+	curta, longa := "55555555-5555-4555-8555-555555555555", "66666666-6666-4666-8666-666666666666"
+	for id, dur := range map[string]int{curta: 240, longa: 3 * 3600} {
+		_, err := tracks.Criar(context.Background(), acervo.Nova{
+			ID: id, UserID: eu, Title: "x", Artist: "y", Genre: "acervo", DurS: dur,
+			AudioKey: "u/eu/a/" + id + ".mp3", AudioType: "audio/mpeg", SizeBytes: 1,
+			ArtKey: "u/eu/c/" + id + ".jpg",
+		})
+		require.NoError(t, err)
+	}
+	validade := func(caminho string) string {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, comCookie(t, cfg, httptest.NewRequest(http.MethodGet, caminho, nil), eu))
+		require.Equal(t, http.StatusFound, w.Code, w.Body.String())
+		u, err := url.Parse(w.Header().Get("Location"))
+		require.NoError(t, err)
+		return u.Query().Get("X-Amz-Expires")
+	}
+
+	require.Equal(t, "3840", validade("/api/acervo/"+curta+"/audio"), "quatro minutos de faixa + uma hora de folga")
+	require.Equal(t, "14400", validade("/api/acervo/"+longa+"/audio"), "três horas de faixa + uma de folga")
+	// A capa não toca: fica no TTL, por mais longa que a faixa seja.
+	require.Equal(t, "3600", validade("/api/acervo/"+longa+"/art"))
+}

@@ -996,3 +996,85 @@ func TestRepetidaEhPorContaEContraQuemRecebe(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, dela, 1)
 }
+
+// --- teto de envio por conta (migração 0015) ---
+
+// O worker reconfere o tamanho contra o teto DA CONTA que pediu o job: quem tem
+// teto maior passa onde o padrão recusaria, e quem não tem continua no padrão.
+func TestTetoDaContaValeNoArquivoEnviado(t *testing.T) {
+	w, jobs, _, s3, dono, pool := montarComPool(t, &baixadorQueNaoDeveriaSerChamado{t: t}, 1<<10)
+	outro := dbtest.CriarUsuario(t, pool, "outro@exemplo.test")
+	ctx := context.Background()
+	w.ComTeto(func(_ context.Context, quem string) (int64, error) {
+		if quem == dono {
+			return 8 << 10, nil
+		}
+		return 1 << 10, nil
+	})
+
+	// O mesmo arquivo de 4 KiB na área de espera de cada um.
+	envio := "77777777-7777-4777-8777-777777777777"
+	erros := map[string]string{}
+	for _, quem := range []string{dono, outro} {
+		s3.semear(storage.KeyUploadStage(quem, envio), "audio/mpeg", make([]byte, 4<<10), time.Now())
+		job, _, err := jobs.Enfileirar(ctx, quem, acervo.FonteUpload(envio), "", "", acervo.Destino{})
+		require.NoError(t, err)
+		for i := 0; i < acervo.MaxTentativas; i++ {
+			_, err = w.Rodar(ctx)
+			require.NoError(t, err)
+		}
+		depois, err := jobs.PorID(ctx, quem, job.ID)
+		require.NoError(t, err)
+		require.Equal(t, "error", depois.Status, "4 KiB de zeros não são áudio para ninguém")
+		erros[quem] = depois.Error
+	}
+
+	// Para quem tem teto de 8 KiB o arquivo passou do tamanho e morreu no
+	// exame; para quem tem 1 KiB, nem chegou lá.
+	require.NotContains(t, erros[dono], "maior que o limite")
+	require.Contains(t, erros[outro], "maior que o limite de 1024 bytes")
+}
+
+// Na ingestão por URL o baixador não sabe de conta — ele tem o teto absoluto.
+// Quem corta no teto da conta é o worker, no meio da cópia.
+func TestTetoDaContaCortaODownloadPorURL(t *testing.T) {
+	arquivo := filepath.Join(t.TempDir(), "grande.bin")
+	require.NoError(t, os.WriteFile(arquivo, make([]byte, 4<<10), 0o600))
+	bx := &baixadorDeArquivo{caminho: arquivo}
+	w, jobs, _, s3, dono := montarComTeto(t, bx, 64<<10)
+	ctx := context.Background()
+	w.ComTeto(func(context.Context, string) (int64, error) { return 1 << 10, nil })
+
+	job, _, err := jobs.Enfileirar(ctx, dono, "https://exemplo.test/grande.mp3", "", "", acervo.Destino{})
+	require.NoError(t, err)
+	for i := 0; i < acervo.MaxTentativas; i++ {
+		_, err = w.Rodar(ctx)
+		require.NoError(t, err)
+	}
+
+	depois, err := jobs.PorID(ctx, dono, job.ID)
+	require.NoError(t, err)
+	require.Equal(t, "error", depois.Status)
+	require.Contains(t, depois.Error, "maior que o limite de 1024 bytes")
+	require.Empty(t, s3.chaves(), "nada foi para o bucket")
+}
+
+// Sem resposta do banco o worker fica no teto padrão — o que nunca aceita o que
+// não devia.
+func TestTetoIlegivelCaiNoPadrao(t *testing.T) {
+	w, jobs, _, s3, dono := montarComTeto(t, &baixadorQueNaoDeveriaSerChamado{t: t}, 1<<10)
+	ctx := context.Background()
+	w.ComTeto(func(context.Context, string) (int64, error) { return 1 << 30, errors.New("banco fora") })
+
+	envio := "88888888-8888-4888-8888-888888888888"
+	s3.semear(storage.KeyUploadStage(dono, envio), "audio/mpeg", make([]byte, 4<<10), time.Now())
+	job, _, err := jobs.Enfileirar(ctx, dono, acervo.FonteUpload(envio), "", "", acervo.Destino{})
+	require.NoError(t, err)
+	for i := 0; i < acervo.MaxTentativas; i++ {
+		_, err = w.Rodar(ctx)
+		require.NoError(t, err)
+	}
+	depois, err := jobs.PorID(ctx, dono, job.ID)
+	require.NoError(t, err)
+	require.Contains(t, depois.Error, "maior que o limite de 1024 bytes")
+}

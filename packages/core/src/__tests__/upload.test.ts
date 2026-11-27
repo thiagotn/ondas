@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AcervoUploader, tituloDoArquivo, type ProgressoEnvio } from '../acervo/upload.js';
+import {
+  AcervoUploader,
+  prazoDeAcompanhamento,
+  tituloDoArquivo,
+  type ProgressoEnvio,
+} from '../acervo/upload.js';
 import { AcervoError } from '../catalog/acervo.js';
 
 /** Resposta de mentira: o uploader lê `text()`, não `json()`. */
@@ -138,6 +143,33 @@ describe('AcervoUploader', () => {
     ).rejects.toThrow('o limite é 60 MB');
     // E não gastou o upload do usuário para descobrir isso.
     expect(enviarBytes).not.toHaveBeenCalled();
+  });
+
+  it('a recusa por tamanho chega com o código e o limite, para a tela escrever a frase', async () => {
+    const { impl } = fetchFalso({
+      upload: resposta(413, {
+        error: 'arquivo grande demais: o limite é 60 MB',
+        code: 'arquivo_grande_demais',
+        params: { limite: 62914560 },
+      }),
+    });
+    const erro = await new AcervoUploader({ enviarBytes: vi.fn(), fetchImpl: impl, esperar: semEspera })
+      .enviar(arquivo)
+      .catch((e: unknown) => e);
+
+    expect(erro).toBeInstanceOf(AcervoError);
+    expect((erro as AcervoError).codigo).toBe('arquivo_grande_demais');
+    expect((erro as AcervoError).params).toEqual({ limite: 62914560 });
+  });
+
+  it('o prazo de acompanhamento cresce com o arquivo, e não muda até 60 MB', () => {
+    const MB = 1024 * 1024;
+    expect(prazoDeAcompanhamento(1)).toBe(240_000);
+    expect(prazoDeAcompanhamento(60 * MB)).toBe(240_000);
+    expect(prazoDeAcompanhamento(60 * MB + 1)).toBe(480_000);
+    expect(prazoDeAcompanhamento(180 * MB)).toBe(720_000);
+    // Um arquivo de 400 MB pediria 28 minutos: para no teto, o mesmo dos links.
+    expect(prazoDeAcompanhamento(400 * MB)).toBe(900_000);
   });
 
   it('marca semSessao quando a sessão cai no meio do envio', async () => {

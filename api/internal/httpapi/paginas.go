@@ -50,7 +50,7 @@ func (s *Server) reivindicarPagina(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("página reivindicada pelo node", "job", job.ID, "tentativa", job.Attempts)
-	escreverJSON(w, http.StatusOK, paginaJSON{ID: job.ID, URL: job.PaginaURL, MaxBytes: s.maxUploadBytes()})
+	escreverJSON(w, http.StatusOK, paginaJSON{ID: job.ID, URL: job.PaginaURL, MaxBytes: s.maxUploadBytesDe(r.Context(), job.UserID)})
 }
 
 // paginaEmCurso acha o job da rota. 404 para tudo que não seja um job de página
@@ -111,7 +111,10 @@ func (s *Server) vagaDaPagina(w http.ResponseWriter, r *http.Request) {
 		escreverErro(w, http.StatusBadRequest, "informe o tamanho do arquivo")
 		return
 	}
-	if max := s.maxUploadBytes(); req.Bytes > max {
+	// O teto é o de quem PEDIU o link (`job.UserID`), como em toda a fila: é na
+	// área de espera dessa conta que o arquivo vai ser gravado.
+	max := s.maxUploadBytesDe(r.Context(), job.UserID)
+	if req.Bytes > max {
 		escreverErroCod(w, http.StatusRequestEntityTooLarge, CodArquivoGrandeDemais,
 			"arquivo grande demais: o limite é "+megabytes(max), map[string]any{"limite": max})
 		return
@@ -120,14 +123,15 @@ func (s *Server) vagaDaPagina(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := uuid.NewString()
-	url, err := s.r2.URLAssinadaPUT(r.Context(), storage.KeyUploadStage(job.UserID, id), validadeUploadPUT)
+	validade := validadeDoPUT(req.Bytes)
+	url, err := s.r2.URLAssinadaPUT(r.Context(), storage.KeyUploadStage(job.UserID, id), validade)
 	if err != nil {
 		slog.Error("assinar PUT da página", "erro", err)
 		escreverErro(w, http.StatusServiceUnavailable, "não foi possível preparar o envio")
 		return
 	}
 	escreverJSON(w, http.StatusOK, vagaJSON{
-		ID: id, URL: url, ExpiraEmS: int(validadeUploadPUT.Seconds()), MaxBytes: s.maxUploadBytes(),
+		ID: id, URL: url, ExpiraEmS: int(validade.Seconds()), MaxBytes: max,
 	})
 }
 
@@ -169,7 +173,7 @@ func (s *Server) paginaPronta(w http.ResponseWriter, r *http.Request) {
 		escreverErro(w, http.StatusBadRequest, "o arquivo chegou vazio")
 		return
 	}
-	if max := s.maxUploadBytes(); tamanho > max {
+	if max := s.maxUploadBytesDe(r.Context(), job.UserID); tamanho > max {
 		s.descartarUpload(r, key)
 		escreverErroCod(w, http.StatusRequestEntityTooLarge, CodArquivoGrandeDemais,
 			"arquivo grande demais: o limite é "+megabytes(max), map[string]any{"limite": max})

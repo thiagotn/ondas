@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -51,11 +52,29 @@ import (
 // uma faixa que já existe é dividida.
 const (
 	// Prazo do PUT assinado. Tem de cobrir o envio inteiro: 15 minutos para
-	// 60MB ainda funciona num upload de ~70kB/s.
+	// 60MB ainda funciona num upload de ~70kB/s. É o prazo MÍNIMO — ver
+	// `validadeDoPUT`.
 	validadeUploadPUT = 15 * time.Minute
+	// O tamanho para o qual os 15 minutos foram pensados.
+	bytesPorValidade int64 = 60 << 20
 	// Teto do nome do arquivo que o cliente manda como título de reserva.
 	maxNomeArquivo = 200
 )
+
+// validadeDoPUT estica o prazo do PUT assinado na proporção do arquivo.
+//
+// Desde a migração 0015 uma conta pode ter teto maior que os 60MB para os
+// quais os 15 minutos foram escolhidos. Manter o prazo fixo cobraria de um
+// arquivo de 400MB uma banda sete vezes maior que a de um de 60; a proporção
+// mantém a mesma exigência (~70kB/s) para qualquer tamanho. Arredonda para
+// cima em blocos de 60MB, então nada abaixo disso muda.
+func validadeDoPUT(bytes int64) time.Duration {
+	blocos := (bytes + bytesPorValidade - 1) / bytesPorValidade
+	if blocos < 1 {
+		blocos = 1
+	}
+	return time.Duration(blocos) * validadeUploadPUT
+}
 
 type vagaJSON struct {
 	ID string `json:"id"`
@@ -72,11 +91,12 @@ func (s *Server) pedirVagaDeUpload(w http.ResponseWriter, r *http.Request) {
 	if !lerJSON(w, r, &req) {
 		return
 	}
-	max := s.maxUploadBytes()
 	if req.Bytes <= 0 {
 		escreverErro(w, http.StatusBadRequest, "informe o tamanho do arquivo")
 		return
 	}
+	user := usuarioDe(r.Context())
+	max := s.maxUploadBytesDe(r.Context(), user.ID)
 	// Recusa ANTES do envio: o teto de verdade é conferido no finalizar, com
 	// o tamanho real do objeto, mas deixar o usuário subir 500MB para só
 	// então ouvir "não" seria cruel com o upload dele.
@@ -85,7 +105,6 @@ func (s *Server) pedirVagaDeUpload(w http.ResponseWriter, r *http.Request) {
 			"arquivo grande demais: o limite é "+megabytes(max), map[string]any{"limite": max})
 		return
 	}
-	user := usuarioDe(r.Context())
 	// COTA, com o tamanho DECLARADO e pelo mesmo motivo do teto acima: recusar
 	// antes de a pessoa subir o arquivo. Aqui ainda não se sabe o destino (ele
 	// vem no finalizar), então a conta conferida é a de quem pede — o caso de
@@ -94,7 +113,8 @@ func (s *Server) pedirVagaDeUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := uuid.NewString()
-	url, err := s.r2.URLAssinadaPUT(r.Context(), storage.KeyUploadStage(user.ID, id), validadeUploadPUT)
+	validade := validadeDoPUT(req.Bytes)
+	url, err := s.r2.URLAssinadaPUT(r.Context(), storage.KeyUploadStage(user.ID, id), validade)
 	if err != nil {
 		slog.Error("assinar PUT de upload", "erro", err)
 		escreverErro(w, http.StatusServiceUnavailable, "não foi possível preparar o envio")
@@ -103,7 +123,7 @@ func (s *Server) pedirVagaDeUpload(w http.ResponseWriter, r *http.Request) {
 	escreverJSON(w, http.StatusOK, vagaJSON{
 		ID:        id,
 		URL:       url,
-		ExpiraEmS: int(validadeUploadPUT.Seconds()),
+		ExpiraEmS: int(validade.Seconds()),
 		MaxBytes:  max,
 	})
 }
@@ -160,7 +180,7 @@ func (s *Server) finalizarUpload(w http.ResponseWriter, r *http.Request) {
 	// Aqui é o teto que vale: a URL assinada não limita bytes, então quem
 	// mentiu no passo 1 é pego agora — e o objeto sai na hora, em vez de
 	// ficar esperando a varredura de abandonados.
-	if max := s.maxUploadBytes(); tamanho > max {
+	if max := s.maxUploadBytesDe(r.Context(), user.ID); tamanho > max {
 		s.descartarUpload(r, key)
 		escreverErroCod(w, http.StatusRequestEntityTooLarge, CodArquivoGrandeDemais,
 			"arquivo grande demais: o limite é "+megabytes(max), map[string]any{"limite": max})
@@ -216,8 +236,23 @@ func cortar(texto string, max int) string {
 	return t
 }
 
-func (s *Server) maxUploadBytes() int64 {
+// maxUploadPadrao é o teto de quem não tem um próprio: o `INGEST_MAX_MB`.
+func (s *Server) maxUploadPadrao() int64 {
 	return int64(s.cfg.IngestMaxMB) << 20
+}
+
+// maxUploadBytesDe é o teto de envio da conta `userID` — a que PEDE o envio.
+//
+// Erro de leitura cai no padrão, e não no teto maior nem numa recusa: o padrão
+// é o que valia para todo mundo antes de existir teto por conta, então errar
+// para ele nunca aceita o que não devia, e só recusa quem tinha teto maior — e
+// o worker reconfere de qualquer jeito.
+func (s *Server) maxUploadBytesDe(ctx context.Context, userID string) int64 {
+	max, err := s.painel.TetoDeEnvio(ctx, userID, s.maxUploadPadrao())
+	if err != nil {
+		slog.Error("teto de envio da conta", "erro", err)
+	}
+	return max
 }
 
 func megabytes(bytes int64) string {

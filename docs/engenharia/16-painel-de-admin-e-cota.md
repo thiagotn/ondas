@@ -17,7 +17,7 @@ vezes seguidas, e ficou claro que a pergunta "quem pode" estava no lugar errado.
 
 ## Configuração é o que o operador decide; dado é o que o admin decide
 
-`INGEST_MAX_MB` é configuração: muda com a capacidade do nó, é a mesma para todo mundo, e faz
+`INGEST_MAX_MB` é configuração: muda com a capacidade do nó, é o padrão de todo mundo, e faz
 sentido viver ao lado do `sizeLimit` do volume. "A fulana pode se cadastrar" não é nada disso — é
 um fato sobre uma pessoa, que muda no dia a dia, e que eu quero mudar do celular.
 
@@ -141,6 +141,34 @@ Com a recusa valendo, faltava a saída: até a 1.13 só o admin apagava faixa, e
 dependia dele. Na 1.14 a própria pessoa apaga do acervo pela PWA (a rota `DELETE /api/acervo/{id}`
 já existia, só de sessão e só para o dono), e a mesma faixa deixa de entrar duas vezes — que era
 cota gasta à toa ([documento 10](10-ingestao-e-ssrf.md), "Faixa repetida").
+
+## O teto de envio também pode ser de uma conta
+
+`INGEST_MAX_MB` continua sendo configuração, e continua sendo o teto de todo mundo — até o admin
+escrever outro número numa conta. A migração `0015` põe `users.max_upload_bytes`, anulável: `NULL` é
+"o padrão do servidor", e é o que toda conta tem. Guardar o padrão em cada linha faria o env deixar
+de valer no dia em que alguém o mudasse.
+
+O motivo foi testar a plataforma com faixa longa (um set de três horas passa de 150 MB) sem abrir o
+mesmo teto para todas as contas. Três decisões saíram daí:
+
+- **O teto é de quem pede o envio**, não de quem vai ser dono da faixa: é na área de espera de quem
+  pediu que o arquivo é gravado. Um lugar só responde a pergunta — `admin.Painel.TetoDeEnvio` — e a
+  API (na vaga e no finalizar), as rotas do node e o worker perguntam nele.
+- **Há um teto absoluto, 900 MiB**, no código (`admin.MaxTetoDeEnvio`) e não no banco: ele vem do
+  disco temporário do worker, um emptyDir de 1 GiB onde o arquivo inteiro fica antes do ffprobe.
+  Subir o número sem subir o volume derruba o pod.
+- **Os prazos pensados para 60 MB viraram proporcionais.** A validade do PUT assinado (15 min), o
+  prazo do job no worker (`INGEST_TIMEOUT_S`) e o tempo que a PWA acompanha a ingestão crescem um
+  bloco a cada 60 MB. O prazo do job para em 12 minutos, abaixo dos 15 de `PrazoTravado` — acima
+  disso a fila daria o job como travado e a faixa seria ingerida duas vezes ao mesmo tempo. Quem
+  tem o teto padrão não vê diferença em nenhum dos três.
+
+A assinatura do GET do áudio era de uma hora fixa e passou a ser a duração da faixa mais uma hora: o
+player volta à mesma URL a cada seek, e um set de três horas parava de responder no meio.
+
+O `PATCH /api/admin/contas/{id}` usa ponteiros, em que ausente é "não mexa"; para LIMPAR o teto o
+valor é zero, que grava `NULL`.
 
 ## O que foi descartado
 

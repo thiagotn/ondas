@@ -412,6 +412,9 @@ type Conta struct {
 	// Última vez que o marcador de reprodução andou — o mais perto que há de
 	// "a pessoa usou o app".
 	UltimaEscutaEm *time.Time `json:"ultimaEscutaEm,omitempty"`
+	// Teto de envio próprio da conta (migração 0015). Ausente = o padrão do
+	// servidor.
+	MaxUploadBytes *int64 `json:"maxUploadBytes,omitempty"`
 }
 
 const selecaoConta = `
@@ -421,7 +424,8 @@ const selecaoConta = `
 	       pl.cota_bytes + u.cota_extra_bytes,
 	       coalesce(t.faixas, 0), coalesce(t.bytes, 0),
 	       u.ultimo_login_em,
-	       (SELECT pb.updated_at FROM playback pb WHERE pb.user_id = u.id)
+	       (SELECT pb.updated_at FROM playback pb WHERE pb.user_id = u.id),
+	       u.max_upload_bytes
 	  FROM users u
 	  JOIN planos pl ON pl.id = u.plano_id
 	  LEFT JOIN (SELECT user_id, count(*) AS faixas, sum(size_bytes + art_bytes) AS bytes
@@ -432,7 +436,8 @@ func lerConta(linha pgx.Row) (*Conta, error) {
 	if err := linha.Scan(&c.ID, &c.Email, &c.Name, &c.Status, &c.PodeEnviar, &c.Mensagem,
 		&c.CriadaEm, &c.DecididoEm,
 		&c.RecebeDoBot, &c.PlanoID, &c.PlanoNome, &c.CotaExtraBytes, &c.CotaBytes,
-		&c.Faixas, &c.UsadoBytes, &c.UltimoLoginEm, &c.UltimaEscutaEm); err != nil {
+		&c.Faixas, &c.UsadoBytes, &c.UltimoLoginEm, &c.UltimaEscutaEm,
+		&c.MaxUploadBytes); err != nil {
 		return nil, err
 	}
 	return &c, nil
@@ -478,16 +483,54 @@ type Ajuste struct {
 	RecebeDoBot    *bool
 	PlanoID        *string
 	CotaExtraBytes *int64
+	// Teto de envio da conta. ZERO é "volte ao padrão do servidor" (grava
+	// NULL): como `nil` já quer dizer "não mexa", limpar precisa de um valor, e
+	// zero não é teto que alguém queira.
+	MaxUploadBytes *int64
 }
 
 func (a Ajuste) Vazio() bool {
-	return a.PodeEnviar == nil && a.RecebeDoBot == nil && a.PlanoID == nil && a.CotaExtraBytes == nil
+	return a.PodeEnviar == nil && a.RecebeDoBot == nil && a.PlanoID == nil &&
+		a.CotaExtraBytes == nil && a.MaxUploadBytes == nil
+}
+
+// MaxTetoDeEnvio é o maior teto de envio que uma conta pode receber.
+//
+// O número vem do worker, não de uma vontade: ele guarda o arquivo inteiro no
+// disco temporário antes de examinar, e esse disco é um emptyDir de 1 GiB.
+// 900 MiB deixa folga para as capas e para o que o ffmpeg escreve. Subir este
+// número sem subir o volume derruba o pod no meio de uma ingestão.
+const MaxTetoDeEnvio int64 = 900 << 20
+
+// TetoDeEnvio devolve o maior arquivo que a conta pode mandar: o dela, quando o
+// admin escreveu um, ou `padrao`. É o único lugar que resolve essa pergunta — a
+// API (antes do envio e no finalizar) e o worker (ao ler o arquivo) perguntam
+// aqui, para os três nunca discordarem.
+//
+// Conta que não existe devolve o padrão: quem cuida disso é quem chamou.
+func (p *Painel) TetoDeEnvio(ctx context.Context, userID string, padrao int64) (int64, error) {
+	var proprio *int64
+	err := p.pool.QueryRow(ctx,
+		`SELECT max_upload_bytes FROM users WHERE id = $1`, userID).Scan(&proprio)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return padrao, nil
+	}
+	if err != nil {
+		return padrao, fmt.Errorf("admin: teto de envio: %w", err)
+	}
+	if proprio == nil {
+		return padrao, nil
+	}
+	return *proprio, nil
 }
 
 // AjustarConta aplica o ajuste num UPDATE só. `ErrInvalido` para plano que não
-// existe ou extra negativo.
+// existe, extra negativo, ou teto de envio negativo ou acima de `MaxTetoDeEnvio`.
 func (p *Painel) AjustarConta(ctx context.Context, id string, a Ajuste) (*Conta, error) {
 	if a.CotaExtraBytes != nil && *a.CotaExtraBytes < 0 {
+		return nil, ErrInvalido
+	}
+	if a.MaxUploadBytes != nil && (*a.MaxUploadBytes < 0 || *a.MaxUploadBytes > MaxTetoDeEnvio) {
 		return nil, ErrInvalido
 	}
 	if a.PlanoID != nil {
@@ -505,8 +548,11 @@ func (p *Painel) AjustarConta(ctx context.Context, id string, a Ajuste) (*Conta,
 		    pode_enviar      = COALESCE($2, pode_enviar),
 		    recebe_do_bot    = COALESCE($3, recebe_do_bot),
 		    plano_id         = COALESCE($4, plano_id),
-		    cota_extra_bytes = COALESCE($5, cota_extra_bytes)
-		 WHERE id = $1`, id, a.PodeEnviar, a.RecebeDoBot, a.PlanoID, a.CotaExtraBytes)
+		    cota_extra_bytes = COALESCE($5, cota_extra_bytes),
+		    max_upload_bytes = CASE WHEN $6::bigint IS NULL THEN max_upload_bytes
+		                            WHEN $6::bigint = 0 THEN NULL
+		                            ELSE $6::bigint END
+		 WHERE id = $1`, id, a.PodeEnviar, a.RecebeDoBot, a.PlanoID, a.CotaExtraBytes, a.MaxUploadBytes)
 	if err != nil {
 		return nil, fmt.Errorf("admin: ajustar conta: %w", err)
 	}

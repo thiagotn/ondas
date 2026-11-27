@@ -91,6 +91,8 @@ func (s *Server) ajustarConta(w http.ResponseWriter, r *http.Request) {
 		RecebeDoBot    *bool   `json:"recebeDoBot"`
 		PlanoID        *string `json:"planoId"`
 		CotaExtraBytes *int64  `json:"cotaExtraBytes"`
+		// Zero volta ao padrão do servidor (ver `admin.Ajuste`).
+		MaxUploadBytes *int64 `json:"maxUploadBytes"`
 	}
 	if !lerJSON(w, r, &req) {
 		return
@@ -98,6 +100,7 @@ func (s *Server) ajustarConta(w http.ResponseWriter, r *http.Request) {
 	ajuste := admin.Ajuste{
 		PodeEnviar: req.PodeEnviar, RecebeDoBot: req.RecebeDoBot,
 		PlanoID: req.PlanoID, CotaExtraBytes: req.CotaExtraBytes,
+		MaxUploadBytes: req.MaxUploadBytes,
 	}
 	if ajuste.Vazio() {
 		escreverErro(w, http.StatusBadRequest, "requisição inválida")
@@ -128,6 +131,13 @@ func (s *Server) ajustarConta(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.CotaExtraBytes != nil {
 		mudou = append(mudou, fmt.Sprintf("extra: %d bytes", *req.CotaExtraBytes))
+	}
+	if req.MaxUploadBytes != nil {
+		if *req.MaxUploadBytes == 0 {
+			mudou = append(mudou, "teto de envio: padrão")
+		} else {
+			mudou = append(mudou, fmt.Sprintf("teto de envio: %d bytes", *req.MaxUploadBytes))
+		}
 	}
 	s.registrar(r, admin.Evento{
 		Acao: "conta.ajustada", AlvoTipo: "conta", AlvoID: conta.ID, AlvoRotulo: conta.Email,
@@ -239,7 +249,13 @@ func (s *Server) configAdmin(r *http.Request) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"cadastroAberto": aberto, "cotaBloqueia": bloqueia}, nil
+	return map[string]any{
+		"cadastroAberto": aberto, "cotaBloqueia": bloqueia,
+		// Só leitura: vêm do env e do código, não do banco. Estão aqui para a
+		// tela da conta dizer quanto é "o padrão" e até onde o teto pode ir.
+		"maxUploadPadraoBytes": s.maxUploadPadrao(),
+		"maxUploadTetoBytes":   admin.MaxTetoDeEnvio,
+	}, nil
 }
 
 func (s *Server) gravarConfigAdmin(w http.ResponseWriter, r *http.Request) {

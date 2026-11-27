@@ -385,3 +385,49 @@ func TestMigracao0012MantemAsContasEAsFaixas(t *testing.T) {
 	require.EqualValues(t, 1<<30, c.CotaBytes)
 	require.EqualValues(t, 123, c.UsadoBytes)
 }
+
+// O teto de envio por conta: o admin escreve, limpa, e não passa do absoluto.
+func TestAdminAjustaOTetoDeEnvioDaConta(t *testing.T) {
+	r, pool, _ := montarComAdmin(t)
+	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
+	rota := "/api/admin/contas/" + eu
+
+	// Conta nova não tem teto próprio: a chave nem vai.
+	w := servir(r, comAdmin(httptest.NewRequest(http.MethodGet, rota, nil)))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.NotContains(t, corpoDe(t, w)["conta"], "maxUploadBytes")
+
+	w = servir(r, comAdmin(pedidoJSON(t, http.MethodPatch, rota, `{"maxUploadBytes":524288000}`)))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.EqualValues(t, 500<<20, corpoDe(t, w)["maxUploadBytes"])
+
+	// Mexer em outra coisa não mexe no teto: ausente é "não mexa".
+	w = servir(r, comAdmin(pedidoJSON(t, http.MethodPatch, rota, `{"cotaExtraBytes":10}`)))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.EqualValues(t, 500<<20, corpoDe(t, w)["maxUploadBytes"])
+
+	// Fora dos limites não entra — e o que estava continua.
+	for _, ruim := range []string{`{"maxUploadBytes":-1}`, `{"maxUploadBytes":943718401}`} {
+		w = servir(r, comAdmin(pedidoJSON(t, http.MethodPatch, rota, ruim)))
+		require.Equal(t, http.StatusBadRequest, w.Code, ruim)
+	}
+	// O absoluto em si entra.
+	w = servir(r, comAdmin(pedidoJSON(t, http.MethodPatch, rota, `{"maxUploadBytes":943718400}`)))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.EqualValues(t, admin.MaxTetoDeEnvio, corpoDe(t, w)["maxUploadBytes"])
+
+	// Zero volta ao padrão do servidor.
+	w = servir(r, comAdmin(pedidoJSON(t, http.MethodPatch, rota, `{"maxUploadBytes":0}`)))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.NotContains(t, corpoDe(t, w), "maxUploadBytes")
+
+	teto, err := admin.New(pool).TetoDeEnvio(context.Background(), eu, 60<<20)
+	require.NoError(t, err)
+	require.EqualValues(t, 60<<20, teto, "sem teto próprio, vale o padrão de quem pergunta")
+
+	// E o histórico diz o que foi mexido.
+	w = servir(r, comAdmin(httptest.NewRequest(http.MethodGet, "/api/admin/eventos", nil)))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), "teto de envio: 524288000 bytes")
+	require.Contains(t, w.Body.String(), "teto de envio: padrão")
+}

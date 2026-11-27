@@ -348,15 +348,62 @@ func TestCotaRecusaFaixaNovaEmTodoCaminho(t *testing.T) {
 func TestConfigDoAdminMudaSoOQueVeio(t *testing.T) {
 	r, _, _ := montarComAdmin(t) // cadastro aberto; cota bloqueando (o padrão da 0013)
 
+	// As duas chaves que se GRAVAM. O que a config traz só para leitura (o teto
+	// de envio padrão e o absoluto) tem o teste dele, logo abaixo.
+	chaves := func(w *httptest.ResponseRecorder) map[string]any {
+		corpo := corpoDe(t, w)
+		return map[string]any{"cadastroAberto": corpo["cadastroAberto"], "cotaBloqueia": corpo["cotaBloqueia"]}
+	}
+
 	w := servir(r, comAdmin(httptest.NewRequest(http.MethodGet, "/api/admin/config", nil)))
 	require.Equal(t, http.StatusOK, w.Code)
-	require.Equal(t, map[string]any{"cadastroAberto": true, "cotaBloqueia": true}, corpoDe(t, w))
+	require.Equal(t, map[string]any{"cadastroAberto": true, "cotaBloqueia": true}, chaves(w))
 
 	w = servir(r, comAdmin(pedidoJSON(t, http.MethodPut, "/api/admin/config", `{"cotaBloqueia":false}`)))
-	require.Equal(t, map[string]any{"cadastroAberto": true, "cotaBloqueia": false}, corpoDe(t, w))
+	require.Equal(t, map[string]any{"cadastroAberto": true, "cotaBloqueia": false}, chaves(w))
 
 	w = servir(r, comAdmin(pedidoJSON(t, http.MethodPut, "/api/admin/config", `{"cadastroAberto":false}`)))
-	require.Equal(t, map[string]any{"cadastroAberto": false, "cotaBloqueia": false}, corpoDe(t, w))
+	require.Equal(t, map[string]any{"cadastroAberto": false, "cotaBloqueia": false}, chaves(w))
+}
+
+// O painel precisa saber quanto é "o padrão" e até onde o teto por conta pode
+// ir, para a tela não oferecer um número que o servidor vai recusar.
+func TestConfigDoAdminTrazOsTetosDeEnvio(t *testing.T) {
+	r, _, cfg := montarComAdmin(t)
+	cfg.IngestMaxMB = 60
+
+	w := servir(r, comAdmin(httptest.NewRequest(http.MethodGet, "/api/admin/config", nil)))
+	require.Equal(t, http.StatusOK, w.Code)
+	corpo := corpoDe(t, w)
+	require.EqualValues(t, 60<<20, corpo["maxUploadPadraoBytes"])
+	require.EqualValues(t, admin.MaxTetoDeEnvio, corpo["maxUploadTetoBytes"])
+}
+
+// O node recebe o teto de quem PEDIU o link, não o do servidor nem o da conta
+// do bot: é ele que desiste antes de subir o que seria recusado.
+func TestNodeRecebeOTetoDaContaQuePediuOLink(t *testing.T) {
+	r, pool, cfg := montarComBucket(t, novoBucket())  // padrão de 10 MB
+	dbtest.CriarUsuario(t, pool, "dono@exemplo.test") // a conta do bot
+	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
+	tetoDaConta(t, pool, eu, 50<<20)
+
+	w := servir(r, comCookie(t, cfg, ingerirURL(t, linkDoYouTube), eu))
+	require.Equal(t, http.StatusAccepted, w.Code, w.Body.String())
+	id := jobDaResposta(t, w)
+
+	w = servir(r, comTokenDoBot(httptest.NewRequest(http.MethodPost, rotaReivindica, nil)))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.EqualValues(t, 50<<20, corpoDe(t, w)["maxBytes"])
+
+	// 20 MB: acima do padrão do servidor, dentro do teto da conta.
+	w = servir(r, comTokenDoBot(pedidoJSON(t, http.MethodPost, "/api/acervo/paginas/"+id+"/vaga", `{"bytes":20971520}`)))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.EqualValues(t, 50<<20, corpoDe(t, w)["maxBytes"])
+
+	// 60 MB: acima do teto da conta.
+	w = servir(r, comTokenDoBot(pedidoJSON(t, http.MethodPost, "/api/acervo/paginas/"+id+"/vaga", `{"bytes":62914560}`)))
+	require.Equal(t, http.StatusRequestEntityTooLarge, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), "50 MB")
 }
 
 // Os dois erros do worker que carregam número ou nome de codec saíam sem código.

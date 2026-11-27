@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -231,8 +232,15 @@ func (s *Server) listarAcervo(w http.ResponseWriter, r *http.Request) {
 // ~100MB por requisição (ADR 0007). O que passa é um 302 de ~1KB. E como a
 // assinatura é feita a cada pedido, ela nunca vence dentro do cache do
 // catálogo.
+//
+// A assinatura dura o TTL configurado OU a faixa inteira mais uma hora, o que
+// for maior. O player pede bytes ao longo da escuta (seek, retomada depois de
+// pausa), sempre na mesma URL: com o TTL de uma hora, um set de três parava de
+// responder no meio. A hora de folga é para quem pausa.
 func (s *Server) audio(w http.ResponseWriter, r *http.Request) {
-	s.redirecionarAssinado(w, r, func(t *acervo.Track) string { return t.AudioKey })
+	s.redirecionarAssinadoPor(w, r,
+		func(t *acervo.Track) string { return t.AudioKey },
+		func(t *acervo.Track) time.Duration { return time.Duration(t.DurS)*time.Second + time.Hour })
 }
 
 func (s *Server) arte(w http.ResponseWriter, r *http.Request) {
@@ -245,6 +253,13 @@ func (s *Server) arte(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) redirecionarAssinado(w http.ResponseWriter, r *http.Request, key func(*acervo.Track) string) {
+	s.redirecionarAssinadoPor(w, r, key, func(*acervo.Track) time.Duration { return 0 })
+}
+
+// redirecionarAssinadoPor é o redirect com a validade da assinatura escolhida
+// pela faixa. Zero (ou qualquer coisa abaixo do TTL) é o TTL configurado.
+func (s *Server) redirecionarAssinadoPor(w http.ResponseWriter, r *http.Request,
+	key func(*acervo.Track) string, validade func(*acervo.Track) time.Duration) {
 	user := usuarioDe(r.Context())
 	id, ok := idDaRota(w, r)
 	if !ok {
@@ -268,7 +283,7 @@ func (s *Server) redirecionarAssinado(w http.ResponseWriter, r *http.Request, ke
 		escreverErro(w, http.StatusNotFound, "faixa sem este arquivo")
 		return
 	}
-	url, err := s.r2.URLAssinada(r.Context(), k)
+	url, err := s.r2.URLAssinadaPor(r.Context(), k, validade(t))
 	if err != nil {
 		slog.Error("assinar url", "erro", err)
 		escreverErro(w, http.StatusInternalServerError, "erro ao liberar o arquivo")

@@ -411,3 +411,91 @@ func TestIngestNaoAceitaFonteDeUpload(t *testing.T) {
 		require.Contains(t, rec.Body.String(), "http(s)")
 	}
 }
+
+// --- teto de envio por conta (migração 0015) ---
+
+// tetoDaConta escreve o teto de envio de uma conta direto na linha, como o
+// painel faria pelo `PATCH /api/admin/contas/{id}`.
+func tetoDaConta(t *testing.T, pool *pgxpool.Pool, userID string, bytes int64) {
+	t.Helper()
+	_, err := pool.Exec(context.Background(),
+		`UPDATE users SET max_upload_bytes = $2 WHERE id = $1`, userID, bytes)
+	require.NoError(t, err)
+}
+
+// O teto próprio abre espaço para UMA conta. Quem não tem um continua no
+// padrão do servidor — é a promessa de que nada muda para os demais.
+func TestTetoDeEnvioProprioValeSoParaAContaQueOTem(t *testing.T) {
+	r, pool, cfg := montarComBucket(t, novoBucket()) // padrão de 10 MB
+	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
+	outra := dbtest.CriarUsuario(t, pool, "outra@exemplo.test")
+	tetoDaConta(t, pool, eu, 50<<20)
+
+	// 20 MB: acima do padrão, dentro do teto de quem tem um.
+	rec := postJSON(t, r, cfg, "/api/acervo/upload", `{"bytes":20971520}`, eu)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var vaga vagaJSON
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &vaga))
+	require.Equal(t, int64(50<<20), vaga.MaxBytes)
+
+	rec = postJSON(t, r, cfg, "/api/acervo/upload", `{"bytes":20971520}`, outra)
+	require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), "10 MB")
+
+	// E o teto próprio também é teto: 60 MB não passa de 50.
+	rec = postJSON(t, r, cfg, "/api/acervo/upload", `{"bytes":62914560}`, eu)
+	require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), "50 MB")
+}
+
+// O finalizar confere o tamanho REAL contra o teto da conta, não o do servidor.
+func TestFinalizarUsaOTetoDaConta(t *testing.T) {
+	b := novoBucket()
+	r, pool, cfg := montarComBucket(t, b) // padrão de 10 MB
+	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
+	tetoDaConta(t, pool, eu, 50<<20)
+
+	pedir := func() (string, string) {
+		rec := postJSON(t, r, cfg, "/api/acervo/upload", `{"bytes":1024}`, eu)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		var vaga vagaJSON
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &vaga))
+		return vaga.ID, "stage/" + eu + "/" + vaga.ID + ".bin"
+	}
+
+	// 30 MB reais: o padrão recusaria, o teto da conta aceita.
+	id, key := pedir()
+	b.semear(key, 30<<20)
+	rec := postJSON(t, r, cfg, "/api/acervo/upload/"+id+"/finalizar", `{}`, eu)
+	require.Equal(t, http.StatusAccepted, rec.Code, rec.Body.String())
+	require.False(t, b.foiApagado(key))
+
+	// 60 MB reais: passa do teto da conta, e sai do bucket na hora.
+	id, key = pedir()
+	b.semear(key, 60<<20)
+	rec = postJSON(t, r, cfg, "/api/acervo/upload/"+id+"/finalizar", `{}`, eu)
+	require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+	require.True(t, b.foiApagado(key))
+}
+
+// O prazo do PUT assinado cresce com o arquivo: um teto maior com os mesmos 15
+// minutos exigiria uma banda que a tela de envio nunca prometeu.
+func TestValidadeDoPUTCresceComOArquivo(t *testing.T) {
+	require.Equal(t, 15*time.Minute, validadeDoPUT(1), "arquivo pequeno fica no prazo de sempre")
+	require.Equal(t, 15*time.Minute, validadeDoPUT(60<<20), "60 MB é o tamanho do prazo de sempre")
+	require.Equal(t, 30*time.Minute, validadeDoPUT(60<<20+1))
+	require.Equal(t, 105*time.Minute, validadeDoPUT(400<<20), "400 MB são sete blocos de 60")
+
+	r, pool, cfg := montarComBucket(t, novoBucket())
+	eu := dbtest.CriarUsuario(t, pool, "eu@exemplo.test")
+	tetoDaConta(t, pool, eu, 500<<20)
+
+	rec := postJSON(t, r, cfg, "/api/acervo/upload", `{"bytes":419430400}`, eu)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var vaga vagaJSON
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &vaga))
+	require.Equal(t, int((105 * time.Minute).Seconds()), vaga.ExpiraEmS)
+	u, err := url.Parse(vaga.URL)
+	require.NoError(t, err)
+	require.Equal(t, "6300", u.Query().Get("X-Amz-Expires"), "a assinatura carrega o mesmo prazo")
+}

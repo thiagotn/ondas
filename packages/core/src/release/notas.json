@@ -1,5 +1,26 @@
 [
   {
+    "versao": "1.15.2",
+    "data": "2026-11-27",
+    "itens": [
+      {
+        "pt-BR": "a recusa de um arquivo grande demais volta a dizer qual é o limite — a frase saía com a marca `{limite}` no lugar do número",
+        "en": "the refusal of a file that is too large says what the limit is again — the sentence came out with the `{limite}` marker in place of the number",
+        "es": "el rechazo de un archivo demasiado grande vuelve a decir cuál es el límite — la frase salía con la marca `{limite}` en lugar del número"
+      },
+      {
+        "pt-BR": "faixa mais longa que uma hora deixa de travar no meio: o endereço do áudio agora vale pela faixa inteira, e avançar ou retomar depois de uma hora de escuta continua funcionando",
+        "en": "a track longer than an hour no longer stalls midway: the audio address now lasts for the whole track, and seeking or resuming after an hour of listening keeps working",
+        "es": "una pista de más de una hora deja de trabarse a la mitad: la dirección del audio ahora vale por la pista entera, y avanzar o retomar después de una hora de escucha sigue funcionando"
+      },
+      {
+        "pt-BR": "o envio de um arquivo grande espera a ingestão pelo tempo que o tamanho pede, em vez de avisar que “está demorando” aos quatro minutos",
+        "en": "uploading a large file waits for ingestion for as long as its size calls for, instead of warning that it “is taking long” at four minutes",
+        "es": "el envío de un archivo grande espera la ingesta el tiempo que su tamaño pide, en lugar de avisar que “está demorando” a los cuatro minutos"
+      }
+    ]
+  },
+  {
     "versao": "1.15.1",
     "data": "2026-11-25",
     "itens": [

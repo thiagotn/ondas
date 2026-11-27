@@ -30,6 +30,7 @@ interface ContaFalsa {
   mensagem?: string;
   faixas: number;
   usadoBytes: number;
+  maxUploadBytes?: number;
 }
 
 async function apiFalsa(page: Page) {
@@ -121,9 +122,22 @@ async function apiFalsa(page: Page) {
     if (umaConta && metodo === 'PATCH') {
       const c = contas.find((x) => x.id === umaConta[1])!;
       Object.assign(c, corpo);
+      // Como o servidor: zero é "volte ao padrão", e a chave some da conta.
+      if (corpo.maxUploadBytes === 0) delete c.maxUploadBytes;
       return json(200, completa(c));
     }
-    if (caminho === '/config' && metodo === 'GET') return json(200, { cadastroAberto, cotaBloqueia });
+    if (umaConta && metodo === 'GET') {
+      const c = contas.find((x) => x.id === umaConta[1])!;
+      return json(200, { conta: completa(c), faixas: [], ingestoes: [] });
+    }
+    if (caminho === '/config' && metodo === 'GET') {
+      return json(200, {
+        cadastroAberto,
+        cotaBloqueia,
+        maxUploadPadraoBytes: 60 * 1024 ** 2,
+        maxUploadTetoBytes: 900 * 1024 ** 2,
+      });
+    }
     if (caminho === '/config' && metodo === 'PUT') {
       // Como o servidor: só muda a chave que veio.
       if (typeof corpo.cadastroAberto === 'boolean') cadastroAberto = corpo.cadastroAberto;
@@ -213,6 +227,43 @@ test('aprovar um pedido e liberar o envio mandam o que foi pedido', async ({ pag
     caminho: '/contas/22222222-2222-4222-8222-222222222222',
     corpo: { podeEnviar: true },
   });
+});
+
+test('o teto de envio de uma conta é escrito, recusado acima do máximo, e volta ao padrão', async ({
+  page,
+}) => {
+  const { pedidos, contas } = await apiFalsa(page);
+  const id = '11111111-1111-4111-8111-111111111111';
+  await entrar(page);
+  await page.goto(`/accounts/${id}`);
+
+  const campo = page.getByLabel('Maior arquivo que esta conta pode enviar');
+  const linha = page.locator('form', { has: campo });
+  // Sem teto próprio o campo abre vazio, e diz quanto é o padrão.
+  await expect(campo).toHaveValue('');
+  await expect(campo).toHaveAttribute('placeholder', /padrão: 60,0 MB/);
+  await expect(linha.getByRole('button', { name: '[salvar]' })).toBeDisabled();
+
+  // Acima do que o servidor aceita: a tela avisa e não manda.
+  await campo.fill('2 GB');
+  await expect(linha.getByText(/o máximo é 900,0 MB/)).toBeVisible();
+  await expect(linha.getByRole('button', { name: '[salvar]' })).toBeDisabled();
+
+  await campo.fill('500 MB');
+  await linha.getByRole('button', { name: '[salvar]' }).click();
+  await expect.poll(() => contas[0]!.maxUploadBytes).toBe(500 * 1024 ** 2);
+  await expect(campo).toHaveValue('500 MB');
+
+  // Apagar o campo volta ao padrão: vai zero, e a conta fica sem teto próprio.
+  await campo.fill('');
+  await linha.getByRole('button', { name: '[salvar]' }).click();
+  await expect.poll(() => contas[0]!.maxUploadBytes).toBeUndefined();
+
+  const ajustes = pedidos.filter((p) => p.metodo === 'PATCH' && p.caminho === `/contas/${id}`);
+  expect(ajustes.map((p) => p.corpo)).toEqual([
+    { maxUploadBytes: 500 * 1024 ** 2 },
+    { maxUploadBytes: 0 },
+  ]);
 });
 
 test('abrir o cadastro vale na tela e no servidor', async ({ page }) => {

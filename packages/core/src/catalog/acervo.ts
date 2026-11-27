@@ -18,6 +18,12 @@ export class AcervoError extends Error {
     readonly semSessao = false,
     /** O código estável da recusa da API, quando ela mandou um (`erros.go`). */
     readonly codigo?: string,
+    /**
+     * Os números que acompanham a recusa (`params` no envelope da API): o
+     * limite de `arquivo_grande_demais`, o usado e a cota de `cota_excedida`.
+     * Crus, como vieram — quem mostra é que formata.
+     */
+    readonly params?: Readonly<Record<string, unknown>>,
   ) {
     super(message);
     this.name = 'AcervoError';

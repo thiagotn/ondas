@@ -9,6 +9,10 @@ a versão dele não acompanha a do app, cujas entregas estão em
 tela `/changelog` do painel, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.4.0 — 2026-11-27
+
+- cada conta pode ter um teto de envio próprio: na tela da conta, o campo `teto de envio` define o maior arquivo aceito dela (até 900 MB). Vazio, vale o padrão do servidor, como sempre foi para todas
+
 ## 1.3.0 — 2026-11-25
 
 - o painel passa a ter versão e notas próprias, separadas das do app: a versão do rodapé abre a lista do que mudou em cada entrega, no idioma do painel

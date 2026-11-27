@@ -8,6 +8,12 @@ têm versão e arquivo próprios: [`packages/admin/CHANGELOG.md`](./packages/adm
 página `/changelog` do app, nos três idiomas. Editar este arquivo à mão é trabalho que o
 próximo `pnpm release` desfaz.
 
+## 1.15.2 — 2026-11-27
+
+- a recusa de um arquivo grande demais volta a dizer qual é o limite — a frase saía com a marca `{limite}` no lugar do número
+- faixa mais longa que uma hora deixa de travar no meio: o endereço do áudio agora vale pela faixa inteira, e avançar ou retomar depois de uma hora de escuta continua funcionando
+- o envio de um arquivo grande espera a ingestão pelo tempo que o tamanho pede, em vez de avisar que “está demorando” aos quatro minutos
+
 ## 1.15.1 — 2026-11-25
 
 - as notas do painel de administração saíram desta página: ele passa a ter versão e notas próprias. Por isso a lista não tem mais a 1.13.0 nem a 1.15.0, que só falavam dele

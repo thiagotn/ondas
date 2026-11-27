@@ -148,15 +148,31 @@ func run() error {
 	}
 
 	prazo := time.Duration(cfg.IngestTimeoutS) * time.Second
+	maxPadrao := int64(cfg.IngestMaxMB) << 20
+	painel := admin.New(pool)
+	// O baixador fica com os tetos ABSOLUTOS — o maior arquivo e o maior prazo
+	// que qualquer conta pode ter. Quem aplica o teto e o prazo DA CONTA é o
+	// worker, job a job (`ComTeto`); o baixador não sabe o que é conta.
+	prazoDoBaixador := prazo
+	if prazoDoBaixador < worker.PrazoMaximo {
+		prazoDoBaixador = worker.PrazoMaximo
+	}
+	tetoDoBaixador := maxPadrao
+	if tetoDoBaixador < admin.MaxTetoDeEnvio {
+		tetoDoBaixador = admin.MaxTetoDeEnvio
+	}
 	w := worker.New(
 		acervo.NewJobs(pool),
 		acervo.NewTracks(pool),
 		r2,
-		ingest.NewBaixador(int64(cfg.IngestMaxMB)<<20, prazo),
+		ingest.NewBaixador(tetoDoBaixador, prazoDoBaixador),
 		dirTrabalho,
 		prazo,
-		int64(cfg.IngestMaxMB)<<20,
-	).ComCota(conferenciaDeCota(admin.New(pool)))
+		maxPadrao,
+	).ComCota(conferenciaDeCota(painel)).
+		ComTeto(func(ctx context.Context, userID string) (int64, error) {
+			return painel.TetoDeEnvio(ctx, userID, maxPadrao)
+		})
 
 	srv := servidorDeSaude()
 	go func() {

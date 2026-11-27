@@ -1,6 +1,7 @@
 import {
   AcervoError,
   canUpload,
+  fmtBytes,
   rotuloDoLink,
   tErro,
   tituloDoArquivo,
@@ -84,11 +85,15 @@ export const useUploads = create<Uploads>((set) => ({
         await queryClient.invalidateQueries({ queryKey: CATALOG_LOGADO_KEY });
       } catch (err) {
         const acervo = err instanceof AcervoError ? err : null;
+        // O limite vem em bytes e a frase o quer escrito ("60,0 MB"). Sem isto
+        // a recusa por tamanho mostrava a marca `{limite}` crua.
+        const limite = acervo?.params?.limite;
+        const params = typeof limite === 'number' ? { limite: fmtBytes(limite) } : undefined;
         mudar(item.id, {
           estado: 'erro',
           // O código da API traduzido quando esta versão o conhece; senão a
           // frase que veio, como sempre foi.
-          erro: tErro(acervo?.codigo) ?? (err instanceof Error ? err.message : 'falhou'),
+          erro: tErro(acervo?.codigo, params) ?? (err instanceof Error ? err.message : 'falhou'),
           ...(acervo?.semSessao ? { semSessao: true } : {}),
         });
         // O admin tirou o envio desta conta com a tela aberta: a sessão que o
